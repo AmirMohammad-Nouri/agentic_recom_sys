@@ -1,0 +1,4618 @@
+{
+ "name": "synthetic_fixture",
+ "note": "SYNTHETIC. Nutrient values approximate; prices and CO2e are rounded placeholders. Not for citation or reporting.",
+ "recipes": [
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.742,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.09,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Italian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r001",
+   "ingredients": [
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 250,
+     "name": "pasta"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 150,
+     "name": "tomato passata"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 5,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 15,
+     "name": "parmesan"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 604,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 584.5,
+    "fibre_g": 1.59,
+    "fruit_veg_nuts_pct": 35.9,
+    "protein_g": 5.27,
+    "sat_fat_g": 1.12,
+    "sodium_mg": 239.7,
+    "sugars_g": 1.95
+   },
+   "prep_minutes": 25,
+   "serving_grams": 432.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Spaghetti Pomodoro",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.189,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.47,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Italian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r002",
+   "ingredients": [
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 230,
+     "name": "pasta"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 150,
+     "name": "eggplant"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "tomato passata"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 30,
+     "name": "mozzarella"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 12,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 5,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 637,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 485.3,
+    "fibre_g": 1.92,
+    "fruit_veg_nuts_pct": 50.1,
+    "protein_g": 4.62,
+    "sat_fat_g": 1.12,
+    "sodium_mg": 180.9,
+    "sugars_g": 2.26
+   },
+   "prep_minutes": 35,
+   "serving_grams": 549.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Pasta alla Norma",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.656,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.48,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Italian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r003",
+   "ingredients": [
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 230,
+     "name": "whole wheat pasta"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 100,
+     "name": "zucchini"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "broccoli"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 10,
+     "name": "parmesan"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 5,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 544,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 458.3,
+    "fibre_g": 2.7,
+    "fruit_veg_nuts_pct": 49.3,
+    "protein_g": 4.42,
+    "sat_fat_g": 0.79,
+    "sodium_mg": 196.2,
+    "sugars_g": 1.68
+   },
+   "prep_minutes": 30,
+   "serving_grams": 497.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Whole-wheat Pasta Primavera",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 2.329,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.57,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Italian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r004",
+   "ingredients": [
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 100,
+     "name": "tortilla"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "tomato passata"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 80,
+     "name": "mozzarella"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 8,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 635,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 810.2,
+    "fibre_g": 1.65,
+    "fruit_veg_nuts_pct": 42.7,
+    "protein_g": 9.8,
+    "sat_fat_g": 3.93,
+    "sodium_mg": 339.3,
+    "sugars_g": 2.73
+   },
+   "prep_minutes": 20,
+   "serving_grams": 328.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Quick Margherita Flatbread",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.97,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.48,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Italian",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r005",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 150,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 150,
+     "name": "tomato passata"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 20,
+     "name": "olives"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 150,
+     "name": "pasta"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 5,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 696,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 472.1,
+    "fibre_g": 1.33,
+    "fruit_veg_nuts_pct": 49.4,
+    "protein_g": 9.61,
+    "sat_fat_g": 0.59,
+    "sodium_mg": 199.0,
+    "sugars_g": 2.13
+   },
+   "prep_minutes": 45,
+   "serving_grams": 617.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Chicken Cacciatore with Pasta",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk",
+    "nuts"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.695,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.36,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Italian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r006",
+   "ingredients": [
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 250,
+     "name": "pasta"
+    },
+    {
+     "allergens": [
+      "milk",
+      "nuts"
+     ],
+     "category": "sauce_spice",
+     "grams": 40,
+     "name": "pesto"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "peas"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 10,
+     "name": "parmesan"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 687,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 754.3,
+    "fibre_g": 2.46,
+    "fruit_veg_nuts_pct": 21.0,
+    "protein_g": 6.46,
+    "sat_fat_g": 1.17,
+    "sodium_mg": 220.3,
+    "sugars_g": 1.93
+   },
+   "prep_minutes": 20,
+   "serving_grams": 381.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Pesto Pasta with Peas",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "fish",
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 2.403,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 3.61,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Japanese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r007",
+   "ingredients": [
+    {
+     "allergens": [
+      "fish"
+     ],
+     "category": "fish",
+     "grams": 140,
+     "name": "salmon"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "broccoli"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 15,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 8,
+     "name": "sugar"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "carrot"
+    }
+   ],
+   "kcal_per_serving": 660,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 548.8,
+    "fibre_g": 0.83,
+    "fruit_veg_nuts_pct": 23.9,
+    "protein_g": 7.51,
+    "sat_fat_g": 0.91,
+    "sodium_mg": 191.4,
+    "sugars_g": 2.29
+   },
+   "prep_minutes": 30,
+   "serving_grams": 503.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Salmon Teriyaki Bowl",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.824,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.87,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Japanese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r008",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 140,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "cucumber"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 15,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 5,
+     "name": "sugar"
+    }
+   ],
+   "kcal_per_serving": 552,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 536.9,
+    "fibre_g": 0.29,
+    "fruit_veg_nuts_pct": 11.6,
+    "protein_g": 11.84,
+    "sat_fat_g": 0.37,
+    "sodium_mg": 216.5,
+    "sugars_g": 1.43
+   },
+   "prep_minutes": 30,
+   "serving_grams": 430.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Chicken Yakitori Rice Bowl",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.561,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.14,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Japanese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r009",
+   "ingredients": [
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 200,
+     "name": "wheat noodles"
+    },
+    {
+     "allergens": [
+      "soy"
+     ],
+     "category": "soy_product",
+     "grams": 100,
+     "name": "tofu"
+    },
+    {
+     "allergens": [
+      "soy"
+     ],
+     "category": "soy_product",
+     "grams": 25,
+     "name": "miso"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "mushroom"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "spinach"
+    }
+   ],
+   "kcal_per_serving": 424,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 417.6,
+    "fibre_g": 1.3,
+    "fruit_veg_nuts_pct": 23.5,
+    "protein_g": 5.44,
+    "sat_fat_g": 0.34,
+    "sodium_mg": 231.4,
+    "sugars_g": 1.11
+   },
+   "prep_minutes": 25,
+   "serving_grams": 425.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Miso Noodle Soup with Tofu",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "eggs",
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.105,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.81,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Japanese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r010",
+   "ingredients": [
+    {
+     "allergens": [
+      "soy"
+     ],
+     "category": "soy_product",
+     "grams": 140,
+     "name": "tofu"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "onion"
+    },
+    {
+     "allergens": [
+      "eggs"
+     ],
+     "category": "egg",
+     "grams": 50,
+     "name": "egg"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 15,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "carrot"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 5,
+     "name": "sugar"
+    }
+   ],
+   "kcal_per_serving": 528,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 424.5,
+    "fibre_g": 0.65,
+    "fruit_veg_nuts_pct": 17.3,
+    "protein_g": 4.94,
+    "sat_fat_g": 0.53,
+    "sodium_mg": 180.1,
+    "sugars_g": 1.98
+   },
+   "prep_minutes": 25,
+   "serving_grams": 520.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Vegetable Tofu Donburi",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "eggs",
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": false,
+   "co2e_kg_per_serving": null,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.54,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Korean",
+   "diet": {
+    "dairy_free": null,
+    "gluten_free": null,
+    "pescatarian": false,
+    "vegan": null,
+    "vegetarian": null
+   },
+   "id": "r011",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 80,
+     "name": "beef"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "spinach"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "carrot"
+    },
+    {
+     "allergens": [
+      "eggs"
+     ],
+     "category": "egg",
+     "grams": 55,
+     "name": "egg"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "zucchini"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 10,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": null,
+     "category": "ferment",
+     "grams": 40,
+     "name": "kimchi"
+    }
+   ],
+   "kcal_per_serving": 591,
+   "meal": "main",
+   "missing": [
+    "sustainability",
+    "allergens",
+    "animal_origin"
+   ],
+   "nutrition_per_100g": {
+    "energy_kj": 437.5,
+    "fibre_g": 0.85,
+    "fruit_veg_nuts_pct": 35.4,
+    "protein_g": 6.67,
+    "sat_fat_g": 1.34,
+    "sodium_mg": 172.5,
+    "sugars_g": 0.84
+   },
+   "prep_minutes": 35,
+   "serving_grams": 565.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Bibimbap",
+   "unknown_allergen_ingredients": [
+    "kimchi"
+   ]
+  },
+  {
+   "allergens": [
+    "soy"
+   ],
+   "allergens_complete": false,
+   "co2e_kg_per_serving": null,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.67,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Korean",
+   "diet": {
+    "dairy_free": null,
+    "gluten_free": null,
+    "pescatarian": true,
+    "vegan": null,
+    "vegetarian": null
+   },
+   "id": "r012",
+   "ingredients": [
+    {
+     "allergens": [
+      "soy"
+     ],
+     "category": "soy_product",
+     "grams": 150,
+     "name": "tofu"
+    },
+    {
+     "allergens": null,
+     "category": "ferment",
+     "grams": 120,
+     "name": "kimchi"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "mushroom"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 180,
+     "name": "white rice"
+    }
+   ],
+   "kcal_per_serving": 393,
+   "meal": "main",
+   "missing": [
+    "sustainability",
+    "allergens",
+    "animal_origin"
+   ],
+   "nutrition_per_100g": {
+    "energy_kj": 304.5,
+    "fibre_g": 0.79,
+    "fruit_veg_nuts_pct": 38.9,
+    "protein_g": 3.76,
+    "sat_fat_g": 0.24,
+    "sodium_mg": 113.7,
+    "sugars_g": 0.94
+   },
+   "prep_minutes": 30,
+   "serving_grams": 540.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Tofu Kimchi Stew",
+   "unknown_allergen_ingredients": [
+    "kimchi"
+   ]
+  },
+  {
+   "allergens": [
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.405,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.7,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Korean",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r013",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "rice noodles"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "spinach"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "carrot"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "mushroom"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 15,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 6,
+     "name": "sugar"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 8,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 385,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 393.6,
+    "fibre_g": 1.3,
+    "fruit_veg_nuts_pct": 39.1,
+    "protein_g": 1.7,
+    "sat_fat_g": 0.31,
+    "sodium_mg": 224.3,
+    "sugars_g": 2.36
+   },
+   "prep_minutes": 30,
+   "serving_grams": 409.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Glass-style Noodle Stir-fry",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.68,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.51,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Indian",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r014",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 250,
+     "name": "chickpeas"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "tomato passata"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 6,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 6,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 150,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 783,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 542.2,
+    "fibre_g": 3.98,
+    "fruit_veg_nuts_pct": 72.2,
+    "protein_g": 4.94,
+    "sat_fat_g": 0.39,
+    "sodium_mg": 135.1,
+    "sugars_g": 3.36
+   },
+   "prep_minutes": 35,
+   "serving_grams": 604.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Chana Masala with Rice",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.703,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.34,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Indian",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r015",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 250,
+     "name": "lentils"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 6,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 5,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 150,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 628,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 493.1,
+    "fibre_g": 4.37,
+    "fruit_veg_nuts_pct": 68.7,
+    "protein_g": 5.37,
+    "sat_fat_g": 0.33,
+    "sodium_mg": 148.8,
+    "sugars_g": 1.6
+   },
+   "prep_minutes": 35,
+   "serving_grams": 533.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Dal Tadka",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 2.254,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.48,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Indian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": true,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r016",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 150,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "tomato passata"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 50,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 15,
+     "name": "butter"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 6,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 180,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 692,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 514.2,
+    "fibre_g": 0.83,
+    "fruit_veg_nuts_pct": 28.4,
+    "protein_g": 9.98,
+    "sat_fat_g": 1.86,
+    "sodium_mg": 165.6,
+    "sugars_g": 1.74
+   },
+   "prep_minutes": 45,
+   "serving_grams": 563.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Butter Chicken with Rice",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.888,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.85,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Indian",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r017",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 200,
+     "name": "spinach"
+    },
+    {
+     "allergens": [
+      "soy"
+     ],
+     "category": "soy_product",
+     "grams": 130,
+     "name": "tofu"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 6,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 5,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 40,
+     "name": "coconut milk"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 150,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 463,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 331.9,
+    "fibre_g": 1.31,
+    "fruit_veg_nuts_pct": 43.9,
+    "protein_g": 3.9,
+    "sat_fat_g": 1.38,
+    "sodium_mg": 164.1,
+    "sugars_g": 0.89
+   },
+   "prep_minutes": 35,
+   "serving_grams": 583.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Saag Tofu",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.312,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.0,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Indian",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r018",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 220,
+     "name": "potato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "broccoli"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 6,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 12,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 350,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 366.4,
+    "fibre_g": 2.54,
+    "fruit_veg_nuts_pct": 95.0,
+    "protein_g": 2.23,
+    "sat_fat_g": 0.47,
+    "sodium_mg": 208.9,
+    "sugars_g": 1.42
+   },
+   "prep_minutes": 40,
+   "serving_grams": 400.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Aloo Gobi-style Potatoes",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.751,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.46,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mexican",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r019",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 180,
+     "name": "black beans"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 160,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "corn"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 50,
+     "name": "avocado"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 4,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 600,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 487.5,
+    "fibre_g": 4.38,
+    "fruit_veg_nuts_pct": 68.0,
+    "protein_g": 4.73,
+    "sat_fat_g": 0.29,
+    "sodium_mg": 79.7,
+    "sugars_g": 1.26
+   },
+   "prep_minutes": 25,
+   "serving_grams": 515.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Black Bean Burrito Bowl",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.94,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.64,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mexican",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r020",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 150,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 100,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "onion"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 100,
+     "name": "tortilla"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 40,
+     "name": "avocado"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 4,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 8,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 753,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 682.1,
+    "fibre_g": 2.23,
+    "fruit_veg_nuts_pct": 43.3,
+    "protein_g": 12.43,
+    "sat_fat_g": 1.06,
+    "sodium_mg": 156.8,
+    "sugars_g": 2.19
+   },
+   "prep_minutes": 30,
+   "serving_grams": 462.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Chicken Fajitas",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 8.254,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.54,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mexican",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r021",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 120,
+     "name": "beef"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 110,
+     "name": "tortilla"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "tomato"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 30,
+     "name": "mozzarella"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 4,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "cabbage"
+    }
+   ],
+   "kcal_per_serving": 709,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 815.2,
+    "fibre_g": 1.8,
+    "fruit_veg_nuts_pct": 27.5,
+    "protein_g": 13.72,
+    "sat_fat_g": 3.79,
+    "sodium_mg": 261.6,
+    "sugars_g": 1.8
+   },
+   "prep_minutes": 30,
+   "serving_grams": 364.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Beef Tacos",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.577,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.58,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mexican",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r022",
+   "ingredients": [
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 110,
+     "name": "tortilla"
+    },
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 100,
+     "name": "black beans"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 50,
+     "name": "mozzarella"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "corn"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 3,
+     "name": "spice mix"
+    }
+   ],
+   "kcal_per_serving": 668,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 770.4,
+    "fibre_g": 4.23,
+    "fruit_veg_nuts_pct": 55.1,
+    "protein_g": 9.36,
+    "sat_fat_g": 2.25,
+    "sodium_mg": 271.6,
+    "sugars_g": 2.54
+   },
+   "prep_minutes": 20,
+   "serving_grams": 363.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Veggie Quesadilla",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.578,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.71,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mediterranean",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r023",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 100,
+     "name": "cucumber"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 50,
+     "name": "feta"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 30,
+     "name": "olives"
+    },
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 100,
+     "name": "chickpeas"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 30,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 15,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 512,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 481.1,
+    "fibre_g": 2.47,
+    "fruit_veg_nuts_pct": 85.4,
+    "protein_g": 4.1,
+    "sat_fat_g": 2.34,
+    "sodium_mg": 211.6,
+    "sugars_g": 2.89
+   },
+   "prep_minutes": 15,
+   "serving_grams": 445.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Greek Salad with Chickpeas",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "fish",
+    "gluten"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 2.162,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 3.69,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mediterranean",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r024",
+   "ingredients": [
+    {
+     "allergens": [
+      "fish"
+     ],
+     "category": "fish",
+     "grams": 140,
+     "name": "salmon"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 180,
+     "name": "couscous"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 100,
+     "name": "zucchini"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 10,
+     "name": "lemon"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 12,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1.5,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 619,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 583.8,
+    "fibre_g": 0.86,
+    "fruit_veg_nuts_pct": 24.8,
+    "protein_g": 8.15,
+    "sat_fat_g": 1.4,
+    "sodium_mg": 153.6,
+    "sugars_g": 0.66
+   },
+   "prep_minutes": 30,
+   "serving_grams": 443.5,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Grilled Salmon with Couscous",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "eggs",
+    "gluten"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.992,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.57,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mediterranean",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r025",
+   "ingredients": [
+    {
+     "allergens": [
+      "eggs"
+     ],
+     "category": "egg",
+     "grams": 110,
+     "name": "egg"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 200,
+     "name": "tomato passata"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 4,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 60,
+     "name": "bread"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 526,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 426.1,
+    "fibre_g": 1.58,
+    "fruit_veg_nuts_pct": 64.0,
+    "protein_g": 4.67,
+    "sat_fat_g": 1.05,
+    "sodium_mg": 243.3,
+    "sugars_g": 3.49
+   },
+   "prep_minutes": 30,
+   "serving_grams": 516.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Shakshuka with Bread",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "sesame"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.483,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.44,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mediterranean",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r026",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 150,
+     "name": "chickpeas"
+    },
+    {
+     "allergens": [
+      "sesame"
+     ],
+     "category": "nut",
+     "grams": 30,
+     "name": "tahini"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "carrot"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "cucumber"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 60,
+     "name": "bread"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 10,
+     "name": "lemon"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 738,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 642.1,
+    "fibre_g": 4.16,
+    "fruit_veg_nuts_pct": 79.0,
+    "protein_g": 5.37,
+    "sat_fat_g": 0.95,
+    "sodium_mg": 163.6,
+    "sugars_g": 3.79
+   },
+   "prep_minutes": 15,
+   "serving_grams": 481.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Hummus and Veggie Plate",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.852,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.67,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mediterranean",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r027",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 150,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 180,
+     "name": "quinoa"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 100,
+     "name": "broccoli"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 10,
+     "name": "lemon"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1.5,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 589,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 545.6,
+    "fibre_g": 1.75,
+    "fruit_veg_nuts_pct": 24.4,
+    "protein_g": 12.7,
+    "sat_fat_g": 0.73,
+    "sodium_mg": 163.5,
+    "sugars_g": 0.79
+   },
+   "prep_minutes": 30,
+   "serving_grams": 451.5,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Lemon Chicken with Quinoa",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "fish",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 2.211,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 3.41,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Nordic",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r028",
+   "ingredients": [
+    {
+     "allergens": [
+      "fish"
+     ],
+     "category": "fish",
+     "grams": 140,
+     "name": "salmon"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 250,
+     "name": "potato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "broccoli"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 10,
+     "name": "butter"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1.5,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 583,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 506.3,
+    "fibre_g": 1.57,
+    "fruit_veg_nuts_pct": 68.5,
+    "protein_g": 7.34,
+    "sat_fat_g": 1.98,
+    "sodium_mg": 146.7,
+    "sugars_g": 0.7
+   },
+   "prep_minutes": 40,
+   "serving_grams": 481.5,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Baked Salmon with Potatoes",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.525,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.16,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Nordic",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r029",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 250,
+     "name": "potato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "mushroom"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "onion"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 60,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 10,
+     "name": "butter"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1.5,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 343,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 298.2,
+    "fibre_g": 1.53,
+    "fruit_veg_nuts_pct": 85.2,
+    "protein_g": 2.36,
+    "sat_fat_g": 1.35,
+    "sodium_mg": 131.4,
+    "sugars_g": 1.85
+   },
+   "prep_minutes": 35,
+   "serving_grams": 481.5,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Creamy Mushroom Potatoes",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "eggs",
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 7.121,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.32,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Nordic",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r030",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 100,
+     "name": "beef"
+    },
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 50,
+     "name": "pork"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 250,
+     "name": "potato"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 20,
+     "name": "bread"
+    },
+    {
+     "allergens": [
+      "eggs"
+     ],
+     "category": "egg",
+     "grams": 20,
+     "name": "egg"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 40,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 30,
+     "name": "onion"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 10,
+     "name": "butter"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "cabbage"
+    }
+   ],
+   "kcal_per_serving": 733,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 527.1,
+    "fibre_g": 1.38,
+    "fruit_veg_nuts_pct": 58.4,
+    "protein_g": 8.84,
+    "sat_fat_g": 2.84,
+    "sodium_mg": 181.1,
+    "sugars_g": 1.4
+   },
+   "prep_minutes": 50,
+   "serving_grams": 582.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Meatballs with Potatoes",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.624,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.27,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Nordic",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r031",
+   "ingredients": [
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 80,
+     "name": "oats"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 80,
+     "name": "berries"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 100,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 60,
+     "name": "banana"
+    }
+   ],
+   "kcal_per_serving": 462,
+   "meal": "breakfast",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 603.5,
+    "fibre_g": 3.89,
+    "fruit_veg_nuts_pct": 43.8,
+    "protein_g": 5.72,
+    "sat_fat_g": 0.98,
+    "sodium_mg": 15.3,
+    "sugars_g": 5.88
+   },
+   "prep_minutes": 10,
+   "serving_grams": 320.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Oat Porridge with Berries",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "peanuts",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.966,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.32,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Chinese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r032",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 140,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [
+      "peanuts"
+     ],
+     "category": "nut",
+     "grams": 30,
+     "name": "peanuts"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 200,
+     "name": "white rice"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 15,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 6,
+     "name": "sugar"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 5,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 813,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 699.8,
+    "fibre_g": 1.08,
+    "fruit_veg_nuts_pct": 23.7,
+    "protein_g": 12.13,
+    "sat_fat_g": 1.05,
+    "sodium_mg": 193.3,
+    "sugars_g": 2.28
+   },
+   "prep_minutes": 30,
+   "serving_grams": 486.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Kung Pao Chicken with Rice",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 7.766,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.49,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Chinese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r033",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 120,
+     "name": "beef"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 150,
+     "name": "broccoli"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 200,
+     "name": "white rice"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 15,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 5,
+     "name": "sugar"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 5,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 692,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 573.5,
+    "fibre_g": 0.98,
+    "fruit_veg_nuts_pct": 30.7,
+    "protein_g": 8.38,
+    "sat_fat_g": 1.99,
+    "sodium_mg": 191.4,
+    "sugars_g": 1.56
+   },
+   "prep_minutes": 25,
+   "serving_grams": 505.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Beef and Broccoli",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.77,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.62,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Chinese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r034",
+   "ingredients": [
+    {
+     "allergens": [
+      "soy"
+     ],
+     "category": "soy_product",
+     "grams": 200,
+     "name": "tofu"
+    },
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 60,
+     "name": "pork"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 200,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 4,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 12,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 5,
+     "name": "garlic"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 671,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 572.1,
+    "fibre_g": 0.53,
+    "fruit_veg_nuts_pct": 1.0,
+    "protein_g": 8.06,
+    "sat_fat_g": 1.28,
+    "sodium_mg": 146.1,
+    "sugars_g": 0.33
+   },
+   "prep_minutes": 30,
+   "serving_grams": 491.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Mapo Tofu",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "eggs",
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.876,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.13,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Chinese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r035",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 250,
+     "name": "white rice"
+    },
+    {
+     "allergens": [
+      "eggs"
+     ],
+     "category": "egg",
+     "grams": 60,
+     "name": "egg"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "peas"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "carrot"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 30,
+     "name": "onion"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 15,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 580,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 522.0,
+    "fibre_g": 1.2,
+    "fruit_veg_nuts_pct": 28.0,
+    "protein_g": 4.09,
+    "sat_fat_g": 0.76,
+    "sodium_mg": 204.3,
+    "sugars_g": 1.51
+   },
+   "prep_minutes": 20,
+   "serving_grams": 465.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Vegetable Fried Rice",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.173,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": null,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Thai",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r036",
+   "ingredients": [
+    {
+     "allergens": [
+      "soy"
+     ],
+     "category": "soy_product",
+     "grams": 150,
+     "name": "tofu"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 25,
+     "name": "curry paste"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 120,
+     "name": "coconut milk"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "zucchini"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 180,
+     "name": "white rice"
+    }
+   ],
+   "kcal_per_serving": 654,
+   "meal": "main",
+   "missing": [
+    "cost"
+   ],
+   "nutrition_per_100g": {
+    "energy_kj": 445.0,
+    "fibre_g": 0.69,
+    "fruit_veg_nuts_pct": 22.8,
+    "protein_g": 3.53,
+    "sat_fat_g": 3.69,
+    "sodium_mg": 107.6,
+    "sugars_g": 1.78
+   },
+   "prep_minutes": 35,
+   "serving_grams": 615.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Green Curry with Tofu",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "crustaceans",
+    "eggs",
+    "gluten",
+    "peanuts",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 3.287,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 3.62,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Thai",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r037",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "rice noodles"
+    },
+    {
+     "allergens": [
+      "crustaceans"
+     ],
+     "category": "shellfish",
+     "grams": 100,
+     "name": "shrimp"
+    },
+    {
+     "allergens": [
+      "eggs"
+     ],
+     "category": "egg",
+     "grams": 50,
+     "name": "egg"
+    },
+    {
+     "allergens": [
+      "peanuts"
+     ],
+     "category": "nut",
+     "grams": 25,
+     "name": "peanuts"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 8,
+     "name": "sugar"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 12,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 10,
+     "name": "lemon"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 678,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 652.6,
+    "fibre_g": 1.03,
+    "fruit_veg_nuts_pct": 8.0,
+    "protein_g": 9.16,
+    "sat_fat_g": 1.14,
+    "sodium_mg": 196.5,
+    "sugars_g": 2.22
+   },
+   "prep_minutes": 30,
+   "serving_grams": 435.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Shrimp Pad Thai",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 2.01,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.19,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Thai",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r038",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 150,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "bell pepper"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 6,
+     "name": "garlic"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 12,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 5,
+     "name": "sugar"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    }
+   ],
+   "kcal_per_serving": 675,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 610.1,
+    "fibre_g": 0.51,
+    "fruit_veg_nuts_pct": 14.3,
+    "protein_g": 11.75,
+    "sat_fat_g": 0.67,
+    "sodium_mg": 167.6,
+    "sugars_g": 1.7
+   },
+   "prep_minutes": 25,
+   "serving_grams": 463.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Thai Basil Chicken",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.604,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.61,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Persian",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r039",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 220,
+     "name": "lentils"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "spinach"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 150,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 586,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 444.3,
+    "fibre_g": 3.89,
+    "fruit_veg_nuts_pct": 70.7,
+    "protein_g": 5.05,
+    "sat_fat_g": 0.31,
+    "sodium_mg": 159.1,
+    "sugars_g": 1.21
+   },
+   "prep_minutes": 60,
+   "serving_grams": 552.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Persian Herb and Lentil Stew",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 2.3,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.32,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Persian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": true,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r040",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 160,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "onion"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 40,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 693,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 525.4,
+    "fibre_g": 0.46,
+    "fruit_veg_nuts_pct": 21.7,
+    "protein_g": 10.53,
+    "sat_fat_g": 0.73,
+    "sodium_mg": 166.7,
+    "sugars_g": 1.06
+   },
+   "prep_minutes": 45,
+   "serving_grams": 552.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Chicken Joojeh with Rice",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "eggs",
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.041,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.63,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Persian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r041",
+   "ingredients": [
+    {
+     "allergens": [
+      "eggs"
+     ],
+     "category": "egg",
+     "grams": 150,
+     "name": "egg"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 100,
+     "name": "spinach"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 30,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 12,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 60,
+     "name": "bread"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 40,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 539,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 572.4,
+    "fibre_g": 1.1,
+    "fruit_veg_nuts_pct": 33.0,
+    "protein_g": 7.34,
+    "sat_fat_g": 1.94,
+    "sodium_mg": 350.7,
+    "sugars_g": 1.81
+   },
+   "prep_minutes": 30,
+   "serving_grams": 394.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Kuku Sabzi Herb Frittata",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 5.603,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 3.15,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Middle Eastern",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r042",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 130,
+     "name": "lamb"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 180,
+     "name": "couscous"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 80,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "cucumber"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 40,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 4,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1.5,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 597,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 503.9,
+    "fibre_g": 0.96,
+    "fruit_veg_nuts_pct": 28.3,
+    "protein_g": 8.55,
+    "sat_fat_g": 2.44,
+    "sodium_mg": 143.6,
+    "sugars_g": 1.07
+   },
+   "prep_minutes": 35,
+   "serving_grams": 495.5,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Lamb Kofta with Couscous",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "sesame"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.586,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.52,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Middle Eastern",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r043",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 150,
+     "name": "chickpeas"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 100,
+     "name": "tortilla"
+    },
+    {
+     "allergens": [
+      "sesame"
+     ],
+     "category": "nut",
+     "grams": 20,
+     "name": "tahini"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "cucumber"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "cabbage"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 15,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 3,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1.5,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 839,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 798.6,
+    "fibre_g": 4.43,
+    "fruit_veg_nuts_pct": 68.3,
+    "protein_g": 6.03,
+    "sat_fat_g": 1.23,
+    "sodium_mg": 279.7,
+    "sugars_g": 3.2
+   },
+   "prep_minutes": 30,
+   "serving_grams": 439.5,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Falafel Wrap",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 8.658,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.43,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "American",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r044",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 130,
+     "name": "beef"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 90,
+     "name": "bread"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 150,
+     "name": "potato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "tomato"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 20,
+     "name": "mozzarella"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 15,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 829,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 776.2,
+    "fibre_g": 1.39,
+    "fruit_veg_nuts_pct": 42.5,
+    "protein_g": 11.38,
+    "sat_fat_g": 3.24,
+    "sodium_mg": 324.7,
+    "sugars_g": 1.55
+   },
+   "prep_minutes": 30,
+   "serving_grams": 447.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Beef Burger with Potato Wedges",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.645,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.24,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "American",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r045",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 120,
+     "name": "black beans"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 30,
+     "name": "oats"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 90,
+     "name": "bread"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 40,
+     "name": "avocado"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 150,
+     "name": "potato"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 12,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 806,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 697.1,
+    "fibre_g": 4.65,
+    "fruit_veg_nuts_pct": 72.3,
+    "protein_g": 5.79,
+    "sat_fat_g": 0.76,
+    "sodium_mg": 254.7,
+    "sugars_g": 1.59
+   },
+   "prep_minutes": 35,
+   "serving_grams": 484.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Black Bean Veggie Burger",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "eggs",
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 2.04,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.01,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "American",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": false,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r046",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "meat",
+     "grams": 130,
+     "name": "chicken breast"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 100,
+     "name": "cabbage"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 20,
+     "name": "parmesan"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 30,
+     "name": "bread"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 15,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [
+      "eggs"
+     ],
+     "category": "egg",
+     "grams": 20,
+     "name": "egg"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 566,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 749.9,
+    "fibre_g": 1.05,
+    "fruit_veg_nuts_pct": 31.6,
+    "protein_g": 17.22,
+    "sat_fat_g": 2.55,
+    "sodium_mg": 311.3,
+    "sugars_g": 1.57
+   },
+   "prep_minutes": 20,
+   "serving_grams": 316.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Chicken Caesar-style Salad",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "fish",
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.918,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 2.02,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "American",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r047",
+   "ingredients": [
+    {
+     "allergens": [
+      "fish"
+     ],
+     "category": "fish",
+     "grams": 100,
+     "name": "tuna"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 100,
+     "name": "bread"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "cucumber"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "tomato"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 20,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 0.5,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 406,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 565.8,
+    "fibre_g": 1.12,
+    "fruit_veg_nuts_pct": 26.6,
+    "protein_g": 12.09,
+    "sat_fat_g": 0.45,
+    "sodium_mg": 314.1,
+    "sugars_g": 2.55
+   },
+   "prep_minutes": 10,
+   "serving_grams": 300.5,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Tuna Sandwich",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.485,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.43,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "American",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r048",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 300,
+     "name": "sweet potato"
+    },
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 100,
+     "name": "black beans"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 40,
+     "name": "avocado"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 40,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "corn"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 3,
+     "name": "spice mix"
+    }
+   ],
+   "kcal_per_serving": 522,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 417.4,
+    "fibre_g": 4.19,
+    "fruit_veg_nuts_pct": 91.8,
+    "protein_g": 3.36,
+    "sat_fat_g": 0.37,
+    "sodium_mg": 37.5,
+    "sugars_g": 3.38
+   },
+   "prep_minutes": 40,
+   "serving_grams": 523.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Loaded Sweet Potato",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.774,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.42,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "American",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r049",
+   "ingredients": [
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 200,
+     "name": "yogurt"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 80,
+     "name": "berries"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 40,
+     "name": "oats"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 60,
+     "name": "banana"
+    }
+   ],
+   "kcal_per_serving": 367,
+   "meal": "breakfast",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 404.1,
+    "fibre_g": 2.16,
+    "fruit_veg_nuts_pct": 36.8,
+    "protein_g": 3.96,
+    "sat_fat_g": 1.25,
+    "sodium_mg": 24.8,
+    "sugars_g": 6.08
+   },
+   "prep_minutes": 5,
+   "serving_grams": 380.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Yogurt Berry Parfait",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.486,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.03,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mediterranean",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r050",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 200,
+     "name": "lentils"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 70,
+     "name": "carrot"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "onion"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "tomato"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 10,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 3,
+     "name": "spice mix"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    },
+    {
+     "allergens": [
+      "gluten"
+     ],
+     "category": "grain",
+     "grams": 40,
+     "name": "bread"
+    }
+   ],
+   "kcal_per_serving": 495,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 476.0,
+    "fibre_g": 4.86,
+    "fruit_veg_nuts_pct": 87.4,
+    "protein_g": 5.44,
+    "sat_fat_g": 0.43,
+    "sodium_mg": 237.3,
+    "sugars_g": 2.91
+   },
+   "prep_minutes": 40,
+   "serving_grams": 435.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Hearty Lentil Soup",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "fish"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.148,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 3.38,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Nordic",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": false
+   },
+   "id": "r051",
+   "ingredients": [
+    {
+     "allergens": [
+      "fish"
+     ],
+     "category": "fish",
+     "grams": 150,
+     "name": "cod"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 200,
+     "name": "potato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 100,
+     "name": "zucchini"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 60,
+     "name": "carrot"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 12,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 10,
+     "name": "lemon"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1.5,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 428,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 335.3,
+    "fibre_g": 1.38,
+    "fruit_veg_nuts_pct": 69.4,
+    "protein_g": 6.16,
+    "sat_fat_g": 0.37,
+    "sodium_mg": 135.7,
+    "sugars_g": 1.34
+   },
+   "prep_minutes": 40,
+   "serving_grams": 533.5,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Cod with Roasted Vegetables",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "milk"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 1.302,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.77,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Italian",
+   "diet": {
+    "dairy_free": false,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": false,
+    "vegetarian": true
+   },
+   "id": "r052",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 220,
+     "name": "white rice"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "mushroom"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "onion"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 25,
+     "name": "parmesan"
+    },
+    {
+     "allergens": [
+      "milk"
+     ],
+     "category": "dairy",
+     "grams": 12,
+     "name": "butter"
+    },
+    {
+     "allergens": [],
+     "category": "oil_fat",
+     "grams": 8,
+     "name": "olive oil"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 2,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 593,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 581.0,
+    "fibre_g": 0.65,
+    "fruit_veg_nuts_pct": 37.5,
+    "protein_g": 4.62,
+    "sat_fat_g": 2.87,
+    "sodium_mg": 273.7,
+    "sugars_g": 1.06
+   },
+   "prep_minutes": 40,
+   "serving_grams": 427.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Mushroom Risotto",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "sesame"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.48,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.95,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Mediterranean",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": true,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r053",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 150,
+     "name": "quinoa"
+    },
+    {
+     "allergens": [],
+     "category": "legume",
+     "grams": 100,
+     "name": "chickpeas"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 120,
+     "name": "sweet potato"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "spinach"
+    },
+    {
+     "allergens": [],
+     "category": "fruit",
+     "grams": 40,
+     "name": "avocado"
+    },
+    {
+     "allergens": [
+      "sesame"
+     ],
+     "category": "nut",
+     "grams": 15,
+     "name": "tahini"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 1,
+     "name": "salt"
+    }
+   ],
+   "kcal_per_serving": 612,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 537.9,
+    "fibre_g": 4.32,
+    "fruit_veg_nuts_pct": 65.1,
+    "protein_g": 4.67,
+    "sat_fat_g": 0.54,
+    "sodium_mg": 111.5,
+    "sugars_g": 2.47
+   },
+   "prep_minutes": 35,
+   "serving_grams": 476.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Vegan Buddha Bowl",
+   "unknown_allergen_ingredients": []
+  },
+  {
+   "allergens": [
+    "gluten",
+    "peanuts",
+    "soy"
+   ],
+   "allergens_complete": true,
+   "co2e_kg_per_serving": 0.349,
+   "co2e_provenance": "fixture_placeholder",
+   "cost_basis": "per serving, ingredient price x grams",
+   "cost_eur_per_serving": 1.22,
+   "cost_provenance": "fixture_placeholder",
+   "cuisine": "Chinese",
+   "diet": {
+    "dairy_free": true,
+    "gluten_free": false,
+    "pescatarian": true,
+    "vegan": true,
+    "vegetarian": true
+   },
+   "id": "r054",
+   "ingredients": [
+    {
+     "allergens": [],
+     "category": "grain",
+     "grams": 200,
+     "name": "rice noodles"
+    },
+    {
+     "allergens": [
+      "peanuts"
+     ],
+     "category": "nut",
+     "grams": 25,
+     "name": "peanuts"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "carrot"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 50,
+     "name": "cucumber"
+    },
+    {
+     "allergens": [],
+     "category": "vegetable",
+     "grams": 40,
+     "name": "cabbage"
+    },
+    {
+     "allergens": [
+      "soy",
+      "gluten"
+     ],
+     "category": "sauce_spice",
+     "grams": 12,
+     "name": "soy sauce"
+    },
+    {
+     "allergens": [],
+     "category": "sauce_spice",
+     "grams": 5,
+     "name": "sugar"
+    }
+   ],
+   "kcal_per_serving": 421,
+   "meal": "main",
+   "missing": [],
+   "nutrition_per_100g": {
+    "energy_kj": 461.6,
+    "fibre_g": 1.75,
+    "fruit_veg_nuts_pct": 43.2,
+    "protein_g": 2.77,
+    "sat_fat_g": 0.49,
+    "sodium_mg": 187.0,
+    "sugars_g": 2.8
+   },
+   "prep_minutes": 20,
+   "serving_grams": 382.0,
+   "servings": 1,
+   "source": "synthetic_fixture_v1",
+   "title": "Peanut Noodle Salad",
+   "unknown_allergen_ingredients": []
+  }
+ ]
+}
