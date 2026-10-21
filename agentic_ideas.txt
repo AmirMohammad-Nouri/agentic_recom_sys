@@ -1,0 +1,63 @@
+PROFESSIONAL SUMMARY: AGENTIC AI FOR TRANSPARENT ADAPTIVE RECOMMENDER SYSTEMS
+ 
+User interaction
+       |
+       v
+Evidence collection
+       |
+       v
+Memory
+       |
+       v
+Preference model
+       |
+       v
+Supervisor Agent
+       |
+       +--> Sufficient confidence?
+       |          |
+       |         YES
+       |          |
+       |          v
+       |      Recommendation
+       |
+       +--> Conflict detected?
+       |          |
+       |         YES
+       |          |
+       |          v
+       |    Search history
+       |          |
+       |          v
+       |    Enough evidence?
+       |       /       
+       |     YES        NO
+       |      |          |
+       |      v          v
+       |   Update      Ask user
+       |                  |
+       |                  v
+       |             New evidence
+       |
+       +--> Counterfactual analysis
+       |
+       +--> Explain decision
+       |
+       v
+Recommendation
+       |
+       v
+User response
+       |
+       v
+New evidence
+       |
+       +-------------> Memory / Preference Model
+ 
+The fundamental idea is therefore not "an LLM recommends food."
+ 
+It is:
+ 
+"An agent continuously manages the learning process between the user and the recommender."
+ 
+The recommender learns what the user likes, the Supervisor Agent decides when the current understanding is insufficient or contradictory, memory provides the evidence needed to investigate, targeted questions resolve important uncertainty, and the transparent ranking engine converts the resulting preference model into recommendations.

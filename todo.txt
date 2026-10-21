@@ -1,0 +1,12 @@
+1) read the project it still need Profile and goal versioning.
+The SQLite event log.
+The supervisor agent.
+The server and web UI.
+Tests and eval scripts.
+Docs
+2) i want this project be transparent. consider claude it printed under a cursor section what it is thinking and based on what evidence it is recommending modifications and new logics. i want have such this feature in this project too.
+3) i want to add RAG in this project. so some contexts such as ingredients and all information that can be useful for the project could be stored in it.
+4) also i want to have knowledge graph with node4j to store different actions, relationships, decisions, and all things important in a structured way that whenever supervisor wanted to extract information based on different search criteria such as time, person, place, decision, food, ingredients, .... . 
+5) due to the fact that i am using laptop with 3050 4GB gpu the nest model that i used was Qwen3.7M parameters. so maybe we can use it in this version as supervisor. what do you think?
+6) in following files are some more good information for your context : Controllable multi criteria food recommendation.docx, agentic_ideas.txt, knoledge_graph_ideas.txt
+7) keep in mind that give me full readme after. including decision system, all concepts, ... and all things that it is important.

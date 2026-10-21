@@ -1,0 +1,166 @@
+Knowledge Graph as a Grounding and Reasoning Layer
+A central component of the proposed architecture is a food-domain Knowledge Graph (KG). The Knowledge Graph represents relationships between foods, ingredients, cuisines, nutritional properties, allergens, sustainability characteristics, restaurants, prices, and other relevant entities.
+ 
+The purpose of the Knowledge Graph is not to replace the preference model. Instead, it provides structured domain knowledge that the Supervisor Agent and recommendation engine can use to reason about recommendations and preference conflicts.
+ 
+For example, the Knowledge Graph could contain relationships such as:
+- Food → contains → Ingredient
+- Food → belongs to → Cuisine
+- Food → has → Nutritional Property
+- Food → has → Sustainability Characteristic
+- Ingredient → has → Allergen
+- Food → similar to → Food
+- Restaurant → serves → Food
+- Food → has → Price Category
+User-related information can also be connected to the graph through evidence relationships:
+- User → prefers → Cuisine
+- User → likes → Ingredient
+- User → dislikes → Ingredient
+- User → values → Sustainability
+- User → interacted_with → Food
+- Preference → supported_by → Interaction
+- Preference → supported_by → Questionnaire Response
+This allows the system to distinguish between what the user prefers, what the system knows about the food domain, and what evidence supports a particular preference assumption.
+Knowledge Graph and Preference Conflict Detection
+The Knowledge Graph becomes particularly useful when the agent encounters conflicting evidence.
+ 
+For example, a user may report that sustainability is very important while repeatedly selecting salmon-based meals. Instead of simply interpreting this behavior as a change in preference, the system can combine three sources of information:
+1. Preference model
+   - Sustainability importance = high
+   - Health importance = high
+   - Taste preference for seafood = high
+2. Interaction history
+   - User repeatedly selects salmon
+   - User rejects several vegetarian alternatives
+   - Some selections occur during situations where price is important
+3. Knowledge Graph
+   - Salmon is associated with specific nutritional properties
+   - Salmon belongs to particular cuisines
+   - Sustainability characteristics can vary by source
+   - Alternative foods may provide similar nutritional properties
+The Supervisor Agent can therefore formulate a more informed hypothesis:
+The user may value sustainability, but health, taste, or price may dominate sustainability under particular contextual conditions.
+ 
+The agent can then retrieve additional evidence or ask a targeted question rather than silently modifying the user's preference.
+Provenance-Aware Preference Model
+The Knowledge Graph can also support preference provenance.
+ 
+Instead of storing only:
+sustainability = 0.78
+ 
+ 
+the system can represent:
+Preference:
+    sustainability
+    estimated_value: 0.78
+    confidence: 0.61
+    source:
+        questionnaire_response_12
+        interaction_143
+        interaction_156
+        feedback_31
+    context:
+        general
+    last_updated:
+        ...
+ 
+ 
+This makes the preference model inspectable and user-correctable.
+ 
+The user could therefore ask:
+"Why do you think sustainability is important to me?"
+ 
+The system could answer based on actual evidence:
+"You rated sustainability highly during onboarding, and you have also selected several meals with high sustainability scores. However, your recent choices show some conflicting behavior, so my confidence in this preference is moderate."
+ 
+This is fundamentally different from asking an LLM to generate a plausible explanation after a recommendation has already been produced.
+Knowledge-Grounded Recommendation
+The final recommendation should remain primarily deterministic and auditable.
+ 
+The Supervisor Agent can retrieve information from the Knowledge Graph and user memory, but the Recommendation Engine performs the actual candidate filtering and ranking.
+ 
+Hard constraints are applied first, such as:
+- Allergies
+- Strict dietary restrictions
+- Explicit exclusions
+- Unavailable items
+- Other safety or feasibility constraints
+The remaining candidates can then be ranked according to soft preferences:
+FinalScore =
+    w_health * HealthScore
+  + w_taste * TasteScore
+  + w_sustainability * SustainabilityScore
+  + w_price * PriceScore
+  + w_diversity * DiversityScore
+  + w_convenience * ConvenienceScore
+  + w_waste * WasteScore
+  + w_novelty * NoveltyScore
+  + w_context * ContextScore
+ 
+ 
+The Knowledge Graph provides structured information required to calculate or justify several of these dimensions.
+ 
+The resulting architecture therefore separates responsibilities:
+- Knowledge Graph → represents food-domain knowledge and relationships.
+- Interaction Memory → represents what the user actually did.
+- Preference Model → represents the system's current beliefs about what the user values.
+- Supervisor Agent → decides what evidence or action is needed.
+- Recommendation Engine → performs constraint filtering and multi-objective ranking.
+- User → provides feedback and can correct the model.
+Transparency and User Control
+The combination of the Supervisor Agent and Knowledge Graph enables a broader concept of Recommendation Decision Transparency.
+ 
+The system should provide transparency at several levels:
+- WHY: Why was this food recommended?
+- WHAT: Which preferences, interactions, and food characteristics contributed to the recommendation?
+- WHERE: Where did the system's belief about the user's preference come from?
+- UNCERTAINTY: How confident is the system about that preference?
+- WHAT IF: How would the recommendation change if the user changed a particular preference?
+- CONTROL: Can the user correct the preference model and immediately observe the effect?
+For example:
+"This meal ranked highly because you currently prioritize health and Mediterranean cuisine. Your preference for sustainability also contributed, although the system has moderate confidence in this preference because some recent choices conflict with it."
+ 
+The Knowledge Graph can provide the factual relationships behind this explanation, while the preference model provides the user-specific reasoning.
+Research Contribution
+The research contribution would therefore not simply be "an LLM-based food recommender" or "a food recommender with a Knowledge Graph."
+ 
+The stronger research proposition is:
+An agentic, knowledge-grounded preference-learning framework in which a Supervisor Agent monitors uncertainty and conflicts in an evolving user preference model, retrieves relevant behavioral evidence and domain knowledge, selectively asks informative questions, and performs evidence-grounded preference updates while exposing the provenance and consequences of those updates to the user.
+ 
+This makes the Knowledge Graph an important part of the research methodology because it enables the agent to reason over structured food-domain relationships rather than relying exclusively on language-model knowledge.
+ 
+The main research question could therefore be:
+How can a knowledge-grounded Supervisor Agent learn and update an evolving user's interpretable preferences from heterogeneous behavioral evidence while maintaining transparency, uncertainty awareness, and user control?
+ 
+A key experimental comparison could evaluate:
+- Traditional recommender
+- Adaptive recommender
+- Agentic recommender
+- Agentic + Knowledge Graph
+- Agentic + Knowledge Graph + transparent preference model
+This would allow the study to determine whether the Knowledge Graph and transparency-aware agent actually improve preference estimation, recommendation quality, user understanding, preference correction, and interaction efficiency, rather than treating the technologies themselves as the contribution.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+This might also interest you.
+ 
+ 
+Reuters Events
+ 
+ 
+Lead Agentic AI Safely
+ 
+Discover how at our Dec 1 Frankfurt event.
+ 
+ 
+ 
+Ad
+Ad options
