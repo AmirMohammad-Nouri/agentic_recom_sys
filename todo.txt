@@ -7,6 +7,9 @@ Docs
 2) i want this project be transparent. consider claude it printed under a cursor section what it is thinking and based on what evidence it is recommending modifications and new logics. i want have such this feature in this project too.
 3) i want to add RAG in this project. so some contexts such as ingredients and all information that can be useful for the project could be stored in it.
 4) also i want to have knowledge graph with node4j to store different actions, relationships, decisions, and all things important in a structured way that whenever supervisor wanted to extract information based on different search criteria such as time, person, place, decision, food, ingredients, .... . 
-5) due to the fact that i am using laptop with 3050 4GB gpu the nest model that i used was Qwen3.7M parameters. so maybe we can use it in this version as supervisor. what do you think?
+5) due to the fact that i am using laptop with 3050 4GB gpu the nest model that i used was Qwen3.5M(based on lama) parameters. so maybe we can use it in this version as supervisor. what do you think?
 6) in following files are some more good information for your context : Controllable multi criteria food recommendation.docx, agentic_ideas.txt, knoledge_graph_ideas.txt
 7) keep in mind that give me full readme after. including decision system, all concepts, ... and all things that it is important.
+8) i want to have greaat UI, having best user experience like professional app but not regular UI which is developed with AI. i dont want it be so exaggerate and it should be normal colors and best features. 
+9) and i was interested in this feature by unsloth :"https://unsloth.ai/docs/basics/train-your-own-decision-model-with-unsloth".can i use it to train my own decision model based on food datasets? i found datasets such as "https://fdc.nal.usda.gov/download-datasets". is this useful?
+and also give me info about how should i provide data for training this model.
