@@ -848,7 +848,7 @@
    "co2e_kg_per_serving": null,
    "co2e_provenance": "fixture_placeholder",
    "cost_basis": "per serving, ingredient price x grams",
-   "cost_eur_per_serving": 2.54,
+   "cost_eur_per_serving": 2.53,
    "cost_provenance": "fixture_placeholder",
    "cuisine": "Korean",
    "diet": {
@@ -2809,7 +2809,7 @@
     "soy"
    ],
    "allergens_complete": true,
-   "co2e_kg_per_serving": 1.77,
+   "co2e_kg_per_serving": 1.771,
    "co2e_provenance": "fixture_placeholder",
    "cost_basis": "per serving, ingredient price x grams",
    "cost_eur_per_serving": 2.62,
