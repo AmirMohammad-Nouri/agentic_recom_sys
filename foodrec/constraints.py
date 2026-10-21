@@ -129,3 +129,62 @@ def _without(declared, code):
     elif code == "cost_limit":
         d["max_cost_eur"] = None
     return d
+
+
+# ---- request-scoped filters --------------------------------------------------------
+# Temporary filters that come from ONE request (e.g. the assistant parsed "something
+# high in protein under 20 minutes"). They narrow eligibility for that request only, are
+# shown to the user as applied filters, are never saved into the profile and never change
+# the food weights. A recipe whose value is unknown fails the filter (fail closed).
+def per_serving(recipe, nutrient):
+    n = (recipe.get("nutrition_per_100g") or {}).get(nutrient)
+    g = recipe.get("serving_grams")
+    return None if n is None or g is None else n * g / 100.0
+
+
+REQUEST_FIELDS = {
+    "protein_g": ("Protein per serving (g)", lambda r: per_serving(r, "protein_g")),
+    "sugars_g": ("Sugars per serving (g)", lambda r: per_serving(r, "sugars_g")),
+    "fibre_g": ("Fibre per serving (g)", lambda r: per_serving(r, "fibre_g")),
+    "kcal": ("Energy per serving (kcal)", lambda r: r.get("kcal_per_serving")),
+    "prep_minutes": ("Preparation time (min)", lambda r: r.get("prep_minutes")),
+    "cost_eur": ("Cost per serving (EUR)", lambda r: r.get("cost_eur_per_serving")),
+    "cuisine": ("Cuisine", lambda r: r.get("cuisine")),
+    "meal": ("Meal type", lambda r: r.get("meal")),
+    "ingredient": ("Ingredient", lambda r: {i["name"].lower() for i in r["ingredients"]}),
+}
+REQUEST_OPS = ("min", "max", "is", "has", "lacks")
+
+
+def filter_label(f):
+    label = REQUEST_FIELDS[f["field"]][0]
+    sym = {"min": ">=", "max": "<=", "is": "=", "has": "includes", "lacks": "excludes"}[f["op"]]
+    return f"{label} {sym} {f['value']}"
+
+
+def validate_request_filters(filters):
+    out = []
+    for f in filters or []:
+        if f.get("field") not in REQUEST_FIELDS or f.get("op") not in REQUEST_OPS:
+            raise ValueError(f"unsupported request filter {f}")
+        out.append({"field": f["field"], "op": f["op"], "value": f["value"],
+                    "label": filter_label(f), "source": f.get("source", "request")})
+    return out
+
+
+def request_filter_fails(recipe, f):
+    v = REQUEST_FIELDS[f["field"]][1](recipe)
+    if v is None:
+        return "value unknown"
+    op, x = f["op"], f["value"]
+    if op == "min" and not v >= float(x):
+        return f"{v:.0f} < {x}"
+    if op == "max" and not v <= float(x):
+        return f"{v:.0f} > {x}"
+    if op == "is" and str(v).lower() != str(x).lower():
+        return f"is {v}"
+    if op == "has" and str(x).lower() not in v:
+        return f"no {x}"
+    if op == "lacks" and str(x).lower() in v:
+        return f"contains {x}"
+    return None

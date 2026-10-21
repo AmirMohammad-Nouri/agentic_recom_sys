@@ -10,14 +10,15 @@ ChoiceModel  Gaussian belief over theta in R^5 (the user's REVEALED trade-off be
                * slate choices (conditional logit over the five items shown),
                * reason chips ("I picked it because of price"),
                * criterion-specific rejections ("too expensive"),
-               * explicit statements (saving a goal, accepting a proposal).
+               * explicit statements (saving a goal, accepting a proposal),
+               * answers to the supervisor's pairwise trade-off questions
+                 ("when they conflict, which matters more: sustainability or taste?").
              Prior mean = BETA0 * stated weights. It estimates what the user does; it NEVER
              changes the saved goal weights. Differences are reported as discrepancies and
              the supervisor agent may PROPOSE a goal change that the user must accept.
 
-All defaults are documented in docs/features.md and calibrated by eval/learner_simulation.py.
+All defaults are documented in docs/features.md. They are design choices, not yet calibrated on user data.
 """
-import copy
 import math
 
 import numpy as np
@@ -274,6 +275,19 @@ class ChoiceModel:
         self.n_statements += 1
         self._log("statement", event_id, {"weights": {k: round(float(weights[k]), 3) for k in CRITERIA}})
 
+    def observe_tradeoff(self, winner, loser, event_id, ts):
+        """Pairwise answer: the user says criterion `winner` matters more than `loser`.
+
+        Bradley-Terry style binary likelihood on theta_winner - theta_loser.
+        """
+        self.inflate(ts)
+        a = np.zeros(5)
+        a[CRITERIA.index(winner)] = self.p["reason_gain"]
+        a[CRITERIA.index(loser)] = -self.p["reason_gain"]
+        self.mu, self.Sigma = self._laplace([], [(a, self.p["kappa_reason"])], self.mu, self.Sigma)
+        self.n_reasons += 1
+        self._log("tradeoff_answer", event_id, {"winner": winner, "loser": loser})
+
     # ---- read-outs -------------------------------------------------------------
     def _simplex(self, th):
         pos = np.maximum(th, 0.0)
@@ -371,6 +385,11 @@ class Learner:
             why = "you saved a goal" if typ == "goal_saved" else "you accepted a proposal"
         elif typ == "feedback":
             why = self._feedback(pl, eid, ts)
+        elif typ == "profile_updated":
+            self._update_priors(pl["declared"], eid)
+            why = "you updated your profile"
+        elif typ == "question_answered":
+            why = self._answer(pl, eid, ts)
         elif typ == "profile_correction":
             why = self._correction(pl, eid, ts)
         return self._trail(before, self._snapshot(), eid, why)
@@ -391,6 +410,26 @@ class Learner:
                 self.history.append((rid, 1.0, 1.0))
         self.stated = dict(pl["weights"])
         self.choice = ChoiceModel(self.stated, self.p, ts)
+
+    def _update_priors(self, d, eid):
+        """A profile edit adds priors only for concepts that have no belief yet, so learned
+        evidence is never wiped by re-saving the profile."""
+        for c in d.get("preferred_cuisines", []):
+            if f"cuisine:{c}" not in self.taste.a:
+                self.taste.set_prior(f"cuisine:{c}", 3.5, 1.5, "declared", eid)
+        for ing in d.get("liked_ingredients", []):
+            if f"ingredient:{ing}" not in self.taste.a:
+                self.taste.set_prior(f"ingredient:{ing}", 3.5, 1.5, "declared", eid)
+        for ing in d.get("disliked_ingredients", []):
+            if not ing.get("strict") and f"ingredient:{ing['name']}" not in self.taste.a:
+                self.taste.set_prior(f"ingredient:{ing['name']}", 1.0, 3.0, "declared", eid)
+
+    def _answer(self, pl, eid, ts):
+        w, l = pl.get("winner"), pl.get("loser")
+        if self.choice is None or w not in CRITERIA or l not in CRITERIA or w == l:
+            return "answer recorded (no model update)"
+        self.choice.observe_tradeoff(w, l, eid, ts)
+        return f"you said {w} matters more than {l}"
 
     def _feedback(self, pl, eid, ts):
         typ, rid, reason = pl["type"], pl["recipe_id"], pl.get("reason")

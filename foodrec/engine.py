@@ -6,8 +6,9 @@ rank the SAME candidate set (controlled comparison).
 """
 import math
 
-from . import CRITERIA, CRITERION_LABELS
-from .constraints import active_constraints, diagnose, eligible
+from . import CRITERIA
+from .constraints import (active_constraints, diagnose, eligible, per_serving,
+                          request_filter_fails, validate_request_filters)
 from .diversity import rerank
 from .explain import build_evidence, ground_narrative, make_pack, template_reasons
 from .features import nutriscore, raw_values
@@ -17,7 +18,8 @@ from .router import route
 from .telemetry import Telemetry
 
 DEFAULT_CONFIG = {"weights": dict(DEFAULT_WEIGHTS), "diversity": 0.3, "mode": "lightweight",
-                  "k": 5, "missing_policy": "renormalize", "candidate_cap": 60}
+                  "k": 5, "missing_policy": "renormalize", "candidate_cap": 60,
+                  "request_filters": []}
 
 
 def _dedupe(recipes):
@@ -64,11 +66,12 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
     cfg.update({k: v for k, v in config.items() if v is not None})
     pipeline = route(cfg["mode"])
     weights, weights_msg = resolve_weights(cfg["weights"], cfg.get("last_valid_weights") or DEFAULT_WEIGHTS)
+    rfilters = validate_request_filters(cfg["request_filters"])
     taste = learner.taste
     out = {"config": {"weights_requested": cfg["weights"], "weights_applied": weights,
                       "weights_message": weights_msg, "diversity": cfg["diversity"],
                       "mode": cfg["mode"], "k": cfg["k"], "missing_policy": cfg["missing_policy"],
-                      "candidate_cap": cfg["candidate_cap"]},
+                      "candidate_cap": cfg["candidate_cap"], "request_filters": rfilters},
            "pipeline": {"mode": cfg["mode"], "preference_scorer": pipeline["preference_scorer"],
                         "uses_llm": pipeline["uses_llm"]},
            "versions": {"catalogue": catalogue.version, "scaler": scaler.version},
@@ -77,10 +80,28 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
     # ---- 1. mandatory constraints -------------------------------------------------
     with tele.stage("filter"):
         elig, report = eligible(catalogue, declared)
+        by_filter, kept = {}, []
+        for r in elig:
+            fails = [f["label"] for f in rfilters if request_filter_fails(r, f)]
+            for lab in fails:
+                by_filter[lab] = by_filter.get(lab, 0) + 1
+            if not fails:
+                kept.append(r)
     out["eligibility"] = {"eligible_count": report["eligible_count"],
                           "excluded_count": report["excluded_count"],
-                          "excluded_by_code": report["excluded_by_code"]}
+                          "excluded_by_code": report["excluded_by_code"],
+                          "after_request_filters": len(kept),
+                          "excluded_by_request_filter": by_filter}
     out["_excluded"] = report["excluded"]
+    if elig and not kept:
+        out["empty"] = {"message": ("Your mandatory rules leave recipes, but none also meets the "
+                                    "filters of this request. Loosen or drop one of them."),
+                        "constraints": [], "request_filters": [
+                            {"label": f["label"], "excluded": by_filter.get(f["label"], 0)}
+                            for f in rfilters]}
+        out["telemetry"] = tele.summary()
+        return out
+    elig = kept
     if not elig:
         out["empty"] = diagnose(catalogue, declared)
         out["telemetry"] = tele.summary()
@@ -170,6 +191,9 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
                 "diet": r["diet"], "allergens": r["allergens"],
                 "allergens_complete": r.get("allergens_complete", False),
                 "nutri_grade": (nutriscore(r["nutrition_per_100g"]) or {}).get("grade"),
+                "per_serving": {k: (None if per_serving(r, k) is None else round(per_serving(r, k), 1))
+                                for k in ("protein_g", "sugars_g", "fibre_g", "sat_fat_g")},
+                "meal": r.get("meal"),
                 "scores": x["scores"], "raw": raw_values(r), "utility": x["utility"],
                 "utility_rank": x["utility_rank"], "final_rank": x["final_rank"],
                 "effective_weights": x["effective_weights"], "contributions": x["contributions"],

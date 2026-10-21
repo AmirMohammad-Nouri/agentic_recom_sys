@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FoodRec</title>
+  <meta name="description" content="Transparent, controllable food recommendations with a supervisor agent.">
+  <link rel="stylesheet" href="/static/app.css?v=0.2.0">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232f6b4f'/%3E%3Cpath d='M5 12h14a7 7 0 0 1-14 0z' fill='white'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/discover" style="color:inherit;text-decoration:none">
+      <span class="brand-mark"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M4 11h16a8 8 0 0 1-16 0z"/></svg></span>
+      <span class="brand-name">FoodRec</span>
+    </a>
+    <nav class="nav" aria-label="Main"></nav>
+    <span class="spacer"></span>
+    <button class="status-pill" type="button" title="System status"><span class="dot"></span>connecting…</button>
+    <button class="icon-btn theme-btn" type="button" title="Toggle theme" aria-label="Toggle theme">
+      <svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
+    </button>
+    <button class="btn ghost sm user-btn" type="button" title="Switch user">
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/></svg>
+      <span class="uid"></span>
+    </button>
+  </header>
+  <main></main>
+  <script type="module" src="/static/app.js?v=0.2.0"></script>
+</body>
+</html>

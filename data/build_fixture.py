@@ -4,7 +4,7 @@ Everything here is illustrative. Ingredient nutrient values are rounded approxim
 of typical food-composition values; prices and CO2e values are rounded PLACEHOLDERS
 (provenance "fixture_placeholder"). They exist so the pipeline can be exercised end to
 end and must not be cited or used for results. Replace them through a real catalogue
-loader (see docs/architecture-inventory.md) before reporting anything.
+loader (see README "Using real data") before reporting anything.
 
 Recipe-level values are computed from ingredient amounts so the fixture is internally
 consistent. A few ingredients deliberately have unknown fields so that missing-value

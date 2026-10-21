@@ -12,8 +12,13 @@ def _diff_config(a, b, extra_a=None, extra_b=None):
                             "before": round(wa, 4), "after": round(wb, 4)})
     for k, label in (("diversity", "Diversity"), ("mode", "Computation mode"),
                      ("missing_policy", "Missing-value policy"), ("k", "List size")):
-        if ca[k] != cb[k]:
-            changes.append({"input": k, "label": label, "before": ca[k], "after": cb[k]})
+        if ca.get(k) != cb.get(k):
+            changes.append({"input": k, "label": label, "before": ca.get(k), "after": cb.get(k)})
+    fa = [f["label"] for f in ca.get("request_filters") or []]
+    fb = [f["label"] for f in cb.get("request_filters") or []]
+    if fa != fb:
+        changes.append({"input": "request_filters", "label": "Request filters",
+                        "before": ", ".join(fa) or "none", "after": ", ".join(fb) or "none"})
     for k, label in (("catalogue", "Catalogue version"), ("scaler", "Scaler version")):
         if a["versions"][k] != b["versions"][k]:
             changes.append({"input": k, "label": label, "before": a["versions"][k], "after": b["versions"][k]})
