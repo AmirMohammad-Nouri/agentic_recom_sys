@@ -1,6 +1,8 @@
 # FoodRec: transparent, agentic food recommendation
 
-FoodRec recommends five recipes ranked by priorities the user controls. A **supervisor agent**
+FoodRec recommends five recipes from the real **HUMMUS** dataset (9,891 food.com recipes),
+ranked by three values the user controls: **healthiness, sustainability and convenience**,
+plus a fixed share for learned taste. A **supervisor agent**
 watches over the learning process: it notices when what you *say* you want and what you
 *do* drift apart. It then searches your history in a **knowledge graph** and either asks a
 targeted question or proposes a change you can accept. The question or proposal is shown
@@ -15,9 +17,12 @@ what came back, and why it answered as it did.
 > chooses among fixed options and phrases answers, and its phrasing is rejected if it states
 > anything the evidence does not support.
 
-> **Data warning.** `data/fixture/` is a SYNTHETIC catalogue of 54 recipes. Nutrient values are
-> rounded approximations. Prices and CO₂e values are placeholders (`provenance:
-> fixture_placeholder`). Do not cite results from it; see [Using real data](#using-real-data).
+> **Data.** Nutrients and the FSA score come from the HUMMUS dataset. Footprints are *estimated*
+> from ingredient amounts × food-group CO₂e factors (Poore & Nemecek 2018). Cuisine, meal type
+> and food groups are labelled by your local Qwen model (or keyword rules) when the catalogue is
+> built. Allergens and diets are detected from ingredient names: verify before relying on them.
+> See [The catalogue](#the-catalogue-hummus) and the plain-language
+> [user model guide](docs/user-model.md).
 
 ---
 
@@ -36,7 +41,7 @@ what came back, and why it answered as it did.
 11. [API](#api)
 12. [Testing](#testing)
 13. [Project layout](#project-layout)
-14. [Using real data](#using-real-data)
+14. [The catalogue (HUMMUS)](#the-catalogue-hummus)
 15. [Limitations](#limitations)
 
 ---
@@ -48,7 +53,7 @@ Requires Python 3.11+.
 ```bash
 python -m venv .venv && source .venv/bin/activate        # or: uv venv && source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest                                          # 52 tests, no services needed
+python -m pytest                                          # 60 tests, no services needed
 foodrec                                                   # http://127.0.0.1:8000
 ```
 
@@ -67,9 +72,14 @@ docker compose up -d neo4j
 foodrec
 ```
 
+The repository ships the built catalogue (`data/hummus/catalogue.json.gz`). On start the app
+imports it into its SQLite database (once per catalogue version), so a fresh device only needs
+that file. To rebuild it with your local Qwen model, see [The catalogue](#the-catalogue-hummus).
+
 On first open, a five-step onboarding asks for allergies and diets (strict rules), likes and
-dislikes, time and budget (each strict *or* a preference), a few dishes you like, and starting
-priorities.
+dislikes, a **health goal** (eat healthier, lose weight, gain weight, build muscle,
+heart-friendly, less sugar) with an optional ingredient limit, a few dishes you like (searchable),
+and how much each of the three values should count.
 
 ---
 
@@ -98,7 +108,7 @@ The design keeps the model inside the zone where small models are dependable:
   medical claim not in the evidence makes the system fall back to the template.
 * **Embeddings on the CPU** (`FOODREC_EMBED_CPU=1`), so the GPU is left entirely to the supervisor.
 * **Thinking off by default** (`FOODREC_LLM_THINK=0`) for latency. Switch "Show model reasoning"
-  on in the Assistant to stream Qwen's own reasoning into the trace, labelled *unverified*.
+  on in the assistant to stream Qwen's own reasoning into the timeline, labelled *unverified*.
 
 Expect roughly 1–4 s per chat turn on that GPU (two short model calls). Recommendations from
 the Discover page never call the model.
@@ -108,7 +118,7 @@ the Discover page never call the model.
 ## How it works
 
 ```
-User interaction ─▶ Event log (SQLite, append-only) ─▶ Learner (taste + revealed trade-offs)
+User interaction ─▶ Event log (SQLite, append-only) ─▶ User model (taste + observed weights)
                                    │                          │
                                    ├─▶ Knowledge graph        ▼
                                    │   (projection)     Supervisor policy ─▶ ask / propose / stay quiet
@@ -123,7 +133,8 @@ User message ─▶ Supervisor agent: perceive → understand → plan → act (
 | Layer | File(s) | Responsibility |
 | --- | --- | --- |
 | Engine | `engine.py`, `constraints.py`, `features.py`, `ranker.py`, `diversity.py`, `preference.py`, `explain.py`, `compare.py`, `router.py`, `telemetry.py` | Deterministic, auditable ranking and evidence |
-| Learner | `learner.py` | Bayesian beliefs with provenance, rebuilt by replaying events |
+| User model | `learner.py` | Taste counts and stated-vs-observed weights with provenance, rebuilt by replaying events |
+| Ingest | `ingest/` | HUMMUS spreadsheet → portable catalogue file (parsing, local-model labels, footprints) |
 | Store | `store.py` | Events, versioned profile and goals, immutable request snapshots, decisions, messages, documents |
 | Service | `service.py` | The only writer: log → learner → graph for every change |
 | Agent | `agent/` | `supervisor.py` (turns), `policy.py` (monitoring), `skills.py` (tools), `intent.py` (parsing), `trace.py` |
@@ -146,8 +157,8 @@ Who decides what is fixed in code:
 | What does the user's message ask for? | Model (JSON schema), validated; rules as fallback | Yes, within 10 fixed intents |
 | Which skills run, with which arguments? | Deterministic plan from validated slots | No |
 | Is one more lookup needed? | Model picks from an allowed list (max 3 skills per turn) | Yes, bounded |
-| Is there a conflict between goal and behaviour? | Policy: posterior probabilities and thresholds | No |
-| Ask a question or propose a change? | Policy: evidence strength rule | No |
+| Is there a gap between goal and behaviour? | Policy: observed − stated, fixed thresholds | No |
+| Ask a question or propose a change? | Policy: gap size and number of events | No |
 | Change the saved goal or a rule? | **The user only** | No |
 | Which words the answer uses | Model, then validated against evidence | Yes, rejected if unsupported |
 
@@ -155,15 +166,18 @@ Who decides what is fixed in code:
 
 After every like, save, choice or rejection the supervisor runs:
 
-1. **Compare** the saved goal with the revealed weights. Conflict if P(|θ_k − w_k| > 0.08) ≥ 0.70.
+1. **Compare** the saved goal (stated weights) with the observed weights: gap = observed − stated.
 2. **Restraint**: one priority question at a time, and a topic you answered or dismissed is left
    alone for 6 feedback events.
 3. **Search history** in the knowledge graph for interactions that name that criterion as the reason.
-4. **Enough evidence?** P ≥ 0.90 *and* ≥ 4 informative events since your last explicit statement:
-   * **yes → proposal.** Move the weight halfway toward the revealed value, run a **counterfactual**
-     ("these recipes would enter, these would leave"), then wait for *Accept* or *Keep my goal*.
-   * **no → targeted question.** "When affordability and convenience pull in different directions,
-     which usually wins for you?" Your answer is recorded as evidence and does not edit the goal.
+4. **How big is the gap?**
+   * **≥ 0.15 after ≥ 6 events → proposal.** Move the weight halfway toward the observed value, run
+     a **counterfactual** ("these recipes would enter, these would leave"), then wait for *Accept*
+     or *Keep my goal*.
+   * **≥ 0.10 after ≥ 3 events → targeted question.** "When convenience and healthiness pull in
+     different directions, which usually wins for you?" Your answer is recorded as evidence and
+     does not edit the goal.
+   * **smaller → stay quiet** and keep recommending.
 5. **Taste conflicts**: a declared liking contradicted by several rejections gives "Do you still
    want Italian as a preference?"
 
@@ -173,22 +187,28 @@ The full specification, with all thresholds, is in [docs/supervisor.md](docs/sup
 
 ## Core concepts
 
-**Five criteria**, each scored 0–1 with higher better and scaled once on the frozen catalogue:
-preference match (a model estimate, not a rating), healthiness (Nutri-Score 2015 points, an
-operational measure, not clinical), sustainability (kg CO₂e per serving), affordability
-(EUR per serving), convenience (minutes).
+**Three values plus taste.** Every recipe has four scores between 0 and 1 (higher is better),
+each a fixed formula you can open on the recipe card (*How it's scored*):
 
-**Weighted utility** `U = Σ w_k · score_k` with weights normalised to sum to 1. Reference check:
-0.30/0.25/0.20/0.15/0.10 × 0.80/0.90/0.55/0.70/0.85 = **0.765**. If all weights are zero, the
-last valid configuration is kept and the user is told how to restore one.
+| Criterion | How it is computed |
+| --- | --- |
+| **Healthiness** | Nine factors per 100 g (energy, fat, saturated fat, sugars, sodium, cholesterol, fibre, protein share of energy, FSA score), each linear between a good and a poor anchor (FSA traffic lights, WCRF, EU claims). Weighted mean; the **health goal** sets the weights (gain weight reverses energy). A–E grade is FoodRec's banding, not Nutri-Score. |
+| **Sustainability** | kg CO₂e per kg of dish = Σ grams × food-group factor / grams (water excluded). Log scale: 0.5 → 1, 30 → 0. |
+| **Convenience** | Number of ingredients (`ingredients_title`): 3 → 1, 15 → 0, linear. |
+| **Taste match** | Learned from likes and rejections (see below). Not a slider. |
 
-**Mandatory rules vs. preferences.** Allergies, diets, "never include" ingredients and *strict*
-limits filter eligibility before ranking. Missing allergen data is never treated as safe. Rules
-are never relaxed automatically; an empty result explains which rule removes the most recipes.
-A preference for quick meals stays a preference.
+**Weighted utility** `U = 0.25 · taste + 0.75 · (w_h·h + w_s·s + w_t·t)`, where the three values
+w sum to 1. Reference check: values 0.5/0.3/0.2 and scores 0.8/0.9/0.55/0.85 give **0.78875**.
+Taste keeps a fixed share so the three sliders mean exactly what they say, and a dish you would
+never eat cannot win on numbers alone.
 
-**Request-only filters.** "Something high in protein under 20 minutes" becomes visible filters
-for that request only. They are never saved and never change your weights.
+**Mandatory rules vs. preferences.** Allergies, diets, "never include" ingredients and a
+*strict* ingredient limit filter eligibility before ranking. Missing allergen data is never
+treated as safe. Rules are never relaxed automatically; an empty result explains which rule
+removes the most recipes.
+
+**Request-only filters.** "Something high in protein with at most 8 ingredients" and the meal
+selector on Discover become visible filters for that request only. They are never saved.
 
 **Missing values.** The default policy *renormalises* the remaining weights for that recipe and
 discloses it. A missing value is never treated as average.
@@ -197,16 +217,17 @@ discloses it. A missing value is never treated as average.
 variety, which higher-utility recipe it displaced, and why.
 
 **Computation modes.** *Lightweight* uses cached taste beliefs. *Extended* adds a pass over
-your like/save/choose/reject history for preference match. Both use the same rules, candidates
-and weights; neither calls a language model; neither guarantees better results.
+your like/save/choose/reject history for taste match. Neither calls a language model.
 
-**Two preference models.** A Beta *taste model* per cuisine, ingredient and category, plus a
-Gaussian *choice model* of how you actually trade the five criteria off, updated from slate
-choices, reasons, criterion-specific rejections, goal statements and trade-off answers. Both
-are pure functions of the event log and keep provenance (which event moved which belief).
+**User model (simple and replayable).** *Taste*: for each cuisine, ingredient and food group,
+taste = (1 + likes) / (2 + likes + dislikes). *Values*: observed weights start at your stated
+weights; choosing a dish multiplies each weight by exp(how much better the chosen dish scores on
+it than the five shown), reasons and answers add a small push, and saving a goal moves them
+halfway to it. **Preference match** = 1 − ½ Σ |stated − observed|. Full walk-through:
+[docs/user-model.md](docs/user-model.md).
 
 **Versioning.** Profile and goal saves create new versions; nothing is overwritten. Every
-recommendation is stored as an immutable snapshot with its profile, goal, catalogue and scaler
+recommendation is stored as an immutable snapshot with its profile, goal, catalogue and scorer
 versions. Before/after comparisons are computed only from recorded snapshots.
 
 Definitions and parameters: [docs/features.md](docs/features.md).
@@ -217,18 +238,19 @@ Definitions and parameters: [docs/features.md](docs/features.md).
 
 | Question | Where it is answered |
 | --- | --- |
-| **WHY** this recipe? | Card → *Evidence*: rules passed, taste concepts with beliefs, soft-target fits |
+| **WHY** this recipe? | Card → *How it's scored*: the nine health factors, the footprint by ingredient, the ingredient count, taste concepts |
 | **WHAT** drove the rank? | Per-criterion score × weight = contribution, utility rank vs. final rank, diversity effect |
-| **WHERE** does a belief come from? | Insights: every belief lists the events that moved it; Assistant: "why do you think…?" |
-| **UNCERTAINTY** | 90 % intervals and confidence per criterion; placeholder and missing data flagged per recipe |
+| **WHERE** does a belief come from? | Insights: every update lists the event and how many points it moved; assistant: "what do you know about me?" |
+| **UNCERTAINTY** | Confidence n/(n+5) for observed weights; estimated footprints and incomplete allergen data flagged per recipe |
 | **WHAT IF** | Live preview while dragging sliders; "what if I cared more about…?" counterfactuals |
 | **WHAT CHANGED** | Banner after each change: inputs changed, recipes entered/left/moved, main driver |
 | **CONTROL** | Correct any belief, undo/reset settings, restore any goal version, dismiss any proposal |
-| **HOW the agent worked** | Live trace under every answer; Supervisor column on Discover; Activity log |
+| **HOW the agent worked** | Live thinking timeline in every answer; the assistant's Supervisor tab; Activity log |
 
-Each trace step has a kind (`perceive`, `reason`, `decide`, `tool`, `model`, `check`,
-`answer`), a source (`policy`, `rules`, `model`, `engine`, `graph`, `validator`…), a duration
-and an expandable **evidence** payload with the raw records behind it.
+Each step in the timeline has a kind with its own icon (context, reasoning, decision, tool,
+model thinking, check, answer), a source chip (policy, rules, model, ranking engine, knowledge
+graph, validator…), a duration, and an **evidence** table with the records behind it (raw JSON
+one click away). The header summarises the turn: "Thought for 2.2 s · 5 steps".
 
 ---
 
@@ -239,7 +261,7 @@ A projection of the catalogue and the event log. It can be rebuilt at any time a
 
 ```
 (Recipe)-[:CONTAINS {grams}]->(Ingredient)-[:HAS_ALLERGEN]->(Allergen)
-(Recipe)-[:OF_CUISINE]->(Cuisine)   (Ingredient)-[:IN_CATEGORY]->(Category)
+(Recipe)-[:OF_CUISINE]->(Cuisine)   (Ingredient)-[:IN_CATEGORY]->(Category {co2e_kg_per_kg})
 (Recipe)-[:SUITS]->(Diet)           (Recipe)-[:SIMILAR_TO {score}]->(Recipe)
 (User)-[:PERFORMED]->(Interaction {type, reason, ts, meal, place})-[:ON]->(Recipe)
 (User)-[:DECLARED {kind, strict}]->(Allergen|Diet|Ingredient|Cuisine)
@@ -258,7 +280,7 @@ cuisine** through fixed templates (`timeline`, `ingredient_profile`, `recipe_con
 ## Vector database and retrieval
 
 **Qdrant** (embedded on disk by default, or a server via `FOODREC_QDRANT=http://…`) stores
-embeddings of every recipe, ingredient, method note (`data/knowledge/*.md`) and user document.
+embeddings of every recipe, food group, method note (`data/knowledge/*.md`) and user document.
 Search is **hybrid**: BM25 and dense cosine, fused with Reciprocal Rank Fusion. Every hit shows
 its BM25 rank, vector rank and fused score. Add vetted documents in **Knowledge → Library**;
 they are chunked and searchable immediately. Without an embedding model a hashing embedder is
@@ -268,21 +290,20 @@ used and labelled *lexical, not semantic*.
 
 ## The interface
 
-* **Discover.** Priority sliders with visible normalised weights, a diversity control, a computation
-  mode switch, the meal/place context recorded with feedback, Apply / Save as goal / Undo / Reset,
-  and a live preview of what a change *would* do. Below that, the top five, each with a contribution
-  bar, key reason, compromise, Like / Save / *I'll cook this* (with reason) / *Not for me* (with
-  reason), and an *Evidence* drawer with a full score table and recipe-to-recipe comparison. The
-  **Supervisor** column shows how each list was computed, what the supervisor concluded after each
-  piece of feedback, and open questions and proposals.
-* **Assistant.** Chat with the supervisor. Its work streams live above each answer, with a cursor
-  on the running step, then collapses to "Worked for 1.4 s · 8 steps". Results, comparisons,
-  counterfactuals and decisions arrive as interactive cards.
-* **Insights.** Saved vs. revealed priorities with uncertainty bands, recent evidence, and taste
-  beliefs with provenance and one-click correction.
+* **Assistant (on every page).** A docked panel on the right, opened from the top bar or the
+  *Ask* button, that stays open as you move between pages. *Chat* streams the thinking timeline
+  above each answer; *Supervisor* shows open questions and proposals and how each list and each
+  review was worked out. Recipe cards have an *Ask* button that sends the question to it.
+* **Discover.** Three value sliders (taste's fixed share is shown), a meal selector (breakfast,
+  lunch, dinner, snack, dessert, drink), diversity, computation mode, Apply / Save as goal / Undo
+  / Reset, and a live preview. The top five show the photo, health grade, ingredient count, kcal,
+  CO₂e, three score chips, Like / Save / *I'll cook this* (with reason) / *Not for me* (with
+  reason), and *How it's scored* with the full calculation.
+* **Insights.** Preference match as a ring, then for each value "You chose" vs. "You do" bars with
+  the gap, the evidence that moved them, and taste beliefs with one-click correction.
 * **Knowledge.** The graph explorer, plus the library with a retrieval tester.
 * **Activity.** The event log and every supervisor decision with its outcome.
-* **Profile.** Rules and preferences, profile versions, and goal versions with *Restore*.
+* **Profile.** Rules, health goal, ingredient limit, profile versions, and goal versions with *Restore*.
 
 Light and dark themes, keyboard-accessible controls, works down to phone width. Plain ES
 modules, no build step; the only external script is the pinned graph renderer (vis-network 9.1.9).
@@ -301,7 +322,8 @@ All settings are environment variables (or `.env`; see `.env.example`).
 | `FOODREC_EMBED_MODEL`, `FOODREC_EMBED_CPU` | `nomic-embed-text`, `1` | Embeddings, on CPU |
 | `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | empty | Neo4j; empty uses the in-process graph |
 | `FOODREC_QDRANT` | `local` | `local`, `memory`, or a Qdrant URL |
-| `FOODREC_DATA_DIR` | `data/runtime` | SQLite, Qdrant files, index metadata |
+| `FOODREC_DATA_DIR` | `data/runtime` | SQLite (`foodrec_v2.db`), Qdrant files, index metadata |
+| `FOODREC_CATALOGUE` | `data/hummus/catalogue.json.gz` | Portable catalogue imported on start |
 | `FOODREC_MAX_STEPS` | `3` | Maximum skills per chat turn |
 
 | Missing service | Fallback |
@@ -320,6 +342,8 @@ Click the status pill for the live state of every component.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/system` | Component status, options, skills, thresholds |
+| GET | `/api/recipes?q=&limit=&ids=&meal=` | Search the catalogue |
+| GET | `/api/recipes/{rid}/breakdown?goal=` | How the three scores of one recipe are calculated |
 | POST | `/api/users/{id}/onboard` | Create profile v1 and goal v1 |
 | GET/PUT | `/api/users/{id}/state`, `/profile` | Current state; save a new profile version |
 | POST | `/api/users/{id}/goal`, `/goal/revert` | Save or restore a goal version |
@@ -345,14 +369,16 @@ Interactive docs at `/docs`.
 python -m pytest
 ```
 
-* `tests/test_reference.py`: 25 deterministic reference cases (score arithmetic incl. 0.765,
-  normalisation, all-zero weights, missing-value policies, fail-closed allergens and diets,
-  strict vs. soft limits, empty-result diagnosis, duplicates, diversity, comparisons, mode
-  parity, narrative validation, learner replay, goal immutability, trade-off evidence).
+* `tests/test_reference.py`: 33 deterministic reference cases (utility 0.78875, normalisation,
+  missing values, the anchors of each criterion, health goals, breakdown = score, fail-closed
+  allergens, strict vs. soft limits, empty-result diagnosis, meal filters, diversity,
+  comparisons, mode parity, narrative validation, and the user model: replay, like ratio,
+  observed weights, inconsistent reasons, preference match, trade-off answers, goal saves).
 * `tests/test_agent.py`: intent parsing, model-output validation, offline and model chat
   turns (with a scripted fake model), streaming, unsupported-number rejection, confirmation of
   profile changes, one-question-at-a-time, cool-down, proposals with counterfactuals, taste
   conflicts, replay after restart, graph templates, hybrid retrieval, and the HTTP API.
+  They run on a 148-recipe sample of the catalogue (`data/fixture/catalogue.json.gz`).
 
 The Neo4j backend implements the same templates in Cypher but needs a running Neo4j, so it
 is not covered by the automatic tests. Check it with `docker compose up -d neo4j` and the app.
@@ -366,39 +392,63 @@ foodrec/
   api.py  service.py  store.py  config.py  llm.py          application, persistence, model client
   engine.py constraints.py features.py ranker.py diversity.py preference.py
   explain.py compare.py router.py telemetry.py learner.py catalogue.py   recommendation core
+  ingest/     build.py parse.py classify.py foodgroups.py               HUMMUS → catalogue file
   agent/      supervisor.py policy.py skills.py intent.py trace.py
   knowledge/  graph.py neo4j_graph.py retrieval.py documents.py
-  web/        index.html app.css app.js lib.js trace.js components.js views/*.js
+  web/        index.html app.css app.js lib.js dock.js trace.js components.js views/*.js
 data/
-  fixture/    synthetic catalogue (build_fixture.py regenerates it)
+  hummus/     hummus_recipes.xlsx, catalogue.json.gz, labels_*.json (label caches)
+  fixture/    148-recipe sample used by the tests
   knowledge/  method notes indexed for retrieval
-docs/         architecture.md supervisor.md features.md background/ (brief and ideas)
+docs/         user-model.md architecture.md supervisor.md features.md background/
 tests/
 ```
 
 ---
 
-## Using real data
+## The catalogue (HUMMUS)
 
-The loader expects the record shape in `data/fixture/recipes.json`: `id`, `title`, `cuisine`,
-`meal`, `ingredients[{name, grams, category, allergens}]`, `diet{…}`, `allergens`,
-`allergens_complete`, `nutrition_per_100g{energy_kj, sugars_g, sat_fat_g, sodium_mg, fibre_g,
-protein_g, fruit_veg_nuts_pct}`, `serving_grams`, `kcal_per_serving`, `prep_minutes`,
-`cost_eur_per_serving` + provenance, `co2e_kg_per_serving` + provenance, `missing`. Point
-`FOODREC_CATALOGUE` and `FOODREC_INGREDIENTS` at your files. Ingredient composition can come
-from a food composition database such as USDA FoodData Central; footprints need a sourced
-dataset (never generate environmental values with a model). Candidate catalogues are listed
-in the brief (FoodNexus, XFoodRec, WiseFood). Check coverage and licences first.
+`python -m foodrec.ingest` turns `data/hummus/hummus_recipes.xlsx` into one portable file,
+`data/hummus/catalogue.json.gz` (≈6 MB): `{meta, groups, recipes}`. Building needs
+`pip install -e ".[ingest]"` (pandas, openpyxl); running the app does not.
 
----
+```bash
+python -m foodrec.ingest                       # label with your local Qwen via Ollama (FOODREC_LLM_MODEL)
+python -m foodrec.ingest --model qwen3.5:4b    # another local model
+python -m foodrec.ingest --no-llm              # keyword rules only, no model needed (~30 s)
+python -m foodrec.ingest --fixture 150         # small sample for the tests
+```
+
+What the build does, per recipe:
+
+1. **Parse** each ingredient line (amount, unit, pack size such as "(8 ounce) can") into grams,
+   drop notes and duplicates, and count ingredients from `ingredients_title`.
+2. **Label** with the local model, in batches with a JSON schema that only allows fixed options:
+   each unique ingredient name → one of ~45 food groups (beef, poultry, cheese, pulses, …), and
+   each recipe → cuisine and meal type (or *non_food*, which drops household and pet "recipes").
+   Every answer is validated; anything invalid falls back to the keyword rules. The build reports
+   how often the model and the rules agree.
+3. **Compute** the footprint (grams × food-group factor, with a per-ingredient breakdown),
+   allergens and diet flags (fail closed: unknown stays unknown), and the three nearest
+   neighbours for the knowledge graph.
+
+Labels are cached in `data/hummus/labels.json` after every batch, so a run can be stopped and
+resumed, and **copying the cache (or just the finished `.json.gz`) to another device skips the
+model there**. `labels_rules.json` is the cache of the rules-only build.
+
+**On start** the app reads `FOODREC_CATALOGUE` and imports it into the `recipes` and
+`catalogue_meta` tables of its SQLite database; if that version is already stored the import is
+skipped. The app then always loads recipes from the database, so a device with the database but
+without the file still runs. The new database file is `foodrec_v2.db`; an older `foodrec.db`
+is left untouched.
 
 ## Limitations
 
-* The catalogue is synthetic; nothing here is a finding.
-* Healthiness is an operational Nutri-Score measure applied to dishes, not a clinical assessment;
-  the 2023 update is not implemented.
-* Preference match and revealed weights are model estimates, not observed ratings or calibrated
-  probabilities. Policy thresholds are design choices that still need calibration.
+* Footprints are estimates from food-group averages and parsed amounts, not a life-cycle
+  assessment. Allergens and diets are detected from ingredient names and can be wrong.
+* Healthiness is an operational nutrient measure for ranking, not medical or dietetic advice.
+* Taste match and observed weights are model estimates, not observed ratings. The learning rate
+  and policy thresholds are design choices that still need calibration with users.
 * The supervisor's model phrasing is validated for numbers, recipe names and medical claims, not
   for every possible misleading statement. The template answer is always available as ground truth.
 * Single-process server and SQLite: suitable for a demo and user studies, not for multi-user production.

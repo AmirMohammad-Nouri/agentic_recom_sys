@@ -1,31 +1,34 @@
-// Discover: priorities, the top five, and the supervisor's live column.
-import { api, CRIT, CRIT_META, clear, f2, h, human, icon, on, pct, state, toast, userPath, weightBar, legend, ago } from "../lib.js";
-import { changeSummary, decisionCard, recipeCard } from "../components.js";
-import { traceView } from "../trace.js";
+// Discover: the three values, the meal, and the top five. The assistant is docked beside it.
+import { api, CRIT, CRIT_META, clear, emit, f2, h, human, icon, on, pct, state, toast, userPath, VALUES, weightBar, legend } from "../lib.js";
+import { changeSummary, recipeCard } from "../components.js";
 
-const feed = []; // supervisor feed for this session: {kind, title, steps, ts}
+function defaultMeal() {
+  const hr = new Date().getHours();
+  return hr < 11 ? "breakfast" : hr < 15 ? "lunch" : hr < 17 ? "snack" : "dinner";
+}
 
 export function discoverView() {
   const goal = state.user_state.goal;
-  const raw = Object.fromEntries(CRIT.map((k) => [k, Math.round((goal?.weights[k] ?? 0.2) * 100)]));
+  const raw = Object.fromEntries(VALUES.map((k) => [k, Math.round((goal?.weights[k] ?? 0.33) * 100)]));
   let diversity = goal?.diversity ?? 0.3;
   let mode = goal?.mode ?? "lightweight";
   const applied = []; // undo stack of applied configs
-  state.context = state.context || { meal: "dinner", place: "home" };
+  state.context = state.context || { meal: defaultMeal(), place: "home" };
+  const taste = state.system?.taste_share ?? 0.25;
 
   // ---- controls -------------------------------------------------------------------------
   const norm = () => {
-    const s = CRIT.reduce((a, k) => a + raw[k], 0);
-    return s > 0 ? Object.fromEntries(CRIT.map((k) => [k, raw[k] / s])) : null;
+    const s = VALUES.reduce((a, k) => a + raw[k], 0);
+    return s > 0 ? Object.fromEntries(VALUES.map((k) => [k, raw[k] / s])) : null;
   };
   const bar = h("div");
   const zeroNote = h("div.hint.hidden", { style: { color: "var(--warn)" } },
     "All priorities are zero. The last valid configuration will be kept; raise any slider to change it.");
-  const sliders = CRIT.map((k) => {
+  const sliders = VALUES.map((k) => {
     const val = h("span.val");
     const input = h("input", { type: "range", min: 0, max: 100, step: 5, value: raw[k], "aria-label": CRIT_META[k].long });
     const row = h("div.slider",
-      h("span.name", h("span.swatch", { style: { background: CRIT_META[k].color } }), CRIT_META[k].long), val, input,
+      h("span.name", { title: CRIT_META[k].what }, h("span.swatch", { style: { background: CRIT_META[k].color } }), CRIT_META[k].long), val, input,
       h("div.ends", h("span", CRIT_META[k].lo), h("span", CRIT_META[k].hi)));
     input.addEventListener("input", () => { raw[k] = +input.value; refresh(); schedulePreview(); });
     return { k, row, val, input };
@@ -42,10 +45,12 @@ export function discoverView() {
   function refresh() {
     const n = norm();
     for (const s of sliders) clear(s.val, h("b", pct(n ? n[s.k] : 0)), ` · ${raw[s.k]}`);
-    clear(bar, weightBar(n || goal.weights));
+    const eff = n || goal.weights;
+    clear(bar, weightBar({ p: taste, ...Object.fromEntries(VALUES.map((k) => [k, (1 - taste) * eff[k]])) }));
     zeroNote.classList.toggle("hidden", !!n);
     clear(divVal, h("b", f2(diversity)));
     [...modeSeg.children].forEach((b, i) => b.classList.toggle("on", ["lightweight", "extended"][i] === mode));
+    [...mealSeg.children].forEach((b, i) => b.classList.toggle("on", ["any", ...MEALS][i] === state.context.meal));
     modeDesc.textContent = state.system?.modes?.[mode]?.description || "";
   }
 
@@ -57,6 +62,7 @@ export function discoverView() {
     pTimer = setTimeout(async () => {
       try {
         const p = await api(userPath("/preview"), { method: "POST", body: { weights: norm(), diversity, mode } });
+        if (!p) return;
         const c = p.comparison;
         if (!c) { preview.textContent = "Preview unavailable."; return; }
         // preview compares against the saved goal; describe relative to it
@@ -67,21 +73,23 @@ export function discoverView() {
     }, 450);
   }
 
-  const contextSel = h("div.row.wrap", { style: { gap: "6px" } },
-    h("select", { onchange: (e) => (state.context.meal = e.target.value), "aria-label": "Meal" },
-      ["breakfast", "lunch", "dinner", "snack"].map((m) => h("option", { value: m, selected: state.context.meal === m }, human(m)))),
-    h("select", { onchange: (e) => (state.context.place = e.target.value), "aria-label": "Place" },
-      ["home", "work", "out"].map((m) => h("option", { value: m, selected: state.context.place === m }, "at " + m))));
+  const MEALS = Object.keys(state.system?.options?.meal_contexts || { breakfast: 1, lunch: 1, dinner: 1, snack: 1, dessert: 1 });
+  const mealSeg = h("div.seg.meal-seg", ["any", ...MEALS].map((m) => h("button", {
+    onclick: () => { state.context.meal = m; refresh(); run(); },
+  }, human(m))));
+  const placeSel = h("select", { onchange: (e) => (state.context.place = e.target.value), "aria-label": "Place" },
+    ["home", "work", "out"].map((m) => h("option", { value: m, selected: state.context.place === m }, "at " + m)));
 
   const controls = h("aside.card.sticky",
-    h("div.card-head", h("h2", "Priorities"), h("span.small.muted", `goal v${goal.version}`)),
+    h("div.card-head", h("h2", "Your values"), h("span.small.muted", `goal v${goal.version}`)),
     h("div.card-body.stack",
       h("div.stack", sliders.map((s) => s.row)),
-      h("div.stack.tight", h("div.field-label", "Weights applied"), bar, zeroNote),
+      h("div.stack.tight", h("div.field-label", "Weights applied"), bar, zeroNote,
+        h("div.hint", `Taste keeps a fixed ${pct(taste)} share, learned from your likes and rejections; the sliders share the rest.`)),
       h("div.divider"),
       h("div.slider", h("span.name", "Diversity"), divVal, divInput, h("div.ends", h("span", "Similar dishes"), h("span", "Varied dishes"))),
       h("div.stack.tight", h("div.field-label", "Computation"), modeSeg, modeDesc),
-      h("div.stack.tight", h("div.field-label", "Context recorded with feedback"), contextSel),
+      h("div.stack.tight", h("div.field-label", "Place (recorded with feedback)"), placeSel),
       h("div.divider"),
       h("div.btn-row",
         h("button.btn.primary.grow", { onclick: () => run() }, "Apply"),
@@ -98,14 +106,14 @@ export function discoverView() {
   let lastResult = null;
 
   async function run(cfg) {
-    const body = cfg || { weights: norm(), diversity, mode };
+    const body = { ...(cfg || { weights: norm(), diversity, mode }), meal: state.context.meal === "any" ? null : state.context.meal };
     try {
       const res = await api(userPath("/recommend"), { method: "POST", body });
       if (lastResult) applied.push(lastResult.config);
       lastResult = res;
       state.lastResult = res;
       renderResults(res);
-      pushFeed({ kind: "pipeline", title: res.results.length ? `Ranked ${res.results.length} recipes` : "No eligible recipes",
+      emit("feed", { title: res.results.length ? `Ranked ${res.results.length} recipes` : "No eligible recipes",
         steps: res.pipeline_trace.map((s, i) => ({ ...s, id: res.request_id + i, status: "done" })), ts: Date.now() / 1000 });
       preview.textContent = "";
     } catch (e) { toast(e.message, "err"); }
@@ -133,7 +141,7 @@ export function discoverView() {
       res.config.weights_message && res.config.weights_message.startsWith("All") ? h("div.change", res.config.weights_message) : null,
       res.results.map((r) => recipeCard(r, { requestId: res.request_id, compareWith })),
       h("div.card-body", { style: { borderTop: "1px solid var(--border)" } }, legend(),
-        h("div.hint", { style: { marginTop: "4px" } }, "Bars show each criterion's share of the utility. Preference match is a model estimate; cost and CO₂e are demo placeholders.")));
+        h("div.hint", { style: { marginTop: "4px" } }, "Bars show each criterion's share of the utility. Taste match is a model estimate; CO₂e is estimated from ingredient amounts and food-group averages.")));
   }
 
   async function saveGoal() {
@@ -143,15 +151,15 @@ export function discoverView() {
       const out = await api(userPath("/goal"), { method: "POST", body: { name: "My priorities", weights: n, diversity, mode } });
       state.user_state = await api(userPath("/state"));
       toast(`Saved as goal v${out.goal_version}`);
-      pushFeed({ kind: "goal", title: `Goal v${out.goal_version} saved`, ts: Date.now() / 1000,
-        steps: [{ id: "g" + out.goal_version, kind: "perceive", source: "learner", status: "done", title: "Explicit statement recorded",
-          detail: "Saving a goal is the strongest evidence of what you want. The revealed-preference model was updated toward it.",
+      emit("feed", { title: `Goal v${out.goal_version} saved`, ts: Date.now() / 1000,
+        steps: [{ id: "g" + out.goal_version, kind: "perceive", source: "learner", status: "done", title: "New goal recorded",
+          detail: "Your observed weights moved halfway toward the new goal, and the event count for the supervisor restarts.",
           evidence: out.trail }] });
     } catch (e) { toast(e.message, "err"); }
   }
 
   function setControls(cfg) {
-    for (const s of sliders) { raw[s.k] = Math.round(cfg.weights[s.k] * 100); s.input.value = raw[s.k]; }
+    for (const s of sliders) { raw[s.k] = Math.round((cfg.weights[s.k] ?? 0) * 100); s.input.value = raw[s.k]; }
     diversity = cfg.diversity; divInput.value = Math.round(diversity * 100);
     mode = cfg.mode;
     refresh();
@@ -159,7 +167,7 @@ export function discoverView() {
   function undo() {
     const prev = applied.pop();
     if (!prev) return toast("Nothing to undo");
-    const cfg = { weights: prev.weights_applied, diversity: prev.diversity, mode: prev.mode };
+    const cfg = { weights: prev.values_applied, diversity: prev.diversity, mode: prev.mode };
     setControls(cfg);
     run(cfg).then(() => applied.pop());
   }
@@ -169,50 +177,19 @@ export function discoverView() {
     run({ weights: g.weights, diversity: g.diversity, mode: g.mode });
   }
 
-  // ---- supervisor column ---------------------------------------------------------------------
-  const decisionsBox = h("div.stack");
-  const feedBox = h("div");
-  const supervisor = h("aside.card.sticky.supervisor-col",
-    h("div.card-head", h("h2", "Supervisor"), h("button.btn.ghost.sm", { onclick: reviewNow, title: "Run the conflict and confidence check now" }, "Review now")),
-    h("div.card-body", decisionsBox),
-    h("div", { style: { borderTop: "1px solid var(--border)" } }, feedBox));
-
-  async function loadDecisions() {
-    const open = await api(userPath("/decisions?status=open"));
-    clear(decisionsBox, open.length ? open.map((d) => decisionCard(d, { onResolved: loadDecisions }))
-      : h("div.small.muted", "No open questions. The supervisor checks your goal against your choices after every piece of feedback."));
-  }
-  async function reviewNow() {
-    const rv = await api(userPath("/review"), { method: "POST" });
-    pushFeed({ kind: "review", title: `Review: ${human(rv.status)}`, steps: rv.trace, ts: Date.now() / 1000 });
-    loadDecisions();
-  }
-  function renderFeed() {
-    clear(feedBox, feed.length ? feed.slice().reverse().slice(0, 12).map((f) => {
-      const tv = traceView({ steps: f.steps || [], title: f.title });
-      return h("div.feed-item", h("div.when", ago(f.ts)), tv.el);
-    }) : h("div.feed-item.small.muted", "Activity appears here: how each list was computed, and what the supervisor concluded after your feedback."));
-  }
-  function pushFeed(item) { feed.push(item); renderFeed(); }
-
-  const off = on((what, data) => {
-    if (what === "review") {
-      pushFeed({ kind: "review", title: `After you ${data.type === "choose" ? "chose" : data.type + "d"} ${data.recipe}: ${human(data.status)}`, steps: data.trace, ts: data.ts });
-      loadDecisions();
-    }
-    if (what === "decision") api(userPath("/state")).then((s) => { state.user_state = s; });
+  const off = on((what) => {
+    if (what === "results_changed" && !state.lastResult) run({ weights: state.user_state.goal.weights, diversity, mode });
   });
 
   refresh();
-  renderFeed();
-  loadDecisions();
   if (state.lastResult && state.lastResult.user_id === state.user) { lastResult = state.lastResult; renderResults(lastResult); }
   else run({ weights: goal.weights, diversity: goal.diversity, mode: goal.mode });
 
   const el = h("div",
     h("div.page-head", h("div", h("h1", "Discover"),
-      h("p", "Five recipes ranked by your priorities. Every reason comes from a recorded evidence record."))),
-    h("div.discover", controls, results, supervisor));
+      h("p", "Five recipes ranked by healthiness, sustainability, convenience and your taste. Every reason comes from a recorded evidence record.")),
+      h("div.stack.tight", { style: { alignItems: "flex-end" } }, h("span.field-label", "Meal"), mealSeg)),
+    h("div.discover", controls, results));
   el.cleanup = off;
   return el;
 }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FoodRec</title>
   <meta name="description" content="Transparent, controllable food recommendations with a supervisor agent.">
-  <link rel="stylesheet" href="/static/app.css?v=0.2.0">
+  <link rel="stylesheet" href="/static/app.css?v=0.3.0">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232f6b4f'/%3E%3Cpath d='M5 12h14a7 7 0 0 1-14 0z' fill='white'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -16,6 +16,10 @@
     </a>
     <nav class="nav" aria-label="Main"></nav>
     <span class="spacer"></span>
+    <button class="btn sm dock-toggle" type="button" title="Show or hide the assistant">
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg>
+      <span class="label">Assistant</span>
+    </button>
     <button class="status-pill" type="button" title="System status"><span class="dot"></span>connecting…</button>
     <button class="icon-btn theme-btn" type="button" title="Toggle theme" aria-label="Toggle theme">
       <svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
@@ -26,6 +30,6 @@
     </button>
   </header>
   <main></main>
-  <script type="module" src="/static/app.js?v=0.2.0"></script>
+  <script type="module" src="/static/app.js?v=0.3.0"></script>
 </body>
 </html>

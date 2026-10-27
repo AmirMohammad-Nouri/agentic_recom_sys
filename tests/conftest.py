@@ -9,9 +9,12 @@ from fakes import FakeLLM  # noqa: E402
 
 from foodrec.catalogue import Catalogue  # noqa: E402
 from foodrec.config import ROOT, load_settings  # noqa: E402
-from foodrec.features import ReferenceScaler  # noqa: E402
+from foodrec.features import Scorer  # noqa: E402
 from foodrec.learner import Learner  # noqa: E402
 from foodrec.ranker import DEFAULT_WEIGHTS  # noqa: E402
+
+
+FIXTURE = ROOT / "data" / "fixture" / "catalogue.json.gz"
 
 
 class OfflineLLM(FakeLLM):
@@ -21,12 +24,12 @@ class OfflineLLM(FakeLLM):
 
 @pytest.fixture(scope="session")
 def cat():
-    return Catalogue.load(ROOT / "data" / "fixture" / "recipes.json")
+    return Catalogue.load(FIXTURE)
 
 
 @pytest.fixture(scope="session")
 def scaler(cat):
-    return ReferenceScaler.fit(cat)
+    return Scorer(cat)
 
 
 @pytest.fixture
@@ -39,7 +42,7 @@ def learner(cat):
 
 def make_app(tmp_path, llm=None):
     from foodrec.service import App
-    return App(load_settings(data_dir=tmp_path, qdrant="memory"), llm=llm or OfflineLLM())
+    return App(load_settings(data_dir=tmp_path, qdrant="memory", catalogue_path=FIXTURE), llm=llm or OfflineLLM())
 
 
 @pytest.fixture
@@ -49,6 +52,7 @@ def app(tmp_path):
 
 @pytest.fixture
 def onboarded(app):
-    app.onboard("u", {"allergens": ["peanuts"], "preferred_cuisines": ["Italian"], "liked_recipes": ["r001"]},
-                {"p": .2, "h": .2, "s": .4, "c": .1, "t": .1})
+    first = app.catalogue.recipes[0]["id"]
+    app.onboard("u", {"allergens": ["peanuts"], "preferred_cuisines": ["Italian"], "liked_recipes": [first],
+                      "health_goal": "eat_healthier"}, {"h": .3, "s": .5, "t": .2})
     return app

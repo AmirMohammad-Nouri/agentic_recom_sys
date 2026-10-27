@@ -1,14 +1,13 @@
 // App shell: top bar, router, system status, onboarding gate.
 import { api, clear, h, icon, on, safeGet, safeSet, state, toast, userPath } from "./lib.js";
+import { mountDock } from "./dock.js";
 import { discoverView } from "./views/discover.js";
-import { assistantView } from "./views/assistant.js";
 import { insightsView } from "./views/insights.js";
 import { knowledgeView } from "./views/knowledge.js";
 import { activityView, onboarding, profileView } from "./views/profile.js";
 
 const ROUTES = {
   discover: { label: "Discover", view: discoverView, icon: "bowl" },
-  assistant: { label: "Assistant", view: assistantView, icon: "spark" },
   insights: { label: "Insights", view: insightsView, icon: "info" },
   knowledge: { label: "Knowledge", view: knowledgeView, icon: "graph" },
   activity: { label: "Activity", view: activityView, icon: "clock" },
@@ -52,8 +51,9 @@ function systemPanel() {
           row("Supervisor model", s.llm.available ? `${s.llm.model} via Ollama` : `Not available — ${s.llm.reason}. Intent parsing uses rules; answers use templates.`, s.llm.available),
           row("Knowledge graph", `${s.graph} · ${s.graph_stats.nodes} nodes, ${s.graph_stats.relationships} relationships`, s.graph.startsWith("Neo4j")),
           row("Retrieval", `${s.retrieval.note} · ${s.retrieval.chunks} passages`, s.retrieval.semantic),
-          row("Catalogue", `${s.catalogue.name} · ${s.catalogue.recipes} recipes · version ${s.catalogue.version}`),
-          row("Scaler", s.scaler))),
+          row("Catalogue", `${s.catalogue.name} · ${s.catalogue.recipes} recipes · version ${s.catalogue.version} · ${s.catalogue.import === "imported" ? "imported into the database at this start" : "loaded from the database"}`),
+          row("Labels", `cuisine, meal and food groups by ${s.catalogue.coverage.labeller}`, s.catalogue.coverage.labeller !== "rules"),
+          row("Scoring", s.scaler))),
         h("div.change", { style: { borderRadius: "8px", border: "1px solid var(--border)" } }, s.catalogue.note),
         h("div", h("div.section-label", "Supervisor skills"),
           h("table.t", h("tbody", s.skills.map((k) => h("tr", h("td.mono", k.name), h("td", k.description), h("td", h("span.tag" + (k.side_effect === "none" ? "" : ".warn"), k.side_effect)))))))),
@@ -115,8 +115,10 @@ async function boot() {
     return;
   }
   renderStatus();
+  mountDock();
   on((what) => {
     if (what === "decision" || what === "review") api(userPath("/state")).then((s) => { state.user_state = s; renderNav(); });
+    if (what === "redirect_onboarding") location.reload();
   });
   window.addEventListener("hashchange", route);
   state.user_state = await api(userPath("/state"));

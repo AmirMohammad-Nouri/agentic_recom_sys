@@ -1,5 +1,5 @@
 // Profile form (shared with onboarding), profile page with version history, and Activity.
-import { api, clear, CRIT, CRIT_META, emit, f2, h, human, icon, state, toast, userPath, weightBar, when, ago } from "../lib.js";
+import { api, clear, CRIT_META, emit, f2, grade, h, human, icon, state, toast, userPath, VALUES, weightBar, when, ago } from "../lib.js";
 import { decisionCard } from "../components.js";
 
 function chipSet(options, selected, { label = (x) => human(x), strict = false } = {}) {
@@ -36,9 +36,18 @@ function ingredientList(all, items, { strictable }) {
   return { el: h("div.stack.tight", h("div.row", input, dl), list), value: () => [...rows.values()] };
 }
 
+const GOAL_TEXT = {
+  eat_healthier: "All nine factors count equally",
+  lose_weight: "Lower energy, fat and sugar; more fibre",
+  gain_weight: "Energy-dense dishes with protein score higher",
+  build_muscle: "Protein counts most",
+  heart_health: "Saturated fat, salt and cholesterol count most",
+  less_sugar: "Sugar counts most",
+};
+
 function limitRow(label, unit, cur, step) {
   const on = h("input", { type: "checkbox", checked: !!cur });
-  const val = h("input", { type: "number", min: 0, step, value: cur?.value ?? (unit === "min" ? 30 : 4) });
+  const val = h("input", { type: "number", min: 2, step, value: cur?.value ?? 10 });
   const strict = h("select", h("option", { value: "soft", selected: cur && !cur.strict }, "Preference"),
     h("option", { value: "strict", selected: cur?.strict }, "Strict limit"));
   return {
@@ -54,8 +63,14 @@ export function profileForm(declared = {}) {
   const cuisines = chipSet(o.cuisines, declared.preferred_cuisines || []);
   const dislikes = ingredientList(o.ingredients, declared.disliked_ingredients || [], { strictable: true });
   const likes = ingredientList(o.ingredients, (declared.liked_ingredients || []).map((n) => ({ name: n })), { strictable: false });
-  const time = limitRow("Preparation time", "min", declared.max_prep_minutes, 5);
-  const cost = limitRow("Cost per serving", "EUR", declared.max_cost_eur, 0.5);
+  const maxIng = limitRow("At most", "ingredients", declared.max_ingredients, 1);
+  const goals = o.health_goals || [];
+  let goal = declared.health_goal || "eat_healthier";
+  const goalPick = h("div.goal-grid", goals.map((g) => {
+    const b = h("button.goal-card" + (g.id === goal ? ".on" : ""), { type: "button" }, h("b", g.label), h("span.small.muted", GOAL_TEXT[g.id] || ""));
+    b.addEventListener("click", () => { goal = g.id; [...goalPick.children].forEach((x) => x.classList.toggle("on", x === b)); });
+    return b;
+  }));
   const sections = {
     safety: h("div.stack",
       h("div.field", h("span.field-label", "Allergies"), allergens.el,
@@ -67,15 +82,17 @@ export function profileForm(declared = {}) {
       h("div.field", h("span.field-label", "Ingredients you like"), likes.el),
       h("div.field", h("span.field-label", "Cuisines you enjoy"), cuisines.el)),
     limits: h("div.stack",
-      h("div.hint", "A preference is shown as a fit reason; a strict limit removes recipes. A preference for quick meals never becomes a rule by itself."),
-      time.el, cost.el),
+      h("div.hint", "A preference is shown as a fit reason; a strict limit removes recipes. Convenience is also one of your three values, so you rarely need a strict limit."),
+      maxIng.el),
+    goal: h("div.stack", goalPick,
+      h("div.hint", "Your health goal decides how much each of the nine nutrient factors counts in the healthiness score. It does not filter recipes and it is not medical advice.")),
   };
   return {
     sections,
     value: () => ({
       allergens: allergens.value(), diets: diets.value(), preferred_cuisines: cuisines.value(),
       disliked_ingredients: dislikes.value(), liked_ingredients: likes.value().map((x) => x.name),
-      max_prep_minutes: time.value(), max_cost_eur: cost.value(), liked_recipes: declared.liked_recipes || [],
+      max_ingredients: maxIng.value(), health_goal: goal, liked_recipes: declared.liked_recipes || [],
     }),
   };
 }
@@ -107,8 +124,8 @@ export function profileView() {
           await api(userPath("/goal/revert"), { method: "POST", body: { version: g.version } });
           state.user_state = await api(userPath("/state")); state.lastResult = null; toast(`Restored v${g.version} as a new version`); load();
         } }, icon("undo"), "Restore") : h("span.tag.accent", "current")),
-      h("div", { style: { marginTop: "6px" } }, weightBar(g.weights)),
-      h("div.small.muted", { style: { marginTop: "4px" } }, CRIT.map((k) => `${CRIT_META[k].label} ${f2(g.weights[k])}`).join(" · ")))));
+      h("div", { style: { marginTop: "6px" } }, weightBar(g.weights, VALUES)),
+      h("div.small.muted", { style: { marginTop: "4px" } }, VALUES.map((k) => `${CRIT_META[k].label} ${f2(g.weights[k])}`).join(" · ")))));
   }
   load();
   return h("div",
@@ -118,7 +135,8 @@ export function profileView() {
       h("div.stack",
         h("section.card", h("div.card-head", h("h2", "Safety rules")), h("div.card-body", form.sections.safety)),
         h("section.card", h("div.card-head", h("h2", "Taste")), h("div.card-body", form.sections.taste)),
-        h("section.card", h("div.card-head", h("h2", "Limits")), h("div.card-body", form.sections.limits))),
+        h("section.card", h("div.card-head", h("h2", "Health goal")), h("div.card-body", form.sections.goal)),
+        h("section.card", h("div.card-head", h("h2", "Ingredient limit")), h("div.card-body", form.sections.limits))),
       h("div.stack",
         h("section.card", h("div.card-head", h("h2", "Goal versions")), h("div.card-body", goals)),
         h("section.card", h("div.card-head", h("h2", "Profile versions")), h("div.card-body", history)))));
@@ -136,7 +154,9 @@ export function activityView() {
   const events = h("ul.timeline");
   const decisions = h("div.stack");
   (async () => {
-    const [evs, decs, recipes] = await Promise.all([api(userPath("/events")), api(userPath("/decisions")), api("/api/recipes")]);
+    const [evs, decs] = await Promise.all([api(userPath("/events")), api(userPath("/decisions"))]);
+    const ids = [...new Set(evs.map((e) => e.payload.recipe_id).filter(Boolean))].slice(0, 200);
+    const recipes = ids.length ? await api("/api/recipes?limit=200&ids=" + encodeURIComponent(ids.join(","))) : [];
     const titles = Object.fromEntries(recipes.map((r) => [r.recipe_id, r.title]));
     clear(events, evs.length ? evs.map((e) => h("li",
       h("span.muted.small", when(e.ts)), h("span", h("span.tag", human(e.type))),
@@ -155,37 +175,66 @@ export function activityView() {
 
 export function onboarding(onDone) {
   const form = profileForm({});
-  const picked = new Set();
+  const picked = new Map();
   let step = 0;
-  const raw = { p: 30, h: 25, s: 20, c: 15, t: 10 };
+  const raw = { h: 40, s: 30, t: 30 };
   const body = h("div.modal-body");
   const ind = h("div.steps-ind");
   const back = h("button.btn.ghost", { onclick: () => go(step - 1) }, "Back");
   const next = h("button.btn.primary", { onclick: () => (step === 4 ? finish() : go(step + 1)) }, "Continue");
-  const titles = ["Safety first", "What you like", "Time and budget", "A few dishes you like", "Starting priorities"];
+  const titles = ["Safety first", "What you like", "Your health goal", "A few dishes you like", "Your three values"];
   const subs = ["These are strict rules. They filter recipes before anything is ranked.",
     "Preferences shape the taste match; only 'never include' items become rules.",
-    "Decide for each whether it is a strict limit or just a preference.",
-    "Pick up to five. This gives the taste model a starting point.",
-    "You can change these at any time; every change is versioned."];
+    "This decides how the nutrient factors are weighted inside the healthiness score.",
+    "Search and pick up to five. This gives the taste model a starting point.",
+    "How much should each count? You can change these at any time; every change is versioned."];
   const head = h("div.modal-head");
+
+  // dish picker with search (the catalogue has thousands of recipes)
   const grid = h("div.pick-grid");
-  api("/api/recipes").then((rs) => grid.append(...rs.map((r) => {
-    const b = h("button.pick", { type: "button" }, h("div.t", r.title), h("div.small.muted", `${r.cuisine} · ${r.prep_minutes} min`));
-    b.addEventListener("click", () => {
-      if (picked.has(r.recipe_id)) picked.delete(r.recipe_id); else if (picked.size < 5) picked.add(r.recipe_id);
-      b.classList.toggle("on", picked.has(r.recipe_id));
-    });
-    return b;
-  })));
-  const prio = h("div.stack", CRIT.map((k) => {
+  const search = h("input", { type: "search", placeholder: "Search dishes or an ingredient, e.g. lentil, pasta, chicken", "aria-label": "Search dishes" });
+  const pickedBox = h("div.chips");
+  let timer = null;
+  const renderPicked = () => clear(pickedBox, [...picked.values()].map((r) => h("span.chip.on", r.title,
+    h("span.x", { onclick: () => { picked.delete(r.recipe_id); renderPicked(); syncGrid(); } }, " ×"))));
+  const syncGrid = () => [...grid.children].forEach((b) => b.classList.toggle("on", picked.has(b.dataset.id)));
+  async function loadDishes() {
+    const rs = await api(`/api/recipes?limit=24&q=${encodeURIComponent(search.value.trim())}`);
+    clear(grid, rs.length ? rs.map((r) => {
+      const img = r.image_url ? h("img", { src: r.image_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : null;
+      img?.addEventListener("error", () => img.remove());
+      const b = h("button.pick" + (picked.has(r.recipe_id) ? ".on" : ""), { type: "button", dataset: { id: r.recipe_id } },
+        h("div.pick-img", icon("bowl"), img), h("div.t", r.title),
+        h("div.small.muted", `${r.cuisine === "Other" ? human(r.meal) : r.cuisine} · ${r.n_ingredients} ingredients`));
+      b.addEventListener("click", () => {
+        if (picked.has(r.recipe_id)) picked.delete(r.recipe_id); else if (picked.size < 5) picked.set(r.recipe_id, r);
+        else toast("Five is enough for a start");
+        syncGrid(); renderPicked();
+      });
+      return b;
+    }) : h("div.small.muted", "No dish matches that search."));
+  }
+  search.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(loadDishes, 250); });
+  loadDishes();
+  const dishes = h("div.stack", search, pickedBox, grid);
+
+  const total = h("div");
+  const sliders = VALUES.map((k) => {
     const input = h("input", { type: "range", min: 0, max: 100, step: 5, value: raw[k] });
-    const v = h("span.val", raw[k]);
-    input.addEventListener("input", () => { raw[k] = +input.value; v.textContent = raw[k]; });
-    return h("div.slider", h("span.name", h("span.swatch", { style: { background: CRIT_META[k].color } }), CRIT_META[k].long), v, input,
-      h("div.ends", h("span", CRIT_META[k].lo), h("span", CRIT_META[k].hi)));
-  }));
-  const pages = [form.sections.safety, form.sections.taste, form.sections.limits, grid, prio];
+    const v = h("span.val");
+    input.addEventListener("input", () => { raw[k] = +input.value; paint(); });
+    return { k, v, el: h("div.slider", h("span.name", h("span.swatch", { style: { background: CRIT_META[k].color } }), CRIT_META[k].long), v, input,
+      h("div.ends", h("span", CRIT_META[k].what), h("span", ""))) };
+  });
+  function paint() {
+    const tot = VALUES.reduce((a, k) => a + raw[k], 0) || 1;
+    for (const s of sliders) clear(s.v, h("b", `${Math.round((100 * raw[s.k]) / tot)}%`));
+    clear(total, weightBar(Object.fromEntries(VALUES.map((k) => [k, raw[k] / tot])), VALUES));
+  }
+  paint();
+  const prio = h("div.stack", sliders.map((s) => s.el), h("div.stack.tight", h("div.field-label", "Share of each value"), total),
+    h("div.hint", `Taste is not a slider: it keeps a fixed ${Math.round((state.system.taste_share ?? 0.25) * 100)}% share and is learned from what you like and reject.`));
+  const pages = [form.sections.safety, form.sections.taste, h("div.stack", form.sections.goal, h("div.divider"), form.sections.limits), dishes, prio];
   function go(i) {
     step = Math.max(0, Math.min(4, i));
     clear(head, h("div.small.muted", `Step ${step + 1} of 5`), h("h2", { style: { fontSize: "18px", marginTop: "4px" } }, titles[step]),
@@ -196,17 +245,17 @@ export function onboarding(onDone) {
     next.textContent = step === 4 ? "Start" : "Continue";
   }
   async function finish() {
-    const tot = CRIT.reduce((a, k) => a + raw[k], 0);
-    if (!tot) return toast("Give at least one priority a value above zero", "err");
-    const declared = { ...form.value(), liked_recipes: [...picked] };
+    const tot = VALUES.reduce((a, k) => a + raw[k], 0);
+    if (!tot) return toast("Give at least one value a weight above zero", "err");
+    const declared = { ...form.value(), liked_recipes: [...picked.keys()] };
     try {
-      await api(userPath("/onboard"), { method: "POST", body: { declared, weights: Object.fromEntries(CRIT.map((k) => [k, raw[k] / tot])) } });
+      await api(userPath("/onboard"), { method: "POST", body: { declared, weights: Object.fromEntries(VALUES.map((k) => [k, raw[k] / tot])) } });
       overlay.remove();
       onDone();
     } catch (e) { toast(e.message, "err"); }
   }
-  const overlay = h("div.overlay", h("div.modal", { role: "dialog", "aria-modal": "true" }, head, body,
-    h("div.modal-foot", back, h("span.small.muted", "Stored locally in this demo's database."), next)));
+  const overlay = h("div.overlay", h("div.modal.wide", { role: "dialog", "aria-modal": "true" }, head, body,
+    h("div.modal-foot", back, h("span.small.muted", "Stored locally in this app's database."), next)));
   go(0);
   document.body.append(overlay);
 }

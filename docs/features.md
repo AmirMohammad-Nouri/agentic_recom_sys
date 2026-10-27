@@ -1,20 +1,25 @@
 # Feature and parameter definitions
 
-## Criteria
+## Criteria (`features.py`)
 
-All scores are in [0, 1], and higher is always better. They are scaled with the 5th–95th percentile
-of the frozen catalogue (`ReferenceScaler`, fitted once and never refitted per request).
+All scores are in [0, 1], and higher is always better. Each is a fixed formula with published
+anchors (no per-catalogue rescaling), so `breakdown(recipe, goal)` reproduces it factor by factor.
 
-| Key | Criterion | Raw value | Direction |
+| Key | Criterion | Raw value | Score |
 | --- | --- | --- | --- |
-| `p` | Preference match | Model estimate from the taste model (lightweight) or taste model + history kernel (extended) | higher |
-| `h` | Healthiness | −(Nutri-Score points), 2015 HCSP solid-foods tables, per 100 g of the dish | higher |
-| `s` | Sustainability | ln(1 + kg CO₂e per serving) | lower |
-| `c` | Affordability | EUR per serving | lower |
-| `t` | Convenience | preparation minutes | lower |
+| `h` | Healthiness | nine factors per 100 g | goal-weighted mean of linear factor scores |
+| `s` | Sustainability | kg CO₂e per kg of dish (water excluded) | (ln 30 − ln x) / (ln 30 − ln 0.5), clipped |
+| `t` | Convenience | number of ingredients (`ingredients_title`) | (15 − n) / 12, clipped |
+| `p` | Taste match | taste model (lightweight) or taste model + history (extended) | model estimate |
 
-Utility: `U = Σ_k w_k · score_k` with `w ≥ 0`, `Σ w = 1`. Reference: 0.30/0.25/0.20/0.15/0.10 ×
-0.80/0.90/0.55/0.70/0.85 = 0.765 (`tests/test_reference.py::test_01`).
+Health factors (good → poor anchor): energy 125 → 400 kcal (WCRF), fat 3 → 17.5 g, saturated
+fat 1.5 → 5 g, sugars 5 → 22.5 g, sodium 120 → 600 mg (FSA traffic lights), cholesterol 20 →
+100 mg, fibre 6 → 0 g, protein 20 → 0 % of energy (EU claims), FSA score 1 → 0 (HUMMUS).
+Health goals re-weight them (`GOALS`); *gain weight* reverses energy. Grade A ≥ 0.80, B ≥ 0.65,
+C ≥ 0.50, D ≥ 0.35, else E.
+
+Utility: `U = 0.25 · p + 0.75 · (w_h·h + w_s·s + w_t·t)` with `w ≥ 0`, `Σ w = 1`. Reference:
+w = 0.5/0.3/0.2, scores p/h/s/t = 0.8/0.9/0.55/0.85 → 0.78875 (`tests/test_reference.py`).
 
 **Missing values** (decided before ranking): `renormalize` (default; drop the criterion for
 that recipe and rescale), `zero`, or `exclude`. A missing value is never replaced by an average.
@@ -23,12 +28,13 @@ that recipe and rescale), `zero`, or `exclude`. A missing value is never replace
 
 * Declaring any allergy excludes recipes with incomplete allergen data (fail closed).
 * A diet flag that is `None` fails the diet.
-* Strict time or cost limits exclude recipes whose value is unknown.
+* A strict ingredient limit excludes recipes above it; as a preference it is a soft target.
 * Rules are never relaxed automatically; `diagnose()` reports how many recipes each rule removes.
 
 **Request-only filters** (from a chat message) narrow one request, are shown with the result
-and are never saved: `protein_g`, `sugars_g`, `fibre_g` (per serving), `kcal`, `prep_minutes`,
-`cost_eur`, `cuisine`, `meal`, `ingredient` (`has`/`lacks`). Unknown values fail closed.
+and are never saved: `protein_min`, `sugars_max`, `kcal_max` (per serving), `max_ingredients`,
+`co2e_max` (kg CO₂e per kg), `cuisine`, `meal` (also the Discover meal selector), `ingredient`
+(`has`/`lacks`). Unknown values fail closed.
 
 ## Diversity (`diversity.py`)
 
@@ -37,24 +43,11 @@ between vectors of cuisine (0.8), ingredient gram shares and categories (0.4/√
 seasonings excluded. First item = highest utility. Ties go to higher utility, then lower list
 position. `d = 0` reproduces utility order. Utility rank and final rank are both logged.
 
-## Learner parameters (`learner.py: PARAMS`)
+## User model (`learner.py`)
 
-| Parameter | Value | Role |
-| --- | --- | --- |
-| `taste_k` | 3.0 | Pseudo-count mass of one full-strength observation |
-| `taste_half_life_days` | 90 | Evidence decays toward the prior |
-| `beta0` | 10 | Scale linking simplex weights to logit-scale θ |
-| `prior_sd` | 1.5 | Prior SD of θ around β₀·w_stated |
-| `statement_sd` | 1.0 | Noise of an explicit goal statement |
-| `process_noise_per_day` | 0.004 | Preferences may drift |
-| `kappa_choice` | 0.7 | Tempering of a slate choice (conditional logit) |
-| `kappa_reason`, `reason_gain` | 1.0, 2.0 | Weight of a stated reason / rejection reason / trade-off answer |
-| `discrepancy_delta` | 0.08 | Weight difference that counts as a discrepancy |
-
-Feedback strengths for the taste model: like 1.0, choose 0.8, save 0.6, reject "not my
-taste" 1.0, other rejections 0.5 (criterion-specific rejections update the choice model
-instead). Onboarding priors: declared cuisine or liked ingredient Beta(3.5, 1.5), soft dislike
-Beta(1, 3). A user correction replaces the belief with a confident one (strength 6).
+Taste: `(1 + likes) / (2 + likes + dislikes)` per concept. Values: observed weights updated
+multiplicatively from choices, reasoned rejections and answers, anchored 5 % to the goal.
+Full explanation, worked example and parameter table: [user-model.md](user-model.md).
 
 ## Computation modes (`router.py`)
 

@@ -19,8 +19,8 @@ from .agent import Supervisor
 from .agent import policy
 from .agent.trace import Trace
 from .config import load_settings
-from .features import nutriscore
-from .service import App
+from .features import breakdown, health_grade
+from .service import MEAL_CONTEXTS, App
 
 WEB = Path(__file__).parent / "web"
 log = logging.getLogger("foodrec.api")
@@ -47,11 +47,12 @@ def pipeline_trace(res):
                    + (", capped with per-criterion coverage" if res["candidates"]["capped"] else "") + ".",
          "duration_ms": st.get("candidates", {}).get("wall_ms")},
         {"kind": "tool", "title": f"Scoring ({cfg['mode']})", "source": "engine",
-         "detail": f"Preference scorer: {res['pipeline']['preference_scorer']}; cache {tel['cache']}; "
-                   f"no language-model call.", "duration_ms": st.get("scoring", {}).get("wall_ms")},
+         "detail": f"Healthiness for the goal '{cfg['health_goal'].replace('_', ' ')}', sustainability from CO2e, "
+                   f"convenience from ingredient count; taste scorer: {res['pipeline']['preference_scorer']}; "
+                   f"cache {tel['cache']}; no language-model call.", "duration_ms": st.get("scoring", {}).get("wall_ms")},
         {"kind": "reason", "title": "Weighted utility", "source": "engine",
          "detail": "U = " + " + ".join(f"{cfg['weights_applied'][k]:.2f}*{CRITERION_LABELS[k]}" for k in cfg["weights_applied"])
-                   + f". {cfg['weights_message']}"},
+                   + f" (taste share {round(100 * cfg['taste_share'])}%). {cfg['weights_message']}"},
         {"kind": "tool", "title": f"Diversity rerank (d = {cfg['diversity']:.2f})", "source": "engine",
          "detail": f"{sum(1 for r in res['results'] if r['evidence']['ranking']['diversity']['promoted'])} recipe(s) promoted "
                    f"for variety; utility rank and final rank are both recorded.",
@@ -66,7 +67,7 @@ def create_app(settings=None, llm=None):
     settings = settings or load_settings()
     core = App(settings, llm=llm)
     sup = Supervisor(core)
-    api = FastAPI(title="FoodRec", version="0.2.0")
+    api = FastAPI(title="FoodRec", version="0.3.0")
     api.state.core, api.state.supervisor = core, sup
 
     @api.exception_handler(ValueError)
@@ -85,13 +86,34 @@ def create_app(settings=None, llm=None):
     def system():
         return {**core.system(), "skills": sup.skills.catalog(), "thresholds": policy.THRESHOLDS}
 
+    def _brief(r):
+        sc = core.scaler.scores(r)
+        return {"recipe_id": r["id"], "title": r["title"], "cuisine": r["cuisine"], "meal": r.get("meal"),
+                "image_url": r.get("image_url"), "n_ingredients": r.get("n_ingredients"),
+                "kcal": r.get("kcal_per_serving"), "co2e_kg_per_kg": (r.get("footprint") or {}).get("kg_co2e_per_kg"),
+                "health_grade": health_grade(sc["h"]), "scores": sc,
+                "diet": r["diet"], "allergens": r["allergens"],
+                "ingredients": [i["name"] for i in r["ingredients"]]}
+
     @api.get("/api/recipes")
-    def recipes():
-        return [{"recipe_id": r["id"], "title": r["title"], "cuisine": r["cuisine"], "meal": r.get("meal"),
-                 "prep_minutes": r["prep_minutes"], "cost_eur": r.get("cost_eur_per_serving"),
-                 "nutri_grade": (nutriscore(r.get("nutrition_per_100g")) or {}).get("grade"),
-                 "diet": r["diet"], "allergens": r["allergens"],
-                 "ingredients": [i["name"] for i in r["ingredients"]]} for r in core.catalogue.recipes]
+    def recipes(q: str = "", limit: int = 40, ids: str = None, meal: str = None):
+        """Search the catalogue (title or exact ingredient), or fetch ids=a,b,c."""
+        found = core.search_recipes(q, max(1, min(limit, 200)), ids.split(",") if ids else None, meal)
+        return [_brief(r) for r in found]
+
+    @api.get("/api/recipes/{rid}/breakdown")
+    def recipe_breakdown(rid: str, goal: str = None, uid: str = None):
+        """How each of the three scores of one recipe is calculated."""
+        if rid not in core.catalogue.by_id:
+            raise HTTPException(404, "unknown recipe")
+        if goal is None and uid:
+            goal = ((core.store.profile(uid) or {}).get("declared") or {}).get("health_goal")
+        r = core.catalogue.get(rid)
+        return {**_brief(r), "breakdown": breakdown(r, goal), "url": r.get("url"),
+                "nutrition_per_100g": r.get("nutrition_per_100g"), "nutrition_per_serving": r.get("nutrition_per_serving"),
+                "fsa_score": r.get("fsa_score"), "allergens_complete": r.get("allergens_complete"),
+                "ingredients_detail": [{k: i.get(k) for k in ("name", "text", "grams", "grams_basis", "category")}
+                                       for i in r["ingredients"]], "label_source": r.get("label_source")}
 
     # ---- user state ---------------------------------------------------------------------
     @api.get("/api/users/{uid}/state")
@@ -129,7 +151,11 @@ def create_app(settings=None, llm=None):
     def recommend(uid: str, body: dict = Body(default={})):
         if not core.store.profile(uid):
             raise HTTPException(409, "complete onboarding first")
-        res = core.recommend(uid, {k: body.get(k) for k in ("weights", "diversity", "mode")}, origin="ui")
+        ov = {k: body.get(k) for k in ("weights", "diversity", "mode")}
+        if body.get("meal") in MEAL_CONTEXTS:
+            ov["request_filters"] = [{"field": "meal", "op": "is", "value": MEAL_CONTEXTS[body["meal"]],
+                                      "source": f"{body['meal']} context"}]
+        res = core.recommend(uid, ov, origin="ui")
         res["pipeline_trace"] = pipeline_trace(res)
         return res
 

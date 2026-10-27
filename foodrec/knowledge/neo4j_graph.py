@@ -162,7 +162,7 @@ class Neo4jGraph(GraphProjection):
         return out
 
     def alternatives(self, recipe_id, criterion, k=3):
-        if criterion not in ("h", "s", "c", "t"):
+        if criterion not in ("h", "s", "t"):
             return []
         prop = f"score_{criterion}"
         rows = self._run(f"""

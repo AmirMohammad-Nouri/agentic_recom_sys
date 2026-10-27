@@ -1,12 +1,17 @@
 // Shared helpers: DOM builder, API client, icons, formatting, tiny app state.
 
-export const CRIT = ["p", "h", "s", "c", "t"];
+// p = taste (a fixed, learned share); h, s, t = the three values the user sets.
+export const CRIT = ["p", "h", "s", "t"];
+export const VALUES = ["h", "s", "t"];
 export const CRIT_META = {
-  p: { label: "Taste match", long: "Preference match", lo: "Not important", hi: "Very important", color: "var(--c-p)" },
-  h: { label: "Healthiness", long: "Healthiness", lo: "Not important", hi: "Very important", color: "var(--c-h)" },
-  s: { label: "Sustainability", long: "Sustainability", lo: "Not important", hi: "Very important", color: "var(--c-s)" },
-  c: { label: "Affordability", long: "Affordability", lo: "Not important", hi: "Very important", color: "var(--c-c)" },
-  t: { label: "Convenience", long: "Convenience", lo: "Not important", hi: "Very important", color: "var(--c-t)" },
+  p: { label: "Taste", long: "Taste match", color: "var(--c-p)", icon: "heart",
+    what: "Learned from your likes and rejections" },
+  h: { label: "Healthiness", long: "Healthiness", lo: "Not important", hi: "Very important", color: "var(--c-h)", icon: "pulse",
+    what: "Nine nutrient factors, weighted by your health goal" },
+  s: { label: "Sustainability", long: "Sustainability", lo: "Not important", hi: "Very important", color: "var(--c-s)", icon: "leaf",
+    what: "Estimated kg CO₂e per kg of dish" },
+  t: { label: "Convenience", long: "Convenience", lo: "Not important", hi: "Very important", color: "var(--c-t)", icon: "list",
+    what: "Fewer ingredients score higher" },
 };
 
 // h("div.card.pad", {onclick}, child, "text", [children])
@@ -69,6 +74,18 @@ const ICONS = {
   user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5",
   compare: "M8 4v16M16 4v16M4 8h4M16 16h4",
   bowl: "M4 11h16a8 8 0 0 1-16 0zM9 7c0-2 2-2 2-4M14 7c0-2 2-2 2-4",
+  eye: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z",
+  branch: "M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9",
+  tool: "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z",
+  cpu: "M9 9h6v6H9zM4 9h2M4 15h2M18 9h2M18 15h2M9 4v2M15 4v2M9 18v2M15 18v2M6 6h12v12H6z",
+  shield: "M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6zM9 12l2 2 4-4",
+  pulse: "M3 12h4l2-5 4 10 2-5h6",
+  list: "M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01",
+  panel: "M4 5h16v14H4zM14 5v14",
+  close: "M6 6l12 12M18 6L6 18",
+  target: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
+  ext: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
 };
 export function icon(name, cls = "") {
   const ns = "http://www.w3.org/2000/svg";
@@ -132,7 +149,6 @@ export function safeSet(k, v) { try { localStorage.setItem(k, v); } catch { /* s
 // ---- formatting --------------------------------------------------------------------------
 export const f2 = (x) => (x === null || x === undefined ? "–" : Number(x).toFixed(2));
 export const pct = (x) => (x === null || x === undefined ? "–" : `${Math.round(x * 100)}%`);
-export const eur = (x) => (x === null || x === undefined ? "unknown" : `€${Number(x).toFixed(2)}`);
 export function ago(ts) {
   const s = Date.now() / 1000 - ts;
   if (s < 60) return "just now";
@@ -170,18 +186,22 @@ export function menu(anchor, items) {
 }
 
 export function grade(g) {
-  return h("span.grade." + (g || "none"), { title: g ? `Nutri-Score ${g} (operational measure)` : "Nutri-Score unknown" }, g || "?");
+  return h("span.grade." + (g || "none"), { title: g ? `Health grade ${g} (FoodRec banding of the healthiness score, not Nutri-Score)` : "Health grade unknown" }, g || "?");
 }
 
-export function weightBar(weights) {
-  return h("div.weightbar", CRIT.map((k) => h("span", {
+// Ask the embedded assistant from anywhere: opens the dock and sends the text.
+export function ask(text) { emit("ask", text); }
+export const co2 = (x) => (x === null || x === undefined ? "unknown" : `${Number(x).toFixed(x < 10 ? 1 : 0)} kg CO₂e/kg`);
+
+export function weightBar(weights, keys = CRIT) {
+  return h("div.weightbar", keys.map((k) => h("span", {
     style: { width: `${(weights[k] || 0) * 100}%`, background: CRIT_META[k].color },
     title: `${CRIT_META[k].long}: ${pct(weights[k])}`,
   })));
 }
 
-export function legend() {
-  return h("div.legend", CRIT.map((k) => h("span", h("i", { style: { background: CRIT_META[k].color } }), CRIT_META[k].label)));
+export function legend(keys = CRIT) {
+  return h("div.legend", keys.map((k) => h("span", h("i", { style: { background: CRIT_META[k].color } }), CRIT_META[k].label)));
 }
 
 // Minimal, safe rendering of assistant text: paragraphs and "- " bullet lists.

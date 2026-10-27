@@ -1,0 +1,199 @@
+
+Scenario 1: Sara says "green and healthy" but acts "busy"
+
+Story: what Sara says she wants and what she does drift apart. The supervisor notices, asks before it guesses, then proposes a change with evidence and a counterfactual. Nothing changes until she accepts.
+
+Onboarding
+- Allergies: peanuts · Diet: vegetarian
+- Likes: cuisines Indian, Mediterranean; ingredient chickpeas. Dislike: eggplant (preference, not strict)
+- No time or budget limit
+- Dishes she likes: Chana Masala with Rice, Greek Salad with Chickpeas
+- Priorities: taste 20 · health 30 · sustainability 35 · price 10 · convenience 5
+
+#: 1
+Do: Discover: look at the top five
+What to point out: Expect Hummus and Veggie Plate, Oat Porridge with Berries, Dal Tadka, Loaded
+Sweet Potato, Black Bean Burrito Bowl. The Supervisor column shows how the list was computed:
+rules, then candidates, then scores, then utility, then diversity.
+────────────────────────────────────────
+#: 2
+Do: Open Evidence on #1
+What to point out: Rules passed, taste concepts with belief values, score × weight = contribution,
+and the "demo placeholder" flags on cost and CO₂e (uncertainty).
+────────────────────────────────────────
+#: 3
+Do: Assistant: "Why is #1 recommended?"
+What to point out: Live trace: perceive → intent (rules or model) → plan explain_recipe → tool →
+answer. The answer is built from recorded evidence: "Sustainability contributes most…", plus
+similar recipes from the knowledge graph.
+────────────────────────────────────────
+#: 4
+Do: Assistant: "What if I cared more about price?"
+What to point out: A counterfactual labelled "preview only; nothing was saved".
+────────────────────────────────────────
+#: 5
+Do: Behaviour phase on Discover, context set to dinner/home. Twice, click I'll cook this → Time on
+Hummus and Veggie Plate (15 min). Every third time, click Not for me → Too slow on Loaded Sweet
+Potato (40 min).
+What to point out: Each click produces a supervisor review trace: "Feedback recorded… your saved
+goal is not changed by feedback."
+────────────────────────────────────────
+#: 6
+Do: At about click 4
+What to point out: Trade-off question: "When convenience and sustainability pull in different
+directions, which usually wins for you?" The trace shows P ≥ 70% (conflict) but below the bar for
+a proposal, so it asks instead of guessing. Answer Convenience. The goal stays at v1, and the
+answer counts only as evidence.
+────────────────────────────────────────
+#: 7
+Do: Clicks 5–9
+What to point out: The trace says "Topic recently dismissed". This is the six-event cool-down
+showing restraint (it also appears after an answer, see notes).
+────────────────────────────────────────
+#: 8
+Do: At about click 10
+What to point out: Proposal: "Give convenience more weight? Saved 0.05, choices behave like 0.25
+(99% likely to differ, 11 supporting events). Accepting moves it halfway, to 0.14."
+Counterfactual: Aloo Gobi-style Potatoes would enter and Dal Tadka would leave. Expand the decide
+step to show the rule: P ≥ 90% and at least 4 events.
+────────────────────────────────────────
+#: 9
+Do: Accept
+What to point out: Goal v2 (accepted_proposal). New list: Hummus and Veggie Plate, Oat Porridge
+with Berries, Black Bean Burrito Bowl (#5 → #3, driven by convenience), Aloo Gobi (enters at
+#4), Loaded Sweet Potato. The "What changed" banner shows this.
+────────────────────────────────────────
+#: 10
+Do: Assistant: "Why is Aloo Gobi-style Potatoes here?"
+What to point out: Good teaching moment. It is utility rank 9, lifted to #4 by diversity because
+Hearty Lentil Soup was too similar to earlier picks (0.77). It is shown as a compromise:
+convenience 0.16 vs a median of 0.63.
+────────────────────────────────────────
+#: 11
+Do: "Why do you think convenience matters to me?"
+What to point out: Provenance: saved 0.14, behaviour suggests 0.24 (90% interval 0.15–0.32), "7
+choices, 3 reasoned rejections, 1 explicit goal statement".
+────────────────────────────────────────
+#: 12
+Do: "Something high protein under 20 minutes"
+What to point out: Request-only filters shown as tags: "30 recipes pass your mandatory rules, 3
+also pass this request's filters". Nothing is saved.
+────────────────────────────────────────
+#: 13
+Do: "What did I reject this week?"
+What to point out: Knowledge graph timeline query, including the supervisor decisions and their
+outcomes.
+────────────────────────────────────────
+#: 14
+Do: Insights, Knowledge → Graph (user:sara), then Profile
+What to point out: Saved vs revealed priorities with uncertainty bands. In the graph: Decision
+-[BASED_ON]→ Interaction edges. In Profile: goal v1 → v2, and Restore v1 shows the user stays in
+control.
+-----------------------------------------------------------------------
+Scenario 2: Reza, safety rules and changing tastes
+
+Story: mandatory rules are never bent, missing data is never treated as safe, a declared taste gets contradicted, a new allergy needs confirmation, and his own household notes become searchable knowledge.
+
+Onboarding
+- Allergy: crustaceans · no diet
+- Likes: Italian, Thai; ingredient mushroom
+- Never include (strict): olives. Dislike (preference): cabbage
+- Time ≤ 35 min, strict. Budget 2.50 €, as a preference
+- Dishes he likes: Spaghetti Pomodoro, Thai Basil Chicken
+- Priorities: taste 50 · health 15 · sustainability 10 · price 10 · convenience 15
+
+#: 1
+Do: Profile
+What to point out: Three mandatory rules: crustaceans, olives, 35 min. The budget is a preference,
+not a rule.
+────────────────────────────────────────
+#: 2
+Do: "Why isn't Bibimbap recommended?"
+What to point out: "Not eligible: allergen data incomplete, cannot confirm safe". It fails closed
+even though it contains no crustaceans.
+────────────────────────────────────────
+#: 3
+Do: "Tell me about Green Curry with Tofu"
+What to point out: Plan explain_recipe → alternatives (two tools). Utility rank 34. Its cost is
+missing, so the scores are shown without affordability (renormalised and disclosed, never
+averaged in). The graph suggests Saag Tofu and others as alternatives.
+────────────────────────────────────────
+#: 4
+Do: Seed "two weeks of history" (see below), then Review now
+What to point out: Trace: "Declared taste contradicted: Italian. Belief fell to 0.37 after 6
+rejections", followed by the question "Do you still want Italian as a preference?"
+────────────────────────────────────────
+#: 5
+Do: Before answering: "Why do you think I like Italian?"
+What to point out: Belief 0.37 from 7.3 units of evidence, the declaration, and the list of
+rejected dishes (provenance). Insights shows the same, with one-click correction.
+────────────────────────────────────────
+#: 6
+Do: Answer Remove from my profile
+What to point out: Profile v2 (answered_question). Preferred cuisines are now Thai only.
+────────────────────────────────────────
+#: 7
+Do: "I'm allergic to gluten"
+What to point out: "I prepared the change 'Add allergy: gluten'. It is not applied until you
+confirm. Eligible recipes would go from 39 to 8." The plan step says mandatory rules only change
+with confirmation.
+────────────────────────────────────────
+#: 8
+Do: Accept the card
+What to point out: Profile v3, four rules. New list: Black Bean Burrito Bowl, Creamy Mushroom
+Potatoes, Dal Tadka, Vegan Buddha Bowl, Green Curry with Tofu (shows the missing-cost badge).
+────────────────────────────────────────
+#: 9
+Do: "Something Italian under 15 minutes"
+What to point out: Empty-result diagnosis: each filter "excludes 8 of the recipes your rules
+allow". Rules are never relaxed.
+────────────────────────────────────────
+#: 10
+Do: "Compare #1 and #2"
+What to point out: Black Bean Burrito Bowl 0.67 vs Creamy Mushroom Potatoes 0.61. Convenience (0.63
+vs 0.31) decides it.
+────────────────────────────────────────
+#: 11
+Do: Knowledge → Library: add "Household note" with the text "We buy tofu in bulk at the Asian
+market every Saturday, so tofu dishes are cheap for us. Our oven is broken until November, so
+avoid baked dishes." In the retrieval tester, search "oven".
+What to point out: Each hit shows its BM25 rank, vector rank and RRF score. Without Ollama
+embeddings the hits are labelled lexical, not semantic.
+────────────────────────────────────────
+#: 12
+Do: "Is our oven working?"
+What to point out: His note comes back first, cited as [doc_…#0] (your document).
+────────────────────────────────────────
+#: 13
+Do: "Which recipes contain tofu?"
+What to point out: Plan graph_lookup → search_knowledge. Structured graph facts (category
+soy_product, used in 6 recipes) plus text passages, including his note.
+────────────────────────────────────────
+#: 14
+Do: "How is healthiness calculated?"
+What to point out: Method notes: Nutri-Score 2015 points, plus the stated limit "not a clinical
+assessment".
+────────────────────────────────────────
+#: 15
+Do: "What did I reject this week?", then Activity, then Graph user:reza
+What to point out: Six rejects and "latest decision: Add allergy: gluten (accepted)". The graph
+shows DECLARED → gluten, Interaction -[ON]→ Recipe, and Decisions. Profile shows v1 → v2 → v3,
+each with its source.
+
+Seed for step 4. Only one Italian dish ever shows on Discover, so you can't reach the 6 rejections the taste-conflict check needs by clicking. Present this as Reza's past two weeks:
+for r in r001 r002 r003 r004 r052 r001; do
+curl -s -X POST localhost:8000/api/users/reza/feedback -H 'content-type: application/json' \
+-d "{\"recipe_id\":\"$r\",\"type\":\"reject\",\"reason\":\"not_my_taste\",\"context\":{\"meal\":\"dinner\",\"place\":\"home\"}}" >/dev/null
+done
+
+---
+
+Things the dry run turned up, so they don't surprise you on stage
+
+- Place questions in chat don't filter. "What did I reject at work?" returns all rejects. The graph stores place, but the chat parser has no place slot, so ask by time and type only.
+- The cool-down step is always titled "Topic recently dismissed", even when the user answered the question. Call it a cool-down.
+- Compare answers are hard to read when you name recipes. The values are printed in the order you named the recipes, not winner first. For example, "Hummus and Veggie Plate is higher (0.67 vs 1.0)" came back when Greek Salad was named first. Asking by rank ("Compare #1 and #2") keeps it readable.
+- The "What changed" banner leaves out profile changes. After a profile change it lists the recipes that entered and left, but no changed input, because compare() only diffs weights, filters and versions (foodrec/service.py:201). Say out loud that the allergy rule caused the change.
+- Oat Porridge (a breakfast) shows up in dinner lists. The meal/place context is recorded with feedback but is not used as a filter.
+
+The dry-run scripts are in /private/tmp/claude-501/-Users-armin-Developer-Python-agentic-recom-sys/b81a94ea-8651-47f9-9323-7b314df28ac6/scratchpad/ (sim2.py is Sara, sim3.py is Reza) if you want to check the numbers again before a demo. I can also turn this into a shareable document for the people you're presenting to.

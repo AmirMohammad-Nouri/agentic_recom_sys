@@ -11,13 +11,6 @@ import statistics
 
 from . import CRITERIA, CRITERION_LABELS
 
-GAP_TEXT = {
-    "cost": "cost is unavailable for this recipe",
-    "sustainability": "sustainability data is unavailable for this recipe",
-    "allergens": "allergen data is incomplete",
-    "animal_origin": "the animal origin of one ingredient is unknown",
-}
-PLACEHOLDER_TEXT = "demo placeholder value, not sourced data"
 
 
 def _f2(x):
@@ -28,7 +21,7 @@ def _pct(x):
     return f"{round(x * 100):d}%"
 
 
-def build_evidence(item, ranked, declared, support, nutri):
+def build_evidence(item, ranked, declared, support, bd):
     """item/ranked: engine result rows. Returns the evidence record for one result."""
     r = item["recipe"]
     scores, eff = item["scores"], item["effective_weights"]
@@ -43,12 +36,10 @@ def build_evidence(item, ranked, declared, support, nutri):
             fit.append({"type": "preference", "concept": s["concept"], "mean": s["mean"],
                         "text": f"matches a taste you showed: {s['concept'].split(':', 1)[1]} "
                                 f"(belief {_f2(s['mean'])})"})
-    t = declared.get("max_prep_minutes")
-    if t and not t.get("strict") and r["prep_minutes"] <= t["value"]:
-        fit.append({"type": "soft_target", "text": f"takes {r['prep_minutes']} min, within your preferred {t['value']} min"})
-    c = declared.get("max_cost_eur")
-    if c and not c.get("strict") and r.get("cost_eur_per_serving") is not None and r["cost_eur_per_serving"] <= c["value"]:
-        fit.append({"type": "soft_target", "text": f"costs {_f2(r['cost_eur_per_serving'])} EUR, within your preferred {c['value']} EUR"})
+    t = declared.get("max_ingredients")
+    if t and not t.get("strict") and r["n_ingredients"] <= t["value"]:
+        fit.append({"type": "soft_target",
+                    "text": f"uses {r['n_ingredients']} ingredients, within your preferred {t['value']}"})
     ev["fit"] = fit
 
     # ---- why it ranked here -----------------------------------------------------
@@ -95,17 +86,18 @@ def build_evidence(item, ranked, declared, support, nutri):
 
     # ---- uncertainty -------------------------------------------------------------
     unc = []
-    for m in r.get("missing", []):
-        unc.append({"kind": "missing", "field": m, "text": GAP_TEXT.get(m, f"{m} unavailable")})
-    if r.get("cost_provenance") == "fixture_placeholder":
-        unc.append({"kind": "placeholder", "field": "cost", "text": f"cost: {PLACEHOLDER_TEXT}"})
-    if r.get("co2e_provenance") == "fixture_placeholder" and r.get("co2e_kg_per_serving") is not None:
-        unc.append({"kind": "placeholder", "field": "sustainability", "text": f"sustainability: {PLACEHOLDER_TEXT}"})
+    if not r.get("allergens_complete", True):
+        unc.append({"kind": "missing", "field": "allergens",
+                    "text": "allergen data is incomplete (some ingredients could not be classified)"})
     unc.append({"kind": "estimate", "field": "p",
-                "text": "preference match is a model estimate, not an observed rating"})
-    if nutri is not None:
+                "text": "taste match is a model estimate, not an observed rating"})
+    if bd and bd["h"]["score"] is not None:
         unc.append({"kind": "measure", "field": "h",
-                    "text": f"healthiness is a Nutri-Score based operational measure (grade {nutri['grade']}), not a clinical assessment"})
+                    "text": f"healthiness is an operational nutrient measure for the goal '{bd['h']['goal_label']}' "
+                            f"(grade {bd['h']['grade']}), not dietetic advice"})
+    if bd and bd["s"]["kg_co2e_per_kg"] is not None:
+        unc.append({"kind": "estimate", "field": "s",
+                    "text": "sustainability is estimated from ingredient amounts and food-group averages"})
     if item["missing_criteria"]:
         names = ", ".join(CRITERION_LABELS[k] for k in item["missing_criteria"])
         unc.append({"kind": "scoring", "field": "missing",
@@ -169,14 +161,12 @@ def template_reasons(ev):
 BANNED = re.compile(r"\b(cure|cures|prevent|prevents|treat|treats|clinical(ly)?|doctor|diagnos\w*|"
                     r"guarantee\w*|proven|will lower|will improve|medical advice)\b", re.I)
 COMPARATIVES = [
-    (re.compile(r"\b(cheaper|more affordable|less expensive|lower cost)\b", re.I), "c:better"),
-    (re.compile(r"\b(pricier|more expensive|costlier|higher cost)\b", re.I), "c:worse"),
     (re.compile(r"\b(healthier|more nutritious|better nutrition)\b", re.I), "h:better"),
     (re.compile(r"\b(less healthy|unhealthier)\b", re.I), "h:worse"),
     (re.compile(r"\b(greener|more sustainable|lower footprint|lower emissions)\b", re.I), "s:better"),
     (re.compile(r"\b(less sustainable|higher footprint|higher emissions)\b", re.I), "s:worse"),
-    (re.compile(r"\b(quicker|faster|less time)\b", re.I), "t:better"),
-    (re.compile(r"\b(slower|more time|takes longer)\b", re.I), "t:worse"),
+    (re.compile(r"\b(simpler|easier|more convenient|fewer ingredients)\b", re.I), "t:better"),
+    (re.compile(r"\b(more complicated|less convenient|more ingredients)\b", re.I), "t:worse"),
 ]
 _NUM = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?%?")
 
@@ -220,8 +210,10 @@ def validate_narrative(text, pack):
     if BANNED.search(text):
         return False, "banned claim: " + BANNED.search(text).group(0)
     in_list = set(pack["titles_in_list"])
+    low = text.lower()
     for t in pack["all_titles"]:
-        if t not in in_list and t.lower() in text.lower():
+        # short one-word titles ("Salsa") collide with ordinary words; only check distinctive ones
+        if t not in in_list and (" " in t.strip() and len(t) >= 12) and t.lower() in low:
             return False, f"mentions a recipe that is not in the list: {t}"
     allowed = pack["numbers"]
     for tok in _NUM.findall(text):

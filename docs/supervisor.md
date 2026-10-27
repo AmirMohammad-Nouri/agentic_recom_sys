@@ -10,38 +10,41 @@ makes from fixed options, with a rule-based fallback.
 Runs after every piece of feedback, on "Review now", and inside chat recommendations.
 
 ```
-evidence ──▶ learner ──▶ compare saved goal w with revealed weights θ
+choices, reasoned rejections, answers ──▶ value model ──▶ observed weights o
                           │
-          P(|θ_k − w_k| > δ) < 0.70 for all k ──▶ "aligned" / "uncertain" (stay quiet)
+          gap_k = o_k − w_k  (w = saved goal)
                           │
-          conflict on criterion k (largest P·|diff|)
+          all |gap| < 0.10, or < 3 events since the goal ──▶ "aligned" (stay quiet)
+                          │
+          criterion k with the largest |gap|
                           │
           another priority question already open? ──▶ wait (one at a time)
           topic answered/dismissed < 6 feedback events ago? ──▶ respect it
                           │
           search history in the graph (timeline, reasons naming k)
                           │
-          P ≥ 0.90 and ≥ 4 informative events since the last explicit statement?
+          |gap| ≥ 0.15 and ≥ 6 events?
                │ yes                                    │ no
                ▼                                        ▼
         GOAL PROPOSAL                            TRADE-OFF QUESTION
-        w_k ← (w_k + θ_k)/2, renormalise         "When k and j pull in different
+        w_k ← (w_k + o_k)/2, renormalise         "When k and j pull in different
         counterfactual: which recipes would       directions, which usually wins?"
-        enter/leave the top five                  answer = Bradley–Terry evidence
-        waits for Accept / Keep my goal           (never edits the goal)
+        enter/leave the top five                  answer = evidence (±0.2 nudge),
+        waits for Accept / Keep my goal           never edits the goal
 ```
 
 Also checked every time: **taste conflicts**. A cuisine or ingredient the user *declared* as a
-liking whose belief fell below 0.40, with at least 2 units of evidence, produces the question
-"Do you still want X as a preference?". Removal only happens if the user picks that option.
+liking whose taste fell below 0.40, with at least 2 units of observed evidence, produces the
+question "Do you still want X as a preference?". Removal only happens if the user picks that
+option.
 
 | Threshold | Value | Meaning |
 | --- | --- | --- |
-| `conflict_prob` | 0.70 | Posterior probability that a weight differs from the goal by more than δ = 0.08 |
-| `strong_prob` | 0.90 | Needed to propose rather than ask |
-| `min_evidence` | 4 | Informative events (choices, reasoned rejections, answers) since the last statement |
-| `low_confidence` | 0.25 | Below this, results are described as resting on the saved goal |
-| `taste_conflict_mean` | 0.40 | Declared liking contradicted when its belief falls below this |
+| `ask_gap` | 0.10 | Gap between observed and stated weight worth a question ... |
+| `ask_min_events` | 3 | ... after this many informative events since the goal was saved |
+| `propose_gap` | 0.15 | Gap worth a proposal ... |
+| `propose_min_events` | 6 | ... after this many events |
+| `taste_conflict_mean` | 0.40 | Declared liking contradicted when its taste falls below this |
 | `taste_min_evidence` | 2.0 | ... with at least this much observed evidence |
 | `cooldown_events` | 6 | Feedback events before an answered or dismissed topic can return |
 

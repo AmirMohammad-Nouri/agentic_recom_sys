@@ -80,6 +80,18 @@ CREATE TABLE IF NOT EXISTS messages (
     attachments_json TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS messages_user ON messages(user_id, ts);
+CREATE TABLE IF NOT EXISTS catalogue_meta (
+    slot TEXT PRIMARY KEY,
+    version TEXT NOT NULL,
+    meta_json TEXT NOT NULL,
+    groups_json TEXT NOT NULL,
+    imported_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS recipes (
+    recipe_id TEXT PRIMARY KEY,
+    pos INTEGER NOT NULL,
+    recipe_json TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS documents (
     doc_id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -107,6 +119,35 @@ class Store:
         c = sqlite3.connect(self.path, timeout=10)
         c.row_factory = sqlite3.Row
         return c
+
+    # ---- recipe catalogue (imported from the portable catalogue file) -----------------
+    def catalogue_version(self):
+        with self._conn() as c:
+            r = c.execute("SELECT version FROM catalogue_meta WHERE slot = 'active'").fetchone()
+            return r["version"] if r else None
+
+    def import_catalogue(self, payload):
+        """Replace the stored catalogue with `payload` unless the same version is stored.
+        Returns "unchanged" or "imported"."""
+        version = payload["meta"]["version"]
+        if self.catalogue_version() == version:
+            return "unchanged"
+        with self._lock, self._conn() as c:
+            c.execute("DELETE FROM recipes")
+            c.executemany("INSERT INTO recipes VALUES (?, ?, ?)",
+                          [(r["id"], i, json.dumps(r, separators=(",", ":"))) for i, r in enumerate(payload["recipes"])])
+            c.execute("INSERT OR REPLACE INTO catalogue_meta VALUES ('active', ?, ?, ?, ?)",
+                      (version, json.dumps(payload["meta"]), json.dumps(payload.get("groups") or {}), time.time()))
+        return "imported"
+
+    def load_catalogue(self):
+        with self._conn() as c:
+            m = c.execute("SELECT * FROM catalogue_meta WHERE slot = 'active'").fetchone()
+            if not m:
+                return None
+            rows = c.execute("SELECT recipe_json FROM recipes ORDER BY pos").fetchall()
+        return {"meta": json.loads(m["meta_json"]), "groups": json.loads(m["groups_json"]),
+                "recipes": [json.loads(r["recipe_json"]) for r in rows]}
 
     # ---- users -------------------------------------------------------------------
     def ensure_user(self, user_id):

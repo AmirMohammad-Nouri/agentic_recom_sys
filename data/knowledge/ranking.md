@@ -1,19 +1,16 @@
 # How recipes are ranked
 
 ## Mandatory rules first
-Allergies, diets, never-include ingredients and strict time or cost limits filter eligibility before any ranking. Missing allergen data is never treated as safe: if you declare any allergy, recipes with incomplete allergen data are excluded. A diet that cannot be verified fails. Rules are never relaxed automatically; when nothing is eligible the system shows which rule removes the most recipes.
+Allergies, diets, strict dislikes and a strict ingredient limit remove recipes before anything is scored. A recipe whose allergen data is incomplete is excluded for anyone with an allergy (fail closed).
 
-## Request-only filters
-The assistant can apply filters from one message, such as "at least 25 g protein" or "under 20 minutes". They are shown with the result, are not saved, and do not change your weights.
+## Four scores
+Each remaining recipe has four scores between 0 and 1: taste match (learned from your likes and rejections), healthiness (nine nutrient factors weighted by your health goal), sustainability (kg CO2e per kg, log scale) and convenience (number of ingredients).
 
-## Weighted utility
-Utility U = sum of weight times score over preference match, healthiness, sustainability, affordability and convenience. The five weights are normalised to sum to 1. Reference check: weights 0.30/0.25/0.20/0.15/0.10 and scores 0.80/0.90/0.55/0.70/0.85 give 0.765.
+## Utility
+You set three values: healthiness, sustainability and convenience, which sum to 1. Taste always keeps a fixed 25 % share, so U = 0.25 x taste + 0.75 x (w_h x healthiness + w_s x sustainability + w_t x convenience). For example values 0.5, 0.3, 0.2 and scores taste 0.8, healthiness 0.9, sustainability 0.55, convenience 0.85 give U = 0.78875.
 
-## Missing values
-The default policy is renormalise: a criterion without evidence is dropped for that recipe and its remaining weights are rescaled. The policy is disclosed in each recipe's evidence.
+## Why taste has a fixed share
+Taste is not something people want to trade off on a slider; it is learned from behaviour. Keeping it at a fixed share means the three sliders mean exactly what they say, and a dish you would never eat still cannot win on numbers alone.
 
 ## Diversity
-A greedy maximal marginal relevance reranker builds the list of five. With diversity d, each step picks the recipe maximising (1 - d) * U - d * (highest similarity to recipes already chosen). Similarity is the cosine between cuisine, ingredient-share and category vectors. d = 0 reproduces pure utility order. Each recipe records both its utility rank and its final rank.
-
-## Computation modes
-Lightweight uses cached features and the concept-level taste model. Extended adds a similarity-weighted pass over your like, save, choose and reject history for the preference estimate. Both modes use the same rules, scores, weights and candidate set; extended mode does not guarantee better results.
+The top five are picked greedily: each next dish maximises (1 - d) x utility - d x similarity to dishes already picked. With d = 0 the list is the pure utility order. Both the utility rank and the final rank are recorded.

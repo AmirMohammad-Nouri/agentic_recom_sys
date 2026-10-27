@@ -10,12 +10,14 @@ import logging
 import threading
 import time
 
-from . import CRITERIA, CRITERION_LABELS
-from .catalogue import Catalogue
+from collections import Counter
+
+from . import CRITERION_LABELS, TASTE_SHARE, VALUE_CRITERIA
+from .catalogue import Catalogue, read_payload
 from .compare import compare
 from .constraints import SUPPORTED_ALLERGENS, SUPPORTED_DIETS, active_constraints, validate_declared
 from .engine import public, recommend
-from .features import ReferenceScaler
+from .features import DEFAULT_GOAL, GOALS, Scorer
 from .knowledge import make_graph, make_retriever
 from .knowledge.documents import build_corpus
 from .learner import Learner
@@ -28,19 +30,22 @@ log = logging.getLogger("foodrec.service")
 LEARNER_EVENTS = ("profile_created", "profile_updated", "goal_saved", "proposal_accepted", "feedback",
                   "profile_correction", "question_answered")
 FEEDBACK_TYPES = ("like", "save", "choose", "reject")
-REJECT_REASONS = ("not_my_taste", "too_expensive", "too_slow", "not_healthy_enough", "not_sustainable",
+REJECT_REASONS = ("not_my_taste", "not_healthy_enough", "not_sustainable", "too_complicated",
                   "had_recently", "other")
-CHOOSE_REASONS = ("taste", "price", "health", "climate", "time")
+CHOOSE_REASONS = ("taste", "health", "climate", "easy")
+# Discover's meal selector -> catalogue meal types (request-only filter, never saved)
+MEAL_CONTEXTS = {"breakfast": ["breakfast"], "lunch": ["main", "salad", "soup", "side"],
+                 "dinner": ["main", "soup", "salad"], "snack": ["snack"], "dessert": ["dessert"],
+                 "drink": ["drink"]}
 
 
 class App:
     def __init__(self, settings, llm=None):
         self.s = settings
         self.lock = threading.RLock()
-        self.catalogue = Catalogue.load(settings.catalogue_path)
-        self.ingredients = json.loads(settings.ingredients_path.read_text())
-        self.scaler = ReferenceScaler.fit(self.catalogue)
         self.store = Store(settings.db_path)
+        self.catalogue, self.catalogue_import = self._load_catalogue(settings.catalogue_path)
+        self.scaler = Scorer(self.catalogue)
         self.llm = llm if llm is not None else OllamaLLM(settings)
         self.graph, self.graph_note = make_graph(settings)
         self.retriever, self.retriever_note = make_retriever(settings, self.llm)
@@ -50,9 +55,22 @@ class App:
         self.reindex()
 
     # ---- startup projections ----------------------------------------------------------
+    def _load_catalogue(self, path):
+        """Import the portable catalogue file into SQLite (skipped if that version is already
+        stored), then load the recipes from the database. Without a file the stored copy is used."""
+        status = "missing_file"
+        if path.exists():
+            status = self.store.import_catalogue(read_payload(path))
+        payload = self.store.load_catalogue()
+        if payload is None:
+            raise FileNotFoundError(f"no catalogue: {path} does not exist and the database holds none. "
+                                    "Build it with: python -m foodrec.ingest")
+        log.info("catalogue %s (%s, %d recipes)", status, payload["meta"]["version"], len(payload["recipes"]))
+        return Catalogue.from_payload(payload), status
+
     def _project_graph(self):
         t0 = time.perf_counter()
-        self.graph.load_catalogue(self.catalogue, self.ingredients, self.scaler)
+        self.graph.load_catalogue(self.catalogue, self.scaler)
         for ev in self.store.events():
             self.graph.record_event(ev)
         for uid in self.store.users():
@@ -61,7 +79,7 @@ class App:
         log.info("graph projected in %.0f ms (%s)", (time.perf_counter() - t0) * 1000, self.graph_note)
 
     def reindex(self):
-        chunks = build_corpus(self.catalogue, self.ingredients, self.s.knowledge_dir, self.store.documents())
+        chunks = build_corpus(self.catalogue, self.s.knowledge_dir, self.store.documents())
         return self.retriever.build(chunks)
 
     def system(self):
@@ -70,14 +88,37 @@ class App:
                 "retrieval": {**self.retriever.description, "note": self.retriever_note},
                 "catalogue": {"name": self.catalogue.name, "version": self.catalogue.version,
                               "recipes": len(self.catalogue), "note": self.catalogue.note,
-                              "coverage": self.catalogue.coverage()},
-                "scaler": self.scaler.version, "modes": MODES,
+                              "coverage": self.catalogue.coverage(), "meta": self.catalogue.meta,
+                              "import": self.catalogue_import},
+                "scaler": self.scaler.version, "scoring": self.scaler.describe(), "modes": MODES,
                 "options": {"allergens": SUPPORTED_ALLERGENS, "diets": SUPPORTED_DIETS,
                             "cuisines": sorted({r["cuisine"] for r in self.catalogue.recipes}),
-                            "ingredients": sorted({i["name"] for r in self.catalogue.recipes
-                                                   for i in r["ingredients"]}),
+                            "meals": sorted({r.get("meal", "main") for r in self.catalogue.recipes}),
+                            "meal_contexts": MEAL_CONTEXTS,
+                            "ingredients": self._common_ingredients(),
+                            "health_goals": [{"id": k, "label": v["label"]} for k, v in GOALS.items()],
                             "reject_reasons": REJECT_REASONS, "choose_reasons": CHOOSE_REASONS},
-                "criteria": CRITERION_LABELS}
+                "criteria": CRITERION_LABELS, "value_criteria": VALUE_CRITERIA, "taste_share": TASTE_SHARE}
+
+    def _common_ingredients(self, min_recipes=5):
+        if not hasattr(self, "_ing_vocab"):
+            c = Counter(i["name"] for r in self.catalogue.recipes for i in r["ingredients"])
+            self._ing_vocab = sorted(n for n, k in c.items() if k >= min_recipes)
+        return self._ing_vocab
+
+    def search_recipes(self, q="", limit=40, ids=None, meal=None):
+        if ids:
+            return [self.catalogue.by_id[i] for i in ids if i in self.catalogue.by_id]
+        q = (q or "").strip().lower()
+        out = []
+        for r in self.catalogue.recipes:
+            if meal and r.get("meal") != meal:
+                continue
+            if not q or q in r["title"].lower() or any(q == i["name"] for i in r["ingredients"]):
+                out.append(r)
+                if len(out) >= limit:
+                    break
+        return out
 
     # ---- learner -------------------------------------------------------------------------
     def learner(self, user_id):
@@ -120,8 +161,8 @@ class App:
                "liked_ingredients": sorted({x.strip().lower() for x in d.get("liked_ingredients") or [] if x.strip()}),
                "preferred_cuisines": sorted(set(d.get("preferred_cuisines") or [])),
                "liked_recipes": list(d.get("liked_recipes") or []),
-               "max_prep_minutes": d.get("max_prep_minutes") or None,
-               "max_cost_eur": d.get("max_cost_eur") or None}
+               "max_ingredients": d.get("max_ingredients") or None,
+               "health_goal": d.get("health_goal") if d.get("health_goal") in GOALS else DEFAULT_GOAL}
         validate_declared(out)
         return out
 
@@ -176,6 +217,7 @@ class App:
         goal = self.store.goal(user_id) or {"version": 0, "weights": dict(DEFAULT_WEIGHTS),
                                             "diversity": 0.3, "mode": "lightweight"}
         cfg = {"weights": overrides.get("weights") or goal["weights"],
+               "health_goal": prof["declared"].get("health_goal") or DEFAULT_GOAL,
                "diversity": goal["diversity"] if overrides.get("diversity") is None else overrides["diversity"],
                "mode": overrides.get("mode") or goal["mode"],
                "request_filters": overrides.get("request_filters") or [],
@@ -187,7 +229,7 @@ class App:
                     "versions": {**res["versions"], "profile": prof["version"], "goal": goal["version"]},
                     "goal_weights": goal["weights"],
                     "weights_source": f"saved goal v{goal['version']}" if all(
-                        abs(res["config"]["weights_applied"][k] - goal["weights"][k]) < 1e-6 for k in CRITERIA)
+                        abs(res["config"]["values_applied"][k] - goal["weights"][k]) < 1e-6 for k in VALUE_CRITERIA)
                     else "adjusted for this request"})
         if save:
             prev = self.store.last_list(user_id)
@@ -293,31 +335,32 @@ class App:
 
     # ---- insight: what the system believes and why ---------------------------------------
     def insight(self, user_id):
+        """Stated vs observed weights per criterion, preference match, taste beliefs."""
         lr = self.learner(user_id)
         goal = self.store.goal(user_id)
-        out = {"stated": goal["weights"] if goal else None, "criteria": [], "taste": [],
-               "counts": None}
-        if lr.choice is not None and goal:
-            inf = lr.choice.inferred()
-            disc = lr.choice.discrepancy(goal["weights"])
-            out["counts"] = {"choices": lr.choice.n_choices, "reasons": lr.choice.n_reasons,
-                             "rejections": lr.choice.n_rejections, "statements": lr.choice.n_statements}
-            for k in CRITERIA:
-                out["criteria"].append({
-                    "criterion": k, "label": CRITERION_LABELS[k], "stated": goal["weights"][k],
-                    "inferred": inf[k]["mean"], "lo": inf[k]["lo"], "hi": inf[k]["hi"],
-                    "confidence": inf[k]["confidence"], "prob_differs": disc[k]["prob_beyond_delta"],
-                    "direction": disc[k]["direction"]})
+        prof = self.store.profile(user_id)
+        out = {"stated": None, "observed": None, "criteria": [], "preference_match": None, "confidence": None,
+               "counts": None, "taste": [], "evidence": [],
+               "health_goal": (prof or {}).get("declared", {}).get("health_goal", DEFAULT_GOAL),
+               "taste_share": TASTE_SHARE}
+        if lr.values is not None and goal:
+            vm = lr.values
+            stated = {k: goal["weights"][k] for k in VALUE_CRITERIA}
+            out.update({"stated": stated, "observed": dict(vm.observed), "preference_match": vm.match(stated),
+                        "confidence": vm.confidence(), "events_since_goal": vm.n, "counts": dict(vm.counts)})
+            for k in VALUE_CRITERIA:
+                out["criteria"].append({"criterion": k, "label": CRITERION_LABELS[k], "stated": stated[k],
+                                        "observed": vm.observed[k], "gap": vm.observed[k] - stated[k],
+                                        "closeness": 1.0 - abs(vm.observed[k] - stated[k])})
             logged = {e["event_id"]: e for e in self.store.events(user_id)}
-            rows = []
-            for e in lr.choice.evidence[-20:][::-1]:
+            for e in vm.evidence[-20:][::-1]:
                 rid = logged.get(e.get("event_id"), {}).get("payload", {}).get("recipe_id")
-                rows.append({**e, "recipe": self.catalogue.by_id[rid]["title"] if rid in self.catalogue.by_id else None,
-                             "ts": logged.get(e.get("event_id"), {}).get("ts")})
-            out["evidence"] = rows
-        for c, m, sd, n in lr.taste.top(12):
+                out["evidence"].append({**e, "recipe": self.catalogue.by_id[rid]["title"]
+                                        if rid in self.catalogue.by_id else None,
+                                        "ts": logged.get(e.get("event_id"), {}).get("ts")})
+        for c, m, n in lr.taste.top(12):
             prov = lr.taste.prov.get(c, [])
-            out["taste"].append({"concept": c, "mean": m, "sd": sd, "evidence": n,
+            out["taste"].append({"concept": c, "mean": m, "evidence": n, **lr.taste.counts(c),
                                  "declared": any(p["kind"] == "declared" for p in prov),
                                  "corrected": any(p["kind"] == "user_correction" for p in prov),
                                  "provenance": prov[-6:][::-1]})

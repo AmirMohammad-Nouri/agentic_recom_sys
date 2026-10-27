@@ -22,11 +22,11 @@ def intent(sup, text):
 
 # ---- intent parsing -----------------------------------------------------------------
 @pytest.mark.parametrize("text,expected", [
-    ("something quick with lentils", "recommend"),
+    ("something easy with lentils", "recommend"),
     ("why is #2 here?", "explain_recipe"),
     ("compare #1 and #3", "compare_recipes"),
     ("what if I cared more about sustainability?", "what_if"),
-    ("why do you think price matters to me?", "why_preference"),
+    ("why do you think convenience matters to me?", "why_preference"),
     ("what did I reject last week?", "history"),
     ("how is healthiness calculated?", "knowledge"),
     ("I'm allergic to sesame", "update_profile"),
@@ -43,31 +43,31 @@ def test_mentioning_a_food_is_not_an_allergy(sup):
 
 
 def test_rule_filters(sup):
-    f = intent(sup, "high protein Indian dinner under 30 minutes without onion")["filters"]
-    assert f == {"protein_min": 25, "max_minutes": 30, "cuisine": "Indian", "exclude_ingredient": "onion"}
+    f = intent(sup, "high protein Indian dinner with at most 8 ingredients without onion")["filters"]
+    assert f == {"protein_min": 25, "max_ingredients": 8, "cuisine": "Indian", "exclude_ingredient": "onion"}
 
 
 def test_model_output_is_validated(sup):
     it, notes = validate_model({"intent": "recommend", "filters": {"cuisine": "Atlantis", "protein_min": 9999,
-                                                                    "max_minutes": 20},
+                                                                    "max_ingredients": 6},
                                 "recipe_refs": ["Unicorn Stew", "#2"]}, "x", sup.app.catalogue, sup.vocab)
-    assert it["filters"] == {"max_minutes": 20.0} and it["recipe_refs"] == ["#2"]
+    assert it["filters"] == {"max_ingredients": 6.0} and it["recipe_refs"] == ["#2"]
     assert len(notes) == 3
 
 
 # ---- supervisor turns (offline: rules + templates) -----------------------------------
 def test_chat_recommend_offline(sup):
-    out = sup.chat("u", "something with chickpeas")
+    out = sup.chat("u", "something with eggs")
     kinds = [s["kind"] for s in out["message"]["trace"]]
     assert kinds[0] == "perceive" and "tool" in kinds and kinds[-1] == "answer"
     res = out["message"]["attachments"]["result"]
-    assert res["config"]["request_filters"][0]["label"] == "Ingredient includes chickpeas"
-    assert all("chickpeas" in r["ingredients"] for r in res["results"])
+    assert res["config"]["request_filters"][0]["label"] == "Ingredient includes eggs"
+    assert all("eggs" in r["ingredients"] for r in res["results"])
 
 
 def test_references_resolve_against_latest_nonempty_list(sup):
     sup.app.recommend("u")
-    sup.chat("u", "something with unicorn under 1 minutes")  # empty result
+    sup.chat("u", "something with at most 1 ingredients")  # empty result
     out = sup.chat("u", "why is #2 here?")
     assert "Which recipe" not in out["message"]["text"]
 
@@ -99,21 +99,23 @@ def test_model_answer_accepted_when_grounded(onboarded):
 
 
 def test_validate_answer():
-    assert validate_answer("Utility 0.82 for Dal Tadka.", [0.82], ["Dal Tadka"], ["Dal Tadka", "Falafel Wrap"])[0]
-    assert not validate_answer("Try Falafel Wrap.", [], ["Dal Tadka"], ["Dal Tadka", "Falafel Wrap"])[0]
+    titles = ["Dal Tadka Classic", "Falafel Wrap Deluxe", "Salsa"]
+    assert validate_answer("Utility 0.82 for Dal Tadka Classic.", [0.82], ["Dal Tadka Classic"], titles)[0]
+    assert not validate_answer("Try Falafel Wrap Deluxe.", [], ["Dal Tadka Classic"], titles)[0]
+    assert validate_answer("Add some salsa on top.", [], [], titles)[0]  # one-word titles are ordinary words
     assert not validate_answer("This is clinically proven.", [], [], [])[0]
 
 
 # ---- monitoring policy ------------------------------------------------------------------
-def _choose_cheapest(app, n):
+def _choose_simplest(app, n):
     for _ in range(n):
         res = app.recommend("u")
-        r = min(res["results"], key=lambda x: x["cost_eur"] or 99)
-        app.feedback("u", res["request_id"], r["recipe_id"], "choose", "price")
+        r = min(res["results"], key=lambda x: x["n_ingredients"])
+        app.feedback("u", res["request_id"], r["recipe_id"], "choose", "easy")
 
 
 def test_conflict_asks_one_question_at_a_time(onboarded):
-    _choose_cheapest(onboarded, 8)
+    _choose_simplest(onboarded, 8)
     raised = []
     for _ in range(3):
         raised += policy.review(onboarded, "u", Trace())["decisions"]
@@ -123,7 +125,7 @@ def test_conflict_asks_one_question_at_a_time(onboarded):
 
 
 def test_dismissed_topic_cools_down(onboarded):
-    _choose_cheapest(onboarded, 8)
+    _choose_simplest(onboarded, 8)
     rv = policy.review(onboarded, "u", Trace())
     d = (rv["decisions"] or onboarded.store.decisions("u", status="open"))[0]
     onboarded.resolve_decision("u", d["decision_id"], "dismiss")
@@ -133,7 +135,7 @@ def test_dismissed_topic_cools_down(onboarded):
 
 
 def test_strong_evidence_produces_proposal_with_counterfactual(onboarded):
-    _choose_cheapest(onboarded, 14)
+    _choose_simplest(onboarded, 14)
     tr = Trace()
     rv = policy.review(onboarded, "u", tr)
     kinds = {d["kind"] for d in onboarded.store.decisions("u", status="open")}
@@ -162,10 +164,10 @@ def test_taste_conflict_question(onboarded):
 def test_learner_rebuilt_from_event_log(tmp_path):
     a = make_app(tmp_path)
     a.onboard("u", {}, None)
-    _choose_cheapest(a, 3)
+    _choose_simplest(a, 3)
     state = a.learner("u").state_dict()
     b = make_app(tmp_path)
-    assert b.learner("u").state_dict()["choice"]["mu"] == pytest.approx(state["choice"]["mu"])
+    assert b.learner("u").state_dict()["values"]["observed"] == pytest.approx(state["values"]["observed"])
     assert len(b.graph.timeline("u")) == len(a.graph.timeline("u"))
 
 
@@ -177,9 +179,9 @@ def test_graph_queries(onboarded):
     assert g.timeline("u", types=["like"], place="work")[0]["recipe_id"] == rid
     assert g.timeline("u", types=["like"], place="home") == []
     assert g.recommended("u")[0]["request_id"] == res["request_id"]
-    prof = g.ingredient_profile("chickpeas", "u")
-    assert prof["recipes"] and prof["category"] == ["legume"]
-    alts = g.alternatives("r001", "s")
+    prof = g.ingredient_profile("eggs", "u")
+    assert prof["recipes"] and prof["category"] == ["eggs"]
+    alts = g.alternatives(rid, "s")
     assert all(a["score"] > a["base_score"] for a in alts)
     nb = g.neighborhood("user:u")
     assert any(e["type"] == "DECLARED" for e in nb["edges"])
@@ -199,13 +201,19 @@ def test_api_end_to_end(tmp_path):
 
     from foodrec.api import create_app
     from foodrec.config import load_settings
-    c = TestClient(create_app(load_settings(data_dir=tmp_path, qdrant="memory"), llm=FakeLLM(intent={"intent": "help"})))
+    from conftest import FIXTURE
+    c = TestClient(create_app(load_settings(data_dir=tmp_path, qdrant="memory", catalogue_path=FIXTURE),
+                              llm=FakeLLM(intent={"intent": "help"})))
     u = "/api/users/x"
     assert c.post(u + "/recommend", json={}).status_code == 409
     c.post(u + "/onboard", json={"declared": {"diets": ["vegetarian"]}})
     r = c.post(u + "/recommend", json={}).json()
     assert len(r["results"]) == 5 and r["pipeline_trace"]
-    assert c.post(u + "/goal", json={"weights": {"p": 0, "h": 0, "s": 0, "c": 0, "t": 0}}).json()["message"].startswith("All")
+    assert c.post(u + "/goal", json={"weights": {"h": 0, "s": 0, "t": 0}}).json()["message"].startswith("All")
+    rid = r["results"][0]["recipe_id"]
+    bd = c.get(f"/api/recipes/{rid}/breakdown").json()["breakdown"]
+    assert {"h", "s", "t"} <= set(bd) and bd["h"]["factors"]
+    assert c.get("/api/recipes", params={"q": "egg", "limit": 3}).json()
     fb = c.post(u + "/feedback", json={"request_id": r["request_id"], "recipe_id": r["results"][0]["recipe_id"],
                                       "type": "like"}).json()
     assert fb["review"]["trace"][0]["title"] == "Feedback recorded"

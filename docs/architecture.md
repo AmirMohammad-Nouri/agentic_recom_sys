@@ -11,7 +11,7 @@ Every component has one job, and the boundaries are enforced in code:
 | Component | Owns | Never does |
 | --- | --- | --- |
 | **Recommendation engine** (`engine.py`, `ranker.py`, `diversity.py`, `constraints.py`) | Eligibility, scoring, weighted utility, diversity, evidence records | Call a language model |
-| **Preference model** (`learner.py`) | Beliefs about taste (Beta) and revealed trade-offs (Gaussian, Laplace) with provenance | Change the saved goal |
+| **Preference model** (`learner.py`) | Taste counts and observed value weights, rebuilt from the event log, with provenance | Change the saved goal |
 | **Supervisor policy** (`agent/policy.py`) | When to stay quiet, ask, or propose; counterfactuals | Apply a proposal |
 | **Supervisor agent** (`agent/supervisor.py`, `agent/skills.py`) | Understand a message, plan skills, compose a validated answer | Call a skill with model-invented arguments; write graph queries |
 | **Language model** (`llm.py`, via Ollama) | Choose among fixed options; fill a JSON schema; phrase facts | Rank, decide or edit anything |

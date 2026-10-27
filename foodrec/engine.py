@@ -6,27 +6,26 @@ rank the SAME candidate set (controlled comparison).
 """
 import math
 
-from . import CRITERIA
+from . import CRITERIA, TASTE_SHARE
 from .constraints import (active_constraints, diagnose, eligible, per_serving,
                           request_filter_fails, validate_request_filters)
 from .diversity import rerank
 from .explain import build_evidence, ground_narrative, make_pack, template_reasons
-from .features import nutriscore, raw_values
+from .features import DEFAULT_GOAL, breakdown, health_grade, raw_values
 from .preference import concept_preference, concept_support, extended_preference
-from .ranker import DEFAULT_WEIGHTS, resolve_weights, utility
+from .ranker import DEFAULT_WEIGHTS, effective_weights, resolve_weights, utility
 from .router import route
 from .telemetry import Telemetry
 
 DEFAULT_CONFIG = {"weights": dict(DEFAULT_WEIGHTS), "diversity": 0.3, "mode": "lightweight",
                   "k": 5, "missing_policy": "renormalize", "candidate_cap": 60,
-                  "request_filters": []}
+                  "request_filters": [], "health_goal": DEFAULT_GOAL, "taste_share": TASTE_SHARE}
 
 
 def _dedupe(recipes):
     seen, keep, dropped = {}, [], []
     for r in sorted(recipes, key=lambda x: x["id"]):
-        key = (r["title"].strip().lower(), r["cuisine"],
-               tuple(sorted((i["name"], i["grams"]) for i in r["ingredients"])))
+        key = (r["title"].strip().lower(), tuple(sorted(i["name"] for i in r["ingredients"])))
         if key in seen:
             dropped.append({"id": r["id"], "duplicate_of": seen[key]})
         else:
@@ -35,22 +34,23 @@ def _dedupe(recipes):
     return keep, dropped
 
 
-def _pool(candidates, scaler, taste, catalogue, cap, now):
-    """Coverage-preserving cap: best ceil(cap/5) per criterion (incl. light P), union, then fill."""
+def _pool(candidates, scaler, taste, catalogue, cap, now, goal, weights):
+    """Coverage-preserving cap: best ceil(cap/4) per criterion (incl. light P), union, then fill
+    by utility under the requested weights."""
     if len(candidates) <= cap:
         return candidates, False
-    per = max(1, math.ceil(cap / 5))
+    per = max(1, math.ceil(cap / len(CRITERIA)))
     chosen = set()
     cols = {"p": {r["id"]: concept_preference(catalogue, taste, r, now) for r in candidates}}
     for r in candidates:
-        for k, v in scaler.scores(r).items():
+        for k, v in scaler.scores(r, goal).items():
             cols.setdefault(k, {})[r["id"]] = v
     for k in CRITERIA:
         ranked = sorted((rid for rid, v in cols[k].items() if v is not None),
                         key=lambda rid: (-cols[k][rid], rid))
         chosen.update(ranked[:per])
     if len(chosen) < cap:
-        base = {r["id"]: sum(DEFAULT_WEIGHTS[k] * (cols[k].get(r["id"]) or 0.0) for k in CRITERIA)
+        base = {r["id"]: sum(weights[k] * (cols[k].get(r["id"]) or 0.0) for k in CRITERIA)
                 for r in candidates}
         for rid in sorted(base, key=lambda x: (-base[x], x)):
             if len(chosen) >= cap:
@@ -65,10 +65,13 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
     cfg = dict(DEFAULT_CONFIG)
     cfg.update({k: v for k, v in config.items() if v is not None})
     pipeline = route(cfg["mode"])
-    weights, weights_msg = resolve_weights(cfg["weights"], cfg.get("last_valid_weights") or DEFAULT_WEIGHTS)
+    values, weights_msg = resolve_weights(cfg["weights"], cfg.get("last_valid_weights") or DEFAULT_WEIGHTS)
+    weights = effective_weights(values, cfg["taste_share"])
+    goal = cfg["health_goal"] or DEFAULT_GOAL
     rfilters = validate_request_filters(cfg["request_filters"])
     taste = learner.taste
-    out = {"config": {"weights_requested": cfg["weights"], "weights_applied": weights,
+    out = {"config": {"weights_requested": cfg["weights"], "values_applied": values, "weights_applied": weights,
+                      "taste_share": cfg["taste_share"], "health_goal": goal,
                       "weights_message": weights_msg, "diversity": cfg["diversity"],
                       "mode": cfg["mode"], "k": cfg["k"], "missing_policy": cfg["missing_policy"],
                       "candidate_cap": cfg["candidate_cap"], "request_filters": rfilters},
@@ -110,12 +113,12 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
     # ---- 2. fixed candidate set ---------------------------------------------------
     with tele.stage("candidates"):
         cands, dropped = _dedupe(elig)
-        cands, capped = _pool(cands, scaler, taste, catalogue, cfg["candidate_cap"], now)
+        cands, capped = _pool(cands, scaler, taste, catalogue, cfg["candidate_cap"], now, goal, weights)
     out["candidates"] = {"ids": [r["id"] for r in cands], "duplicates_removed": dropped,
                          "capped": capped}
 
     # ---- 3. scores and utility ----------------------------------------------------
-    key = (catalogue.version, scaler.version, cfg["mode"], learner.n_events,
+    key = (catalogue.version, scaler.version, cfg["mode"], goal, learner.n_events,
            tuple(r["id"] for r in cands), int(now // 3600) if now else 0)
     with tele.stage("scoring"):
         if cache is not None and key in cache:
@@ -125,7 +128,7 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
             tele.cache = "miss" if cache is not None else "not_used"
             cached = {}
             for r in cands:
-                s = scaler.scores(r)
+                s = scaler.scores(r, goal)
                 if cfg["mode"] == "extended":
                     p, info = extended_preference(catalogue, taste, r, learner.history, now)
                 else:
@@ -177,24 +180,28 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
         evs = []
         for x in ranked:
             x["constraint_labels"] = labels
-            ev = build_evidence(x, ranked, declared, x["support"], nutriscore(x["recipe"].get("nutrition_per_100g")))
-            evs.append(ev)
             r = x["recipe"]
+            bd = breakdown(r, goal)
+            ev = build_evidence(x, ranked, declared, x["support"], bd)
+            evs.append(ev)
+            fp = r.get("footprint") or {}
             out["results"].append({
-                "recipe_id": r["id"], "title": r["title"], "cuisine": r["cuisine"],
-                "prep_minutes": r["prep_minutes"], "cost_eur": r.get("cost_eur_per_serving"),
-                "co2e_kg": r.get("co2e_kg_per_serving"), "kcal": r.get("kcal_per_serving"),
+                "recipe_id": r["id"], "title": r["title"], "cuisine": r["cuisine"], "meal": r.get("meal"),
+                "image_url": r.get("image_url"), "url": r.get("url"),
+                "n_ingredients": r.get("n_ingredients"), "kcal": r.get("kcal_per_serving"),
+                "co2e_kg_per_kg": fp.get("kg_co2e_per_kg"), "co2e_kg_per_serving": fp.get("kg_co2e_per_serving"),
                 "ingredients": [i["name"] for i in r["ingredients"]],
-                "ingredients_detail": r.get("ingredients", []),
+                "ingredients_detail": [{k: i.get(k) for k in ("name", "text", "amount", "grams", "category")}
+                                       for i in r["ingredients"]],
                 "nutrition_per_100g": r.get("nutrition_per_100g", {}),
-                "serving_grams": r.get("serving_grams"),
+                "nutrition_per_serving": r.get("nutrition_per_serving", {}),
+                "serving_grams": r.get("serving_grams"), "fsa_score": r.get("fsa_score"),
                 "diet": r["diet"], "allergens": r["allergens"],
                 "allergens_complete": r.get("allergens_complete", False),
-                "nutri_grade": (nutriscore(r["nutrition_per_100g"]) or {}).get("grade"),
+                "health_grade": health_grade(x["scores"].get("h")),
                 "per_serving": {k: (None if per_serving(r, k) is None else round(per_serving(r, k), 1))
                                 for k in ("protein_g", "sugars_g", "fibre_g", "sat_fat_g")},
-                "meal": r.get("meal"),
-                "scores": x["scores"], "raw": raw_values(r), "utility": x["utility"],
+                "scores": x["scores"], "raw": raw_values(r), "breakdown": bd, "utility": x["utility"],
                 "utility_rank": x["utility_rank"], "final_rank": x["final_rank"],
                 "effective_weights": x["effective_weights"], "contributions": x["contributions"],
                 "missing_criteria": x["missing_criteria"], "p_info": x["p_info"],

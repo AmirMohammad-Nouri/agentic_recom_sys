@@ -1,13 +1,14 @@
 # How healthiness is scored
 
-## Nutri-Score points
-Healthiness uses the Nutri-Score points for solid foods (2015 HCSP version), computed per 100 g of the composed dish. Negative points come from energy (one point per 335 kJ above 335 kJ, up to 10), sugars (thresholds every 4.5 g), saturated fat (every 1 g) and sodium (every 90 mg). Positive points come from the share of fruit, vegetables, legumes and nuts (1 point above 40 %, 2 above 60 %, 5 above 80 %), fibre (thresholds every 0.7 g, up to 5) and protein (thresholds every 1.6 g, up to 5).
+## Nine factors
+Healthiness combines nine factors from the recipe's nutrients per 100 g, each scored 0 to 1 between a good and a poor anchor (linear in between):
+energy 125 to 400 kcal (WCRF energy-density bands); total fat 3 to 17.5 g, saturated fat 1.5 to 5 g, sugars 5 to 22.5 g and sodium 120 to 600 mg (UK FSA traffic-light limits); cholesterol 20 to 100 mg; fibre 6 g down to 0 g (EU high-fibre claim); protein 20 % down to 0 % of energy (EU high-protein claim); and the dataset's FSA health score (1 = healthiest).
 
-## Protein rule
-Protein points are not counted when negative points reach 11 or more and the fruit and vegetable share earns fewer than 5 points. This is part of the official algorithm.
+## Health goal
+Healthiness = sum(weight x factor score) / sum(weight). The weights come from the health goal chosen at onboarding. Eat healthier weighs all nine factors equally. Lose weight puts more weight on energy, fat, sugars and fibre. Build muscle puts most weight on protein. Heart-friendly eating stresses saturated fat, sodium, cholesterol and fibre. Cut down on sugar stresses sugars. Gain weight reverses the energy factor so energy-dense dishes score higher. Changing the goal changes the weights, never the data.
 
-## From points to a score
-The raw criterion is the negative Nutri-Score total (higher is better). It is scaled to 0-1 using the 5th and 95th percentile of the frozen catalogue, so the scale never depends on the current result list. Grades: A up to -1, B up to 2, C up to 10, D up to 18, E above.
+## Grade
+The A to E health grade is FoodRec's own banding of the score (A from 0.8, B from 0.65, C from 0.5, D from 0.35); it is not the official Nutri-Score. Missing nutrients are left out and the remaining weights rescaled; the breakdown lists them.
 
-## Limits
-This is an operational measure applied to dishes. It is not a clinical assessment, it does not implement the 2023 Nutri-Score update, and it cannot judge portion size or a whole diet. Olive oil is not counted in the fruit and vegetable share; legumes are counted with vegetables.
+## Not advice
+Healthiness is an operational ranking measure, not medical or dietetic advice.

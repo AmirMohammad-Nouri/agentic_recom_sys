@@ -11,3 +11,6 @@ foodrec.db
 *.db-wal
 *.db-shm
 .DS_Store
+foodrec_v2.db
+data/hummus/*.xlsx
+data/hummus/labels_rules.json

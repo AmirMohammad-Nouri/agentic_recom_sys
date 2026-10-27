@@ -4,7 +4,7 @@ Rules (all documented in docs/features.md):
 * Missing allergen information is never evidence that a recipe is allergen free: if a
   user declares ANY allergen, recipes with incomplete allergen data are excluded.
 * A diet flag that is unknown (None) fails a declared diet.
-* A strict time or cost limit cannot be verified for a recipe with a missing value, so
+* A strict ingredient-count limit cannot be verified for a recipe with a missing value, so
   that recipe is excluded.
 * Mandatory constraints are never relaxed automatically. diagnose() only REPORTS which
   constraints conflict so the user can revise them.
@@ -35,12 +35,9 @@ def active_constraints(declared):
     for d in declared.get("disliked_ingredients", []):
         if d.get("strict"):
             out.append((f"dislike:{d['name'].lower()}", f"Never include: {d['name']}"))
-    t = declared.get("max_prep_minutes")
+    t = declared.get("max_ingredients")
     if t and t.get("strict"):
-        out.append(("time_limit", f"Preparation at most {t['value']} min"))
-    c = declared.get("max_cost_eur")
-    if c and c.get("strict"):
-        out.append(("cost_limit", f"Cost at most {c['value']} EUR"))
+        out.append(("ingredient_limit", f"At most {t['value']} ingredients"))
     return out
 
 
@@ -64,20 +61,13 @@ def violations(recipe, declared):
     for d in declared.get("disliked_ingredients", []):
         if d.get("strict") and d["name"].lower() in names:
             out.append((f"dislike:{d['name'].lower()}", f"contains {d['name']}"))
-    t = declared.get("max_prep_minutes")
+    t = declared.get("max_ingredients")
     if t and t.get("strict"):
-        m = recipe.get("prep_minutes")
+        m = recipe.get("n_ingredients")
         if m is None:
-            out.append(("time_limit", "preparation time unknown"))
+            out.append(("ingredient_limit", "ingredient count unknown"))
         elif m > t["value"]:
-            out.append(("time_limit", f"takes {m} min"))
-    c = declared.get("max_cost_eur")
-    if c and c.get("strict"):
-        v = recipe.get("cost_eur_per_serving")
-        if v is None:
-            out.append(("cost_limit", "cost unknown"))
-        elif v > c["value"]:
-            out.append(("cost_limit", f"costs {v:.2f} EUR"))
+            out.append(("ingredient_limit", f"has {m} ingredients"))
     return out
 
 
@@ -124,10 +114,8 @@ def _without(declared, code):
     elif kind == "dislike":
         d["disliked_ingredients"] = [x for x in d.get("disliked_ingredients", [])
                                      if x["name"].lower() != name]
-    elif code == "time_limit":
-        d["max_prep_minutes"] = None
-    elif code == "cost_limit":
-        d["max_cost_eur"] = None
+    elif code == "ingredient_limit":
+        d["max_ingredients"] = None
     return d
 
 
@@ -137,18 +125,16 @@ def _without(declared, code):
 # shown to the user as applied filters, are never saved into the profile and never change
 # the food weights. A recipe whose value is unknown fails the filter (fail closed).
 def per_serving(recipe, nutrient):
-    n = (recipe.get("nutrition_per_100g") or {}).get(nutrient)
-    g = recipe.get("serving_grams")
-    return None if n is None or g is None else n * g / 100.0
+    return (recipe.get("nutrition_per_serving") or {}).get(nutrient)
 
 
 REQUEST_FIELDS = {
     "protein_g": ("Protein per serving (g)", lambda r: per_serving(r, "protein_g")),
     "sugars_g": ("Sugars per serving (g)", lambda r: per_serving(r, "sugars_g")),
     "fibre_g": ("Fibre per serving (g)", lambda r: per_serving(r, "fibre_g")),
-    "kcal": ("Energy per serving (kcal)", lambda r: r.get("kcal_per_serving")),
-    "prep_minutes": ("Preparation time (min)", lambda r: r.get("prep_minutes")),
-    "cost_eur": ("Cost per serving (EUR)", lambda r: r.get("cost_eur_per_serving")),
+    "kcal": ("Energy per serving (kcal)", lambda r: per_serving(r, "kcal")),
+    "n_ingredients": ("Number of ingredients", lambda r: r.get("n_ingredients")),
+    "co2e_kg": ("Footprint (kg CO2e per kg)", lambda r: (r.get("footprint") or {}).get("kg_co2e_per_kg")),
     "cuisine": ("Cuisine", lambda r: r.get("cuisine")),
     "meal": ("Meal type", lambda r: r.get("meal")),
     "ingredient": ("Ingredient", lambda r: {i["name"].lower() for i in r["ingredients"]}),
@@ -159,7 +145,8 @@ REQUEST_OPS = ("min", "max", "is", "has", "lacks")
 def filter_label(f):
     label = REQUEST_FIELDS[f["field"]][0]
     sym = {"min": ">=", "max": "<=", "is": "=", "has": "includes", "lacks": "excludes"}[f["op"]]
-    return f"{label} {sym} {f['value']}"
+    v = f["value"]
+    return f"{label} {sym} {' or '.join(map(str, v)) if isinstance(v, (list, tuple)) else v}"
 
 
 def validate_request_filters(filters):
@@ -181,6 +168,10 @@ def request_filter_fails(recipe, f):
         return f"{v:.0f} < {x}"
     if op == "max" and not v <= float(x):
         return f"{v:.0f} > {x}"
+    if op == "is" and isinstance(x, (list, tuple)):
+        if str(v).lower() not in {str(y).lower() for y in x}:
+            return f"is {v}"
+        return None
     if op == "is" and str(v).lower() != str(x).lower():
         return f"is {v}"
     if op == "has" and str(x).lower() not in v:

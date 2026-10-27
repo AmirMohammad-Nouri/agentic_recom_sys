@@ -1,10 +1,10 @@
 // Reusable UI pieces: recipe card, decision card, change summary, comparison table.
-import { api, CRIT, CRIT_META, clear, emit, eur, f2, grade, h, human, icon, menu, pct, state, toast, userPath, weightBar, ago } from "./lib.js";
+import { api, ask, co2, CRIT, CRIT_META, clear, emit, f2, grade, h, human, icon, menu, pct, state, toast, userPath, VALUES, weightBar, ago } from "./lib.js";
 
-const REJECT = [["not_my_taste", "Not my taste"], ["too_expensive", "Too expensive"], ["too_slow", "Takes too long"],
-  ["not_healthy_enough", "Not healthy enough"], ["not_sustainable", "Not sustainable enough"], ["had_recently", "Had it recently"]];
-const CHOOSE = [["taste", "It sounds tasty"], ["price", "It is affordable"], ["health", "It is healthy"],
-  ["climate", "It is climate-friendly"], ["time", "It is quick"], [null, "No particular reason"]];
+const REJECT = [["not_my_taste", "Not my taste"], ["not_healthy_enough", "Not healthy enough"],
+  ["not_sustainable", "Not sustainable enough"], ["too_complicated", "Too many ingredients"], ["had_recently", "Had it recently"]];
+const CHOOSE = [["taste", "It sounds tasty"], ["health", "It is healthy"], ["climate", "It is climate-friendly"],
+  ["easy", "It is easy to make"], [null, "No particular reason"]];
 
 export async function sendFeedback(r, requestId, type, reason) {
   try {
@@ -23,6 +23,26 @@ export async function sendFeedback(r, requestId, type, reason) {
 
 export const personalFits = (r) => r.evidence.fit.filter((f) => f.type !== "constraint").map((f) => f.text);
 const ruleCount = (r) => r.evidence.fit.filter((f) => f.type === "constraint").length;
+
+function thumb(r) {
+  const box = h("div.thumb", icon("bowl"));
+  if (r.image_url) {
+    const img = h("img", { src: r.image_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" });
+    img.addEventListener("error", () => img.remove());
+    box.append(img);
+  }
+  return box;
+}
+
+// Three small score chips: what the recipe scores on each value criterion.
+export function scoreChips(r) {
+  return h("div.score-chips", VALUES.map((k) => {
+    const v = r.scores?.[k];
+    return h("span.score-chip", { title: `${CRIT_META[k].long}: ${CRIT_META[k].what}` },
+      h("span.sc-bar", h("span", { style: { width: pct(v || 0), background: CRIT_META[k].color } })),
+      h("span.sc-label", CRIT_META[k].label), h("b", f2(v)));
+  }));
+}
 
 export function recipeCard(r, { requestId, compareWith = [] } = {}) {
   const ev = r.evidence;
@@ -43,22 +63,20 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
     } catch { /* toast already shown */ }
   };
 
-  const card = h("article.recipe",
-    h("div.rank", r.final_rank),
+  return h("article.recipe",
+    h("div.rank-col", h("div.rank", r.final_rank), thumb(r)),
     h("div",
-      h("div.row.between",
+      h("div.row.between", { style: { alignItems: "flex-start" } },
         h("div.grow",
-          h("h3", r.title),
+          h("h3", r.url ? h("a.title-link", { href: r.url, target: "_blank", rel: "noopener" }, r.title) : r.title),
           h("div.meta",
-            h("span.m", r.cuisine + (r.meal === "breakfast" ? " · breakfast" : "")),
-            h("span.m", icon("clock"), `${r.prep_minutes} min`),
-            h("span.m", icon("euro"), eur(r.cost_eur)),
-            h("span.m", icon("flame"), `${r.kcal} kcal`),
-            h("span.m", icon("leaf"), r.co2e_kg == null ? "unknown" : `${f2(r.co2e_kg)} kg CO₂e`),
-            h("span.m", grade(r.nutri_grade)))),
-        h("div", { style: { textAlign: "right" } },
-          h("div", { style: { fontWeight: 600 } }, f2(r.utility)),
-          h("div.small.muted", "utility"))),
+            h("span.m", r.cuisine === "Other" ? human(r.meal) : `${r.cuisine} · ${human(r.meal)}`),
+            h("span.m", { title: "Health grade" }, grade(r.health_grade)),
+            h("span.m", icon("list"), `${r.n_ingredients} ingredients`),
+            h("span.m", icon("flame"), r.kcal == null ? "kcal unknown" : `${Math.round(r.kcal)} kcal`),
+            h("span.m", icon("leaf"), co2(r.co2e_kg_per_kg)))),
+        h("div.util", h("div", f2(r.utility)), h("div.small.muted", "utility"))),
+      scoreChips(r),
       h("div.contrib", { title: "Share of the utility contributed by each criterion" }, weightBar(contribW)),
       h("div.reason",
         top ? [h("b", CRIT_META[top].long), ` contributes most (${f2(rk.contributions[top].contribution)} of ${f2(r.utility)}). `] : null,
@@ -78,15 +96,49 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
           ...REJECT.map(([k, t]) => ({ text: t, run: () => act("reject", k) }))]) }, icon("x"), "Not for me"),
         h("span.grow"),
         status,
+        h("button.btn.sm.ghost", { onclick: () => ask(`Why is #${r.final_rank} ${r.title} recommended?`), title: "Ask the assistant about this recipe" },
+          icon("spark"), "Ask"),
         h("button.btn.sm.ghost", {
           onclick: (e) => {
             detailBox.classList.toggle("hidden");
             if (!detailBox.firstChild) detailBox.append(recipeDetails(r, compareWith));
-            e.currentTarget.lastChild.textContent = detailBox.classList.contains("hidden") ? "Evidence" : "Hide evidence";
+            e.currentTarget.lastChild.textContent = detailBox.classList.contains("hidden") ? "How it's scored" : "Hide";
           },
-        }, icon("info"), "Evidence")),
+        }, icon("info"), "How it's scored")),
       detailBox));
-  return card;
+}
+
+// ---- score breakdown: how each of the three scores was calculated ------------------------
+export function scoreBreakdown(bd) {
+  const hh = bd.h, ss = bd.s, tt = bd.t;
+  const fac = hh.factors.map((f) => h("tr" + (f.score == null ? ".muted" : ""),
+    h("td", f.label, f.flipped ? h("span.tag.info", { title: "Reversed for the goal: more is better" }, "reversed") : null),
+    h("td.num", f.value == null ? "–" : `${f.value} ${f.unit}`),
+    h("td.num.small.muted", `${f.good} → ${f.poor}`),
+    h("td.num", f.weight === 1 ? "1" : h("b", f.weight)),
+    h("td.bar-cell", f.score == null ? h("span.small.muted", "missing") :
+      h("div.row", h("div.minibar.grow", h("span", { style: { width: pct(f.score), background: "var(--c-h)" } })), h("span.small", f2(f.score))))));
+  const fp = (ss.breakdown || []).filter((b) => b.share >= 0.01).slice(0, 6);
+  return h("div.breakdown",
+    h("section",
+      h("div.bd-head", h("span.swatch", { style: { background: "var(--c-h)" } }), h("b", "Healthiness"), grade(hh.grade),
+        h("span.bd-score", f2(hh.score)), h("span.small.muted", `goal: ${hh.goal_label}`)),
+      h("table.t", h("thead", h("tr", h("th", "Factor (per 100 g)"), h("th.num", "Value"), h("th.num", "Good → poor"), h("th.num", "Weight"), h("th", "Score"))),
+        h("tbody", fac)),
+      h("div.formula", "Healthiness = Σ weight × factor score / Σ weight", hh.missing.length ? ` · missing: ${hh.missing.join(", ")}` : "")),
+    h("section",
+      h("div.bd-head", h("span.swatch", { style: { background: "var(--c-s)" } }), h("b", "Sustainability"),
+        h("span.bd-score", f2(ss.score)), h("span.small.muted", co2(ss.kg_co2e_per_kg) + (ss.kg_co2e_per_serving != null ? ` · ${f2(ss.kg_co2e_per_serving)} kg per serving` : ""))),
+      fp.length ? h("div.fp-bars", fp.map((b) => h("div.fp-row",
+        h("span.fp-name", b.name, h("span.small.muted", ` · ${human(b.category)}`)),
+        h("div.minibar", h("span", { style: { width: pct(b.share), background: "var(--c-s)" } })),
+        h("span.small", `${pct(b.share)}`), h("span.small.muted", `${Math.round(b.grams)} g × ${b.factor}`)))) : null,
+      h("div.formula", `Footprint = Σ grams × food-group factor / total grams (Poore & Nemecek 2018). Score: log scale, ${ss.anchors.best} → 1, ${ss.anchors.worst} → 0.`)),
+    h("section",
+      h("div.bd-head", h("span.swatch", { style: { background: "var(--c-t)" } }), h("b", "Convenience"),
+        h("span.bd-score", f2(tt.score)), h("span.small.muted", `${tt.n_ingredients} ingredients`)),
+      h("div.chips", tt.ingredients.map((n) => h("span.tag", n))),
+      h("div.formula", `Score = (${tt.anchors.worst} − n) / (${tt.anchors.worst} − ${tt.anchors.best}), clipped to 0–1.`)));
 }
 
 function recipeDetails(r, compareWith) {
@@ -96,7 +148,7 @@ function recipeDetails(r, compareWith) {
     const c = rk.contributions[k];
     const w = r.effective_weights[k];
     return h("tr",
-      h("td", h("span.row", h("span", { style: { width: "8px", height: "8px", borderRadius: "2px", background: CRIT_META[k].color } }), CRIT_META[k].long)),
+      h("td", h("span.row", h("span.swatch", { style: { background: CRIT_META[k].color } }), CRIT_META[k].long)),
       h("td.num", c ? f2(c.score) : h("span.tag.warn", "missing")),
       h("td.num", pct(w)),
       h("td.num", c ? f2(c.contribution) : "–"),
@@ -109,21 +161,20 @@ function recipeDetails(r, compareWith) {
     const o = compareWith.find((x) => x.recipe_id === cmpSel.value);
     clear(cmpBox, o ? compareTable(r, o) : null);
   });
-  const raw = r.raw || {};
   return h("div.details",
     h("div",
       h("div.section-label", "Why it ranked here"),
       h("table.t", h("thead", h("tr", h("th", "Criterion"), h("th.num", "Score"), h("th.num", "Weight"), h("th.num", "Contribution"), h("th", ""))), h("tbody", rows)),
       h("div.small.muted", { style: { marginTop: "6px" } },
-        `Utility ${f2(r.utility)} = Σ weight × score. Utility rank ${rk.utility_rank}, final rank ${rk.final_rank}.`,
+        `Utility ${f2(r.utility)} = Σ weight × score (taste keeps a fixed share). Utility rank ${rk.utility_rank}, final rank ${rk.final_rank}.`,
         rk.diversity.max_similarity_to_earlier ? ` Similarity to earlier picks ${f2(rk.diversity.max_similarity_to_earlier)}.` : "")),
+    h("div", h("div.section-label", "How each score is calculated"), scoreBreakdown(r.breakdown)),
     r.reasons.ranked_here.length ? h("div", h("div.section-label", "Ranking notes"), h("ul.reason-list", r.reasons.ranked_here.map((x) => h("li", x)))) : null,
     h("div", h("div.section-label", "Fits you because"), h("ul.reason-list.fit", r.reasons.fits.map((x) => h("li", x)))),
     r.reasons.compromises.length ? h("div", h("div.section-label", "Compromises"), h("ul.reason-list.comp", r.reasons.compromises.map((x) => h("li", x)))) : null,
     h("div", h("div.section-label", "Uncertain or estimated"), h("ul.reason-list", r.reasons.gaps.map((x) => h("li", x)))),
-    h("div", h("div.section-label", "Per serving"),
-      h("div.small.muted", `${r.serving_grams} g · protein ${r.per_serving.protein_g ?? "?"} g · sugars ${r.per_serving.sugars_g ?? "?"} g · fibre ${r.per_serving.fibre_g ?? "?"} g · raw time ${raw.t ?? "?"} min`),
-      h("div.chips", { style: { marginTop: "6px" } }, r.ingredients_detail.map((i) => h("span.tag", `${i.name} ${i.grams} g`)))),
+    h("div", h("div.section-label", "Ingredients"),
+      h("ul.ing-list", r.ingredients_detail.map((i) => h("li", i.text || i.name, h("span.small.muted", ` · ≈${Math.round(i.grams)} g`))))),
     compareWith.length > 1 ? h("div", h("div.section-label", "Compare"), h("div", { style: { margin: "6px 0" } }, cmpSel), cmpBox) : null);
 }
 
@@ -178,8 +229,8 @@ export function decisionCard(d, { onResolved } = {}) {
     h("span.small.muted", ago(d.ts))), h("h4", d.title), h("p", b.explanation)];
   if (d.kind === "goal_proposal") {
     kids.push(h("div.stack.tight", { style: { marginTop: "10px" } },
-      h("div.small.muted", "Saved goal"), weightBar(b.stated),
-      h("div.small.muted", "Proposed"), weightBar(b.proposed_weights)));
+      h("div.small.muted", "Saved goal"), weightBar(b.stated, VALUES),
+      h("div.small.muted", "Proposed"), weightBar(b.proposed_weights, VALUES)));
     const cf = b.counterfactual || {};
     if (cf.entered?.length || cf.left?.length) {
       kids.push(h("div.small", { style: { marginTop: "8px" } },

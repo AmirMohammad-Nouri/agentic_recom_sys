@@ -56,14 +56,24 @@ class HashingEmbedder:
     name = "hashing-512"
     semantic = False
 
+    def __init__(self):
+        self._slot = {}  # feature -> (column, sign); hashing is the slow part on a large corpus
+
+    def _feature(self, f):
+        x = self._slot.get(f)
+        if x is None:
+            h = int(hashlib.md5(f.encode()).hexdigest(), 16)
+            x = self._slot[f] = (h % self.dim, 1.0 if (h >> 64) & 1 else -1.0)
+        return x
+
     def embed(self, texts, kind="document"):
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
         for row, t in enumerate(texts):
             toks = tokenize(t)
             feats = toks + [a + "_" + b for a, b in zip(toks, toks[1:])]
             for f in feats:
-                h = int(hashlib.md5(f.encode()).hexdigest(), 16)
-                out[row, h % self.dim] += 1.0 if (h >> 64) & 1 else -1.0
+                col, sign = self._feature(f)
+                out[row, col] += sign
             n = np.linalg.norm(out[row])
             if n > 0:
                 out[row] /= n

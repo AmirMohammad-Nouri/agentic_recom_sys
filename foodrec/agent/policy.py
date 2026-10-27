@@ -1,31 +1,30 @@
 """Supervisor monitoring policy (deterministic, documented thresholds).
 
-Implements the loop from the project idea (docs/supervisor.md):
+After every piece of feedback the supervisor compares the user's STATED weights (saved
+goal) with the OBSERVED weights from the value model (learner.py):
 
-    evidence -> preference model -> supervisor
-        confident & consistent      -> recommend
-        conflict detected           -> search history (knowledge graph)
-            enough evidence         -> PROPOSE a goal update (user must accept)
-            not enough evidence     -> ASK a targeted question
-        counterfactual analysis     -> show what the proposal would change
-        explain decision            -> every step goes to the trace
+    gap_k = observed_k - stated_k
+    small gaps                                  -> keep recommending, nothing to ask
+    gap >= ASK_GAP with >= ASK_MIN events       -> ASK a trade-off question
+    gap >= PROPOSE_GAP with >= PROPOSE_MIN      -> PROPOSE moving the weight halfway
+                                                   (shows a what-if first; the user must accept)
 
 The policy never edits a saved goal or a mandatory constraint. Its outputs are decisions
 (proposals and questions) that wait for the user.
 """
-from .. import CRITERIA, CRITERION_LABELS
+from .. import VALUE_CRITERIA, CRITERION_LABELS
 
 THRESHOLDS = {
-    "conflict_prob": 0.70,       # P(|revealed - stated| > delta) needed to call a conflict
-    "strong_prob": 0.90,         # ... needed to PROPOSE instead of ASK
-    "min_evidence": 4,           # informative events since the last explicit statement
-    "low_confidence": 0.25,      # revealed weights this uncertain are reported as "mostly stated"
-    "taste_conflict_mean": 0.40, # declared liking whose belief fell below this ...
+    "ask_gap": 0.10,             # |observed - stated| that is worth a question ...
+    "ask_min_events": 3,         # ... after at least this many informative events
+    "propose_gap": 0.15,         # |observed - stated| that is worth a proposal ...
+    "propose_min_events": 6,     # ... after at least this many informative events
+    "taste_conflict_mean": 0.40, # declared liking whose taste fell below this ...
     "taste_min_evidence": 2.0,   # ... with at least this much observed evidence
     "cooldown_events": 6,        # after a dismissal, do not re-raise the same topic for N events
 }
-REASON_FOR = {"c": ("price", "too_expensive"), "t": ("time", "too_slow"), "h": ("health", "not_healthy_enough"),
-              "s": ("climate", "not_sustainable"), "p": ("taste", "not_my_taste")}
+REASON_FOR = {"t": ("easy", "too_complicated"), "h": ("health", "not_healthy_enough"),
+              "s": ("climate", "not_sustainable")}
 
 
 def _pct(x):
@@ -48,60 +47,49 @@ def _cooling_down(app, user_id, topic):
     return n_after < THRESHOLDS["cooldown_events"]
 
 
-def _since_statement(evidence):
-    out = []
-    for row in reversed(evidence):
-        if row["kind"] == "statement":
-            break
-        out.append(row)
-    return out[::-1]
-
-
 def review(app, user_id, trace, trigger="feedback"):
     """Run the monitoring loop once. Returns an assessment and any new decisions."""
     lr = app.learner(user_id)
     goal = app.store.goal(user_id)
-    result = {"status": "insufficient_data", "conflicts": [], "decisions": [], "confidence": {}}
-    if lr.choice is None or goal is None:
-        trace.step("reason", "No preference model yet", "The user has not completed onboarding.")
+    result = {"status": "insufficient_data", "conflicts": [], "decisions": [], "confidence": None}
+    if lr.values is None or goal is None:
+        trace.step("reason", "No user model yet", "The user has not completed onboarding.")
         return result
-    stated = goal["weights"]
-    inf = lr.choice.inferred()
-    disc = lr.choice.discrepancy(stated)
-    recent = _since_statement(lr.choice.evidence)
-    informative = [r for r in recent if r["kind"] in ("choice", "rejection", "tradeoff_answer") and not r.get("flag")]
-    result["confidence"] = {k: inf[k]["confidence"] for k in CRITERIA}
-    trace.step("perceive", "Compared stated goal with revealed behaviour",
-               f"Saved goal v{goal['version']}; {lr.choice.n_choices} choices, {lr.choice.n_rejections} "
-               f"criterion-specific rejections, {lr.choice.n_reasons} stated reasons so far; "
-               f"{len(informative)} informative events since the last explicit goal statement.",
-               evidence={"stated": {k: round(stated[k], 3) for k in CRITERIA},
-                         "revealed_mean": {k: round(inf[k]["mean"], 3) for k in CRITERIA},
-                         "confidence": {k: round(inf[k]["confidence"], 2) for k in CRITERIA},
+    vm = lr.values
+    stated = {k: goal["weights"][k] for k in VALUE_CRITERIA}
+    gap = vm.gap(stated)
+    match = vm.match(stated)
+    result["confidence"] = vm.confidence()
+    result["preference_match"] = match
+    trace.step("perceive", "Compared your goal with your behaviour",
+               f"Saved goal v{goal['version']}; {vm.n} informative event(s) since it was saved "
+               f"({vm.counts['choices']} choices, {vm.counts['rejections']} reasoned rejections, "
+               f"{vm.counts['reasons']} reasons, {vm.counts['answers']} answers in total). "
+               f"Preference match {_pct(match)}.",
+               evidence={"stated": {k: round(stated[k], 3) for k in VALUE_CRITERIA},
+                         "observed": {k: round(vm.observed[k], 3) for k in VALUE_CRITERIA},
+                         "gap": {k: round(gap[k], 3) for k in VALUE_CRITERIA},
+                         "preference_match": round(match, 3), "confidence": round(vm.confidence(), 2),
                          "trigger": trigger}, source="learner")
 
-    conflicts = sorted((k for k in CRITERIA if disc[k]["prob_beyond_delta"] >= THRESHOLDS["conflict_prob"]),
-                       key=lambda k: -disc[k]["prob_beyond_delta"] * abs(disc[k]["mean_diff"]))
-    result["conflicts"] = [{"criterion": k, "prob": disc[k]["prob_beyond_delta"], "direction": disc[k]["direction"],
-                            "stated": stated[k], "revealed": inf[k]["mean"]} for k in conflicts]
-    if not conflicts:
-        low = [CRITERION_LABELS[k] for k in CRITERIA if inf[k]["confidence"] < THRESHOLDS["low_confidence"]]
-        result["status"] = "aligned" if not low else "uncertain"
-        trace.step("reason", "No conflict between goal and behaviour",
-                   f"No criterion reaches the conflict threshold (P >= {_pct(THRESHOLDS['conflict_prob'])}). "
-                   + (f"Revealed weights are still uncertain for {', '.join(low)}, so recommendations rest "
-                      f"mainly on the saved goal." if low else "The saved goal explains the behaviour well."),
-                   evidence={k: round(disc[k]["prob_beyond_delta"], 2) for k in CRITERIA})
+    k = max(VALUE_CRITERIA, key=lambda x: abs(gap[x]))
+    big = abs(gap[k]) >= THRESHOLDS["ask_gap"] and vm.n >= THRESHOLDS["ask_min_events"]
+    if not big:
+        result["status"] = "aligned" if vm.n >= THRESHOLDS["ask_min_events"] else "uncertain"
+        trace.step("reason", "Goal and behaviour agree" if result["status"] == "aligned" else "Still learning",
+                   f"Largest gap is {CRITERION_LABELS[k]} ({gap[k]:+.2f}); the supervisor acts only when a gap "
+                   f"reaches {THRESHOLDS['ask_gap']:.2f} after {THRESHOLDS['ask_min_events']} or more events.",
+                   evidence={x: round(gap[x], 3) for x in VALUE_CRITERIA})
     else:
         result["status"] = "conflict"
-        k = conflicts[0]
+        result["conflicts"] = [{"criterion": x, "gap": gap[x], "stated": stated[x], "observed": vm.observed[x],
+                                "direction": "higher" if gap[x] > 0 else "lower"}
+                               for x in sorted(VALUE_CRITERIA, key=lambda x: -abs(gap[x]))
+                               if abs(gap[x]) >= THRESHOLDS["ask_gap"]]
         topic = f"criterion:{k}"
-        d = disc[k]
-        trace.step("reason", f"Conflict on {CRITERION_LABELS[k]}",
-                   f"Saved weight {stated[k]:.2f}; behaviour suggests {inf[k]['mean']:.2f} "
-                   f"(90% interval {inf[k]['lo']:.2f}-{inf[k]['hi']:.2f}). Probability the true weight differs "
-                   f"by more than {app.learner(user_id).p['discrepancy_delta']:.2f}: {_pct(d['prob_beyond_delta'])}.",
-                   evidence={"criterion": k, **{x: round(v, 3) if isinstance(v, float) else v for x, v in d.items()}})
+        trace.step("reason", f"Gap on {CRITERION_LABELS[k]}",
+                   f"Saved weight {stated[k]:.2f}; your choices behave like {vm.observed[k]:.2f} "
+                   f"(gap {gap[k]:+.2f}, {vm.n} events).", evidence={"criterion": k, "gap": round(gap[k], 3)})
         waiting = [d for d in app.store.decisions(user_id, status="open", limit=50)
                    if d["kind"] in ("goal_proposal", "tradeoff_question")]
         if waiting:
@@ -113,7 +101,7 @@ def review(app, user_id, trace, trigger="feedback"):
                        f"The user dismissed this topic within the last {THRESHOLDS['cooldown_events']} events; "
                        "respecting that and not asking again yet.")
         else:
-            _resolve_conflict(app, user_id, trace, k, stated, inf, disc, informative, result)
+            _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result)
 
     _taste_conflicts(app, user_id, trace, lr, result)
     return result
@@ -132,22 +120,21 @@ def _history_evidence(app, user_id, trace, k):
     return rows, support
 
 
-def _resolve_conflict(app, user_id, trace, k, stated, inf, disc, informative, result):
+def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result):
     rows, support = _history_evidence(app, user_id, trace, k)
-    n_inf = len(informative)
-    strong = disc[k]["prob_beyond_delta"] >= THRESHOLDS["strong_prob"] and n_inf >= THRESHOLDS["min_evidence"]
+    strong = abs(gap[k]) >= THRESHOLDS["propose_gap"] and vm.n >= THRESHOLDS["propose_min_events"]
     trace.step("decide", "Enough evidence to propose a change?" + (" Yes" if strong else " No"),
-               f"Rule: propose only if P >= {_pct(THRESHOLDS['strong_prob'])} AND at least "
-               f"{THRESHOLDS['min_evidence']} informative events since the last statement. "
-               f"Here P = {_pct(disc[k]['prob_beyond_delta'])}, events = {n_inf}. "
+               f"Rule: propose only if the gap is at least {THRESHOLDS['propose_gap']:.2f} after "
+               f"{THRESHOLDS['propose_min_events']} events. Here gap = {abs(gap[k]):.2f}, events = {vm.n}. "
                + ("Preparing a proposal; the saved goal stays unchanged until you accept it."
                   if strong else "Asking a targeted question instead of guessing."),
                source="policy", data={"options": ["propose", "ask"], "chosen": "propose" if strong else "ask"})
-    evidence_events = [r["event_id"] for r in informative if r.get("event_id")] + [r["event_id"] for r in support]
+    evidence_events = [r["event_id"] for r in vm.evidence if r.get("event_id") and not r.get("flag")
+                       and r["kind"] != "goal_saved"][-12:] + [r["event_id"] for r in support]
     evidence_events = list(dict.fromkeys(evidence_events))
     if strong:
         proposed = dict(stated)
-        proposed[k] = (stated[k] + inf[k]["mean"]) / 2.0
+        proposed[k] = (stated[k] + vm.observed[k]) / 2.0
         tot = sum(proposed.values())
         proposed = {x: v / tot for x, v in proposed.items()}
         s = trace.start("tool", "Counterfactual: what would the proposal change?",
@@ -160,29 +147,28 @@ def _resolve_conflict(app, user_id, trace, k, stated, inf, disc, informative, re
               "moved": len(cmp_.get("moved", []))}
         trace.finish(s, f"{len(cf['entered'])} recipe(s) would enter the top five, {len(cf['left'])} would leave.",
                      evidence=cf)
-        direction = "more" if inf[k]["mean"] > stated[k] else "less"
+        direction = "more" if gap[k] > 0 else "less"
         d = app.add_decision(user_id, "goal_proposal",
                              f"Give {CRITERION_LABELS[k].lower()} {direction} weight?", {
                                  "topic": f"criterion:{k}", "criterion": k,
                                  "explanation": (f"Your saved goal gives {CRITERION_LABELS[k].lower()} "
                                                  f"{stated[k]:.2f}, but your choices behave like "
-                                                 f"{inf[k]['mean']:.2f} ({_pct(disc[k]['prob_beyond_delta'])} "
-                                                 f"likely to differ, {n_inf} supporting events). Accepting "
+                                                 f"{vm.observed[k]:.2f} ({vm.n} events). Accepting "
                                                  f"moves it halfway, to {proposed[k]:.2f}."),
-                                 "stated": stated, "revealed": {x: inf[x]["mean"] for x in CRITERIA},
-                                 "proposed_weights": proposed, "probability": disc[k]["prob_beyond_delta"],
+                                 "stated": stated, "observed": dict(vm.observed),
+                                 "proposed_weights": proposed, "gap": gap[k],
                                  "evidence_events": evidence_events, "counterfactual": cf,
                                  "recipes": (cmp_["entered"] + cmp_["left"])[:6]}, "policy")
     else:
-        others = [x for x in CRITERIA if x != k]
-        opposite = [x for x in others if disc[x]["direction"] != disc[k]["direction"]]
-        j = max(opposite or others, key=lambda x: (abs(disc[x]["mean_diff"]), stated[x]))
-        hi, lo = (k, j) if disc[k]["direction"] == "higher" else (j, k)
+        others = [x for x in VALUE_CRITERIA if x != k]
+        opposite = [x for x in others if (gap[x] > 0) != (gap[k] > 0)]
+        j = max(opposite or others, key=lambda x: (abs(gap[x]), stated[x]))
+        hi, lo = (k, j) if gap[k] > 0 else (j, k)
         q = (f"When {CRITERION_LABELS[hi].lower()} and {CRITERION_LABELS[lo].lower()} pull in different "
              f"directions, which usually wins for you?")
         d = app.add_decision(user_id, "tradeoff_question", q, {
             "topic": f"criterion:{k}", "criterion": k,
-            "explanation": (f"Your recent choices lean {disc[k]['direction']} on "
+            "explanation": (f"Your recent choices lean {'more' if gap[k] > 0 else 'less'} towards "
                             f"{CRITERION_LABELS[k].lower()} than your saved goal, but there is not yet enough "
                             f"evidence to suggest a change. Your answer is recorded as evidence; it does not "
                             f"edit your goal."),
@@ -204,7 +190,7 @@ def _taste_conflicts(app, user_id, trace, lr, result):
         kind, _, name = c.partition(":")
         if kind not in ("cuisine", "ingredient"):
             continue
-        declared = any(p["kind"] == "declared" for p in lr.taste.prov.get(c, []))
+        declared = lr.taste.l0.get(c, 0) > 0
         if not declared or m >= THRESHOLDS["taste_conflict_mean"] or n < THRESHOLDS["taste_min_evidence"]:
             continue
         topic = f"concept:{c}"

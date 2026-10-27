@@ -39,8 +39,8 @@ def _flag(name, default):
 @dataclass
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(_env("FOODREC_DATA_DIR", ROOT / "data" / "runtime")))
-    catalogue_path: Path = field(default_factory=lambda: Path(_env("FOODREC_CATALOGUE", ROOT / "data" / "fixture" / "recipes.json")))
-    ingredients_path: Path = field(default_factory=lambda: Path(_env("FOODREC_INGREDIENTS", ROOT / "data" / "fixture" / "ingredients.json")))
+    # Portable catalogue built by `python -m foodrec.ingest`; imported into the database on start-up.
+    catalogue_path: Path = field(default_factory=lambda: Path(_env("FOODREC_CATALOGUE", ROOT / "data" / "hummus" / "catalogue.json.gz")))
     knowledge_dir: Path = field(default_factory=lambda: Path(_env("FOODREC_KNOWLEDGE_DIR", ROOT / "data" / "knowledge")))
 
     # Supervisor language model (Ollama). Default sized for a 4 GB GPU, see README.
@@ -70,7 +70,8 @@ class Settings:
 
     @property
     def db_path(self):
-        return self.data_dir / "foodrec.db"
+        # v2: three criteria and the HUMMUS catalogue. The v1 database (foodrec.db) is left untouched.
+        return self.data_dir / "foodrec_v2.db"
 
     @property
     def qdrant_path(self):

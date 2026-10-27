@@ -15,10 +15,10 @@ import json
 import time
 from dataclasses import dataclass, field
 
-from .. import CRITERIA, CRITERION_LABELS
+from .. import CRITERIA, CRITERION_LABELS, TASTE_SHARE, VALUE_CRITERIA
 from ..constraints import violations
-from ..features import nutriscore
-from ..ranker import utility
+from ..features import DEFAULT_GOAL, breakdown, health_grade
+from ..ranker import effective_weights, utility
 from . import policy
 from .intent import filters_to_request
 
@@ -93,7 +93,7 @@ class Skills:
         rf = filters_to_request(filters or {})
         if rf:
             overrides["request_filters"] = [{**f, "source": "your message"} for f in rf]
-        if criterion and direction == "more" and not rf:
+        if criterion in VALUE_CRITERIA and direction == "more" and not rf:
             goal = app.store.goal(ctx.user_id)
             w = dict(goal["weights"])
             w[criterion] += 0.15
@@ -119,12 +119,13 @@ class Skills:
         for r in top:
             ev = r["evidence"]
             k = ev["ranking"]["top_contributor"]
-            line = (f"#{r['final_rank']} {r['title']} ({r['cuisine']}, {r['prep_minutes']} min, "
-                    f"utility {r['utility']:.2f}); {CRITERION_LABELS[k].lower()} contributes most")
+            line = (f"#{r['final_rank']} {r['title']} ({r['cuisine']}, {r['n_ingredients']} ingredients, "
+                    f"health grade {r['health_grade']}, utility {r['utility']:.2f}); "
+                    f"{CRITERION_LABELS[k].lower()} contributes most")
             if ev["compromises"]:
                 line += f"; compromise: {ev['compromises'][0]['text']}"
             facts.append(line + ".")
-            nums += [r["final_rank"], r["prep_minutes"], round(r["utility"], 2)] + \
+            nums += [r["final_rank"], r["n_ingredients"], round(r["utility"], 2)] + \
                     [round(v["contribution"], 2) for v in ev["ranking"]["contributions"].values()]
             titles.append(r["title"])
         el = res["eligibility"]
@@ -156,7 +157,8 @@ class Skills:
         else:
             viol = violations(r, prof["declared"])
             goal = app.store.goal(ctx.user_id)
-            sc = app.scaler.scores(r)
+            hg = prof["declared"].get("health_goal") or DEFAULT_GOAL
+            sc = app.scaler.scores(r, hg)
             row = next((t for t in (last or {}).get("ranking_table", []) if t["recipe_id"] == recipe_id), None)
             if viol:
                 facts.append(f"{r['title']} is not eligible for you: " + "; ".join(v[1] for v in viol) + ".")
@@ -166,15 +168,27 @@ class Skills:
                 nums += [row["utility_rank"], round(row["utility"], 2)]
             if goal and not viol:
                 sc_p = (row or {}).get("scores", {}).get("p")
-                u, eff, missing, contrib = utility(goal["weights"], {**sc, "p": sc_p})
-                parts = [f"{CRITERION_LABELS[k]} {sc[k]:.2f}" for k in ("h", "s", "c", "t") if sc[k] is not None]
+                parts = [f"{CRITERION_LABELS[k]} {sc[k]:.2f}" for k in VALUE_CRITERIA if sc[k] is not None]
                 facts.append("Criterion scores: " + ", ".join(parts) + ".")
-                nums += [round(sc[k], 2) for k in ("h", "s", "c", "t") if sc[k] is not None]
+                nums += [round(sc[k], 2) for k in VALUE_CRITERIA if sc[k] is not None]
             data = {"recipe": {"recipe_id": recipe_id, "title": r["title"], "scores": sc, "violations": viol}}
-        ns = nutriscore(r.get("nutrition_per_100g"))
-        facts.append(f"Nutri-Score grade {ns['grade'] if ns else 'unknown'}; {r['prep_minutes']} min; "
-                     f"{r['kcal_per_serving']} kcal per serving.")
-        nums += [r["prep_minutes"], r["kcal_per_serving"]]
+        bd = breakdown(r, (prof["declared"].get("health_goal") or DEFAULT_GOAL))
+        fp = r.get("footprint") or {}
+        facts.append(f"Health grade {bd['h']['grade'] or 'unknown'} for the goal '{bd['h']['goal_label']}'; "
+                     f"{r['n_ingredients']} ingredients; about {fp.get('kg_co2e_per_kg')} kg CO2e per kg; "
+                     f"{r.get('kcal_per_serving')} kcal per serving.")
+        nums += [r["n_ingredients"], fp.get("kg_co2e_per_kg"), r.get("kcal_per_serving")]
+        top = [b for b in fp.get("breakdown", [])[:2] if b["share"] >= 0.2]
+        if top:
+            facts.append("Most of its footprint comes from " + " and ".join(
+                f"{b['name']} ({round(100 * b['share'])}%)" for b in top) + ".")
+            nums += [round(100 * b["share"]) for b in top]
+        weak = sorted((f for f in bd["h"]["factors"] if f["score"] is not None), key=lambda f: f["score"])[:2]
+        if weak and weak[0]["score"] < 0.5:
+            facts.append("Weakest health factors: " + ", ".join(f"{f['label'].lower()} {f['value']} {f['unit']}"
+                                                                 for f in weak if f["score"] < 0.5) + ".")
+            nums += [f["value"] for f in weak]
+        data["breakdown"] = bd
         if kg.get("user_interactions"):
             types = [i["type"] for i in kg["user_interactions"]]
             facts.append(f"Your history with it: {', '.join(types[:5])}.")
@@ -188,7 +202,8 @@ class Skills:
     def _scores_now(self, user_id, rid):
         last = self.last_result(user_id) or {}
         row = next((t for t in last.get("ranking_table", []) if t["recipe_id"] == rid), None)
-        sc = dict(row["scores"]) if row else {**self.app.scaler.scores(self.app.catalogue.get(rid)), "p": None}
+        hg = ((self.app.store.profile(user_id) or {}).get("declared") or {}).get("health_goal")
+        sc = dict(row["scores"]) if row else {**self.app.scaler.scores(self.app.catalogue.get(rid), hg), "p": None}
         return sc
 
     def compare_recipes(self, ctx, a, b):
@@ -197,17 +212,18 @@ class Skills:
         ra, rb = app.catalogue.get(a), app.catalogue.get(b)
         sa, sb = self._scores_now(ctx.user_id, a), self._scores_now(ctx.user_id, b)
         rows, facts, nums = [], [], []
+        eff = effective_weights(goal["weights"], TASTE_SHARE)
         for k in CRITERIA:
             va, vb = sa.get(k), sb.get(k)
-            w = goal["weights"][k]
+            w = eff[k]
             rows.append({"criterion": k, "label": CRITERION_LABELS[k], "weight": w, "a": _r2(va), "b": _r2(vb),
                          "delta": None if va is None or vb is None else _r2(va - vb)})
             if va is not None and vb is not None and abs(va - vb) >= 0.05:
                 better = ra["title"] if va > vb else rb["title"]
                 facts.append(f"{CRITERION_LABELS[k]}: {better} is higher ({_r2(va)} vs {_r2(vb)}; weight {w:.2f}).")
                 nums += [_r2(va), _r2(vb), round(w, 2)]
-        ua = utility(goal["weights"], sa)[0]
-        ub = utility(goal["weights"], sb)[0]
+        ua = utility(eff, sa)[0]
+        ub = utility(eff, sb)[0]
         if ua is not None and ub is not None:
             facts.append(f"Under your current goal: {ra['title']} {ua:.2f} vs {rb['title']} {ub:.2f}.")
             nums += [round(ua, 2), round(ub, 2)]
@@ -216,8 +232,8 @@ class Skills:
             facts.append("Shared ingredients: " + ", ".join(shared) + ".")
         missing_p = sa.get("p") is None or sb.get("p") is None
         if missing_p:
-            facts.append("Preference match is only available for recipes in your latest ranking; it is left out here.")
-        return SkillResult(f"Compared {ra['title']} with {rb['title']} on five criteria",
+            facts.append("Taste match is only available for recipes in your latest ranking; it is left out here.")
+        return SkillResult(f"Compared {ra['title']} with {rb['title']} on four criteria",
                            {"comparison": {"a": {"recipe_id": a, "title": ra["title"], "utility": ua},
                                            "b": {"recipe_id": b, "title": rb["title"], "utility": ub},
                                            "rows": rows, "shared_ingredients": shared}},
@@ -226,6 +242,10 @@ class Skills:
     def what_if(self, ctx, criterion, direction="more", amount=0.15):
         app = self.app
         goal = app.store.goal(ctx.user_id)
+        if criterion not in VALUE_CRITERIA:
+            return SkillResult("Taste has a fixed share", {}, [f"Taste is a fixed {round(TASTE_SHARE * 100)}% share "
+                               "learned from your likes and rejections, so there is no taste weight to change. "
+                               "Try healthiness, sustainability or convenience."], [round(TASTE_SHARE * 100)])
         w = dict(goal["weights"])
         w[criterion] = max(0.0, w[criterion] + (amount if direction != "less" else -amount))
         tot = sum(w.values())
@@ -281,21 +301,24 @@ class Skills:
             nums += [round(mean, 2), round(n, 1)]
             data = {"taste": t or {"concept": concept, "mean": mean, "evidence": n, "provenance": prov}}
         else:
-            k = criterion or max(CRITERIA, key=lambda x: next((c["prob_differs"] for c in ins["criteria"] if c["criterion"] == x), 0))
+            if criterion == "p":
+                criterion = None
+            k = criterion or max(VALUE_CRITERIA, key=lambda x: next((abs(c["gap"]) for c in ins["criteria"]
+                                                                      if c["criterion"] == x), 0))
             c = next((c for c in ins["criteria"] if c["criterion"] == k), None)
             if c is None:
-                return SkillResult("No preference model yet", {}, ["Complete onboarding first."])
+                return SkillResult("No user model yet", {}, ["Complete onboarding first."])
             facts.append(f"Your saved goal gives {c['label'].lower()} a weight of {c['stated']:.2f}.")
-            facts.append(f"From your behaviour I estimate {c['inferred']:.2f} (90% interval {c['lo']:.2f} to "
-                         f"{c['hi']:.2f}); confidence {c['confidence']:.2f} on a 0-1 scale.")
-            if c["prob_differs"] >= policy.THRESHOLDS["conflict_prob"]:
-                facts.append(f"That differs from your goal with probability {c['prob_differs']:.2f}, so I treat it as "
-                             f"a possible conflict, but I never change your goal myself.")
+            facts.append(f"Your choices so far behave like {c['observed']:.2f} (gap {c['gap']:+.2f}); overall "
+                         f"preference match {ins['preference_match']:.2f}, confidence {ins['confidence']:.2f} "
+                         f"after {ins['events_since_goal']} event(s) since the goal was saved.")
+            if abs(c["gap"]) >= policy.THRESHOLDS["ask_gap"]:
+                facts.append("That gap is large enough for me to ask about it, but I never change your goal myself.")
             else:
                 facts.append("Your behaviour is consistent with your saved goal on this priority.")
             lr = app.learner(ctx.user_id)
             logged = {e["event_id"]: e for e in app.store.events(ctx.user_id)}
-            for e in lr.choice.evidence[::-1][:8]:
+            for e in lr.values.evidence[::-1][:8]:
                 src = logged.get(e.get("event_id"), {})
                 pl = src.get("payload", {})
                 rid = pl.get("recipe_id")
@@ -303,11 +326,13 @@ class Skills:
                                 "reason": e.get("reason") or pl.get("reason"), "flag": e.get("flag"),
                                 "recipe": app.catalogue.by_id[rid]["title"] if rid in app.catalogue.by_id else None,
                                 "ts": src.get("ts")})
-            nums += [round(c[x], 2) for x in ("stated", "inferred", "lo", "hi", "confidence", "prob_differs")]
-            data = {"criterion": c, "counts": ins["counts"]}
+            nums += [round(c[x], 2) for x in ("stated", "observed", "gap")] + \
+                [round(ins["preference_match"], 2), round(ins["confidence"], 2), ins["events_since_goal"],
+                 round(c["gap"], 2), round(abs(c["gap"]), 2)]
+            data = {"criterion": c, "counts": ins["counts"], "preference_match": ins["preference_match"]}
             if ins["counts"]:
                 facts.append(f"Evidence so far: {ins['counts']['choices']} choices, {ins['counts']['rejections']} "
-                             f"reasoned rejections, {ins['counts']['statements']} explicit goal statements.")
+                             f"reasoned rejections, {ins['counts']['answers']} answered questions.")
                 nums += list(ins["counts"].values())
         data["evidence"] = ev_rows
         return SkillResult("Read the preference model and its provenance", data, facts, nums, [], evidence=ev_rows)
@@ -364,13 +389,12 @@ class Skills:
                 return SkillResult(f"No graph node for {name}", {}, [f"{name} is not in the knowledge graph."])
             ing = p["ingredient"]
             facts = [f"{name}: category {', '.join(p['category']) or 'unknown'}; allergens {', '.join(p['allergens']) or 'none recorded'}.",
-                     f"Per 100 g: protein {ing.get('protein_g')} g, sugars {ing.get('sugars_g')} g, fibre {ing.get('fibre_g')} g, "
-                     f"{ing.get('kcal')} kcal.",
+                     f"Its food group has a footprint of {ing.get('co2e_kg_per_kg')} kg CO2e per kg.",
                      f"Used in {len(p['recipes'])} recipes, e.g. " + ", ".join(r["title"] for r in p["recipes"][:4]) + "."]
             if p.get("user_interactions"):
                 facts.append("Your interactions with dishes containing it: " +
                              ", ".join(f"{k} {v}" for k, v in p["user_interactions"].items()) + ".")
-            nums = [ing.get(x) for x in ("protein_g", "sugars_g", "fibre_g", "kcal") if ing.get(x) is not None] + \
+            nums = [ing.get(x) for x in ("co2e_kg_per_kg",) if ing.get(x) is not None] + \
                    [len(p["recipes"])] + list((p.get("user_interactions") or {}).values())
             return SkillResult(f"Graph facts for ingredient {name}", {"graph": p}, facts, nums,
                                [r["title"] for r in p["recipes"][:4]], evidence={"node": f"ingredient:{name}"})
@@ -403,13 +427,13 @@ class Skills:
     def review(self, ctx):
         res = policy.review(self.app, ctx.user_id, ctx.trace, trigger="chat")
         facts = {"aligned": ["Your behaviour is consistent with your saved goal."],
-                 "uncertain": ["No conflict, but some revealed priorities are still uncertain; recommendations rely mainly on your saved goal."],
+                 "uncertain": ["No conflict so far, but there are only a few choices to learn from; recommendations rely mainly on your saved goal."],
                  "conflict": [f"Possible conflict on {CRITERION_LABELS[c['criterion']].lower()}: saved {c['stated']:.2f}, "
-                              f"behaviour suggests {c['revealed']:.2f}." for c in res["conflicts"][:2]],
+                              f"behaviour suggests {c['observed']:.2f}." for c in res["conflicts"][:2]],
                  "insufficient_data": ["Not enough data yet."]}[res["status"]]
         for d in res["decisions"]:
             facts.append(f"I raised: {d['title']} (it waits for you; nothing was changed).")
-        nums = [round(x, 2) for c in res["conflicts"][:2] for x in (c["stated"], c["revealed"])]
+        nums = [round(x, 2) for c in res["conflicts"][:2] for x in (c["stated"], c["observed"])] + [round(res.get("preference_match") or 0, 2)]
         return SkillResult(f"Supervisor review: {res['status']}", {"review": res, "decisions": res["decisions"]}, facts, nums)
 
     def propose_profile_change(self, ctx, op, value):

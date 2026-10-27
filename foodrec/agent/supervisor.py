@@ -18,11 +18,11 @@ from .skills import Skills
 from .trace import Trace
 
 FOLLOW_UPS = ("alternatives", "graph_lookup", "search_knowledge", "explain_preference", "history")
-HELP = ("I can suggest five recipes (\"something quick with lentils\"), explain why a recipe ranks where it "
+HELP = ("I can suggest five recipes (\"something with lentils and few ingredients\"), explain why a recipe ranks where it "
         "does (\"why #2?\"), compare two dishes, show what would change if a priority moved (\"what if I cared "
         "more about sustainability?\"), tell you what I believe about your preferences and why, search your "
         "history (\"what did I reject last week?\"), answer questions from the recipe and ingredient knowledge "
-        "base, and prepare profile changes for you to confirm. Everything I do is shown step by step above.")
+        "base (how healthiness, sustainability and convenience are scored), and prepare profile changes for you to confirm. Everything I do is shown step by step above.")
 
 
 @dataclass
@@ -167,7 +167,7 @@ class Supervisor:
             if not refs:
                 return [], "Which recipe do you mean? You can say \"#2\" or use its name."
             plan = [("explain_recipe", {"recipe_id": refs[0]})]
-            if it["criterion"] in ("h", "s", "c", "t") and it["direction"] == "more":
+            if it["criterion"] in ("h", "s", "t") and it["direction"] == "more":
                 plan.append(("alternatives", {"recipe_id": refs[0], "criterion": it["criterion"]}))
             return plan, None
         if i == "compare_recipes":
@@ -180,8 +180,7 @@ class Supervisor:
             return [("compare_recipes", {"a": refs[0], "b": refs[1]})], None
         if i == "what_if":
             if not it["criterion"]:
-                return [], ("Which priority should change? Taste, healthiness, sustainability, affordability "
-                            "or convenience.")
+                return [], ("Which priority should change? Healthiness, sustainability or convenience.")
             return [("what_if", {"criterion": it["criterion"], "direction": it["direction"] or "more"})], None
         if i == "why_preference":
             return [("explain_preference", {"criterion": None if it["concept"] else it["criterion"],
@@ -236,7 +235,7 @@ class Supervisor:
         done = {n for n, _ in results}
         last_rid = next((r.data.get("recipe", {}).get("recipe_id") for n, r in results if n == "explain_recipe"), None)
         options = {}
-        if last_rid and it["criterion"] in ("h", "s", "c", "t") and "alternatives" not in done:
+        if last_rid and it["criterion"] in ("h", "s", "t") and "alternatives" not in done:
             options["alternatives"] = {"recipe_id": last_rid, "criterion": it["criterion"]}
         if it["concept"] and "graph_lookup" not in done:
             options["graph_lookup"] = {"concept": it["concept"]}
@@ -335,8 +334,10 @@ def validate_answer(text, numbers, titles, all_titles):
     if m:
         return False, f"unsupported health/certainty claim '{m.group(0)}'"
     allowed_t = {t.lower() for t in titles}
+    low = text.lower()
     for t in all_titles:
-        if t.lower() in text.lower() and t.lower() not in allowed_t:
+        # one-word titles ("Salsa", "Hummus") collide with ordinary words; check distinctive ones only
+        if " " in t.strip() and len(t) >= 12 and t.lower() in low and t.lower() not in allowed_t:
             return False, f"mentions '{t}', which is not in the evidence"
     allowed = [float(n) for n in numbers]
     for tok in _NUM.findall(text):

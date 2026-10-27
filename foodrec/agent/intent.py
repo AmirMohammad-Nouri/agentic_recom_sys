@@ -11,7 +11,7 @@ import re
 from .. import CRITERIA
 
 INTENTS = {
-    "recommend": "suggest recipes now (optionally with request filters such as quick, high protein, a cuisine)",
+    "recommend": "suggest recipes now (optionally with request filters such as few ingredients, high protein, a cuisine)",
     "explain_recipe": "why a specific recipe was recommended or how it scores",
     "compare_recipes": "compare two recipes",
     "what_if": "what would change if a priority were higher/lower (counterfactual, nothing saved)",
@@ -25,14 +25,14 @@ INTENTS = {
 PROFILE_OPS = ("add_allergen", "remove_allergen", "add_diet", "remove_diet", "add_dislike", "remove_dislike")
 FILTER_KEYS = {"protein_min": ("protein_g", "min", 0, 150), "sugars_max": ("sugars_g", "max", 0, 200),
                "sugars_min": ("sugars_g", "min", 0, 200), "fibre_min": ("fibre_g", "min", 0, 60),
-               "kcal_max": ("kcal", "max", 50, 3000), "max_minutes": ("prep_minutes", "max", 1, 600),
-               "max_cost": ("cost_eur", "max", 0.1, 100)}
+               "kcal_max": ("kcal", "max", 50, 3000), "max_ingredients": ("n_ingredients", "max", 2, 40),
+               "co2e_max": ("co2e_kg", "max", 0.1, 60)}
+MEALS = ("breakfast", "main", "side", "salad", "soup", "dessert", "snack", "drink", "sauce")
 CRITERION_WORDS = {
     "p": ("taste", "tasty", "flavour", "flavor", "preference match", "like more"),
     "h": ("health", "healthy", "healthier", "nutritious", "nutrition", "nutri"),
     "s": ("sustainab", "climate", "co2", "carbon", "green", "environment", "planet", "footprint"),
-    "c": ("cheap", "price", "cost", "afford", "budget", "money", "expensive"),
-    "t": ("quick", "fast", "time", "convenien", "easy", "effort", "minutes"),
+    "t": ("convenien", "easy", "easier", "simple", "simpler", "fewer ingredients", "effort", "quick"),
 }
 SCHEMA = {
     "type": "object",
@@ -44,7 +44,7 @@ SCHEMA = {
         "filters": {"type": "object", "properties": {
             **{k: {"type": ["number", "null"]} for k in FILTER_KEYS},
             "cuisine": {"type": ["string", "null"]},
-            "meal": {"type": ["string", "null"], "enum": ["breakfast", "main", None]},
+            "meal": {"type": ["string", "null"], "enum": list(MEALS) + [None]},
             "include_ingredient": {"type": ["string", "null"]},
             "exclude_ingredient": {"type": ["string", "null"]}}},
         "concept": {"type": ["string", "null"]},
@@ -117,19 +117,21 @@ def _filters(t, vocab):
     if re.search(r"low[ -]cal|light meal|few calories|under \d+ ?kcal", t):
         m = re.search(r"under (\d+) ?kcal", t)
         f["kcal_max"] = int(m.group(1)) if m else 550
-    m = re.search(r"(?:under|less than|within|max(?:imum)?|in) (\d+) ?(?:min|minutes)", t)
+    m = re.search(r"(?:under|less than|at most|max(?:imum)?|only|just) (\d+) ingredients?", t)
     if m:
-        f["max_minutes"] = int(m.group(1))
-    elif _has(t, "quick", "fast meal", "in a hurry"):
-        f["max_minutes"] = 25
-    m = re.search(r"(?:under|less than|max(?:imum)?|below) (?:€ ?)?(\d+(?:[.,]\d+)?) ?(?:€|eur|euros?)", t)
-    if m:
-        f["max_cost"] = float(m.group(1).replace(",", "."))
+        f["max_ingredients"] = int(m.group(1))
+    elif _has(t, "few ingredients", "fewer ingredients", "quick", "in a hurry", "simple meal", "easy meal"):
+        f["max_ingredients"] = 7
+    if re.search(r"low[ -](carbon|co2|footprint|emission)", t):
+        f["co2e_max"] = 2.0
     for c in vocab["cuisines"]:
         if re.search(rf"\b{re.escape(c.lower())}\b", t):
             f["cuisine"] = c
-    if "breakfast" in t:
-        f["meal"] = "breakfast"
+    for meal, words in (("breakfast", ("breakfast", "brunch")), ("dessert", ("dessert", "something sweet")),
+                        ("soup", ("soup",)), ("salad", ("salad",)), ("snack", ("snack",)), ("drink", ("drink", "smoothie"))):
+        if _has(t, *words):
+            f["meal"] = meal
+            break
     for ing in sorted(vocab["ingredients"], key=len, reverse=True):
         if re.search(rf"\b(without|no|not|skip|avoid) {re.escape(ing)}\b", t):
             f["exclude_ingredient"] = ing
@@ -214,11 +216,11 @@ def model_prompt(text, context, vocab):
         {"role": "system", "content": (
             "You classify one message sent to a food recommendation assistant and extract fields. "
             "Return JSON only, matching the schema. Use null when a field is not mentioned. Never invent "
-            "values. Criteria codes: p=taste/preference match, h=healthiness, s=sustainability, "
-            "c=affordability, t=convenience/time.\nIntents:\n" + intents + "\n"
+            "values. Criteria codes: p=taste match, h=healthiness, s=sustainability (CO2 footprint), "
+            "t=convenience (few ingredients).\nIntents:\n" + intents + "\n"
             "recipe_refs: recipe titles exactly as written by the user, or '#n' for 'number n' in the "
-            "current list. filters only for this request (protein_min grams per serving, max_minutes, "
-            "max_cost euros, kcal_max, cuisine, meal, include_ingredient, exclude_ingredient). "
+            "current list. filters only for this request (protein_min grams per serving, max_ingredients, "
+            "kcal_max per serving, co2e_max kg CO2e per kg, cuisine, meal, include_ingredient, exclude_ingredient). "
             "profile_change only when the user states an allergy, diet or a food to never include.\n"
             f"Known cuisines: {', '.join(vocab['cuisines'])}.")},
         {"role": "user", "content": f"Current list: {context or 'none'}\nMessage: {text}"},
@@ -266,7 +268,7 @@ def validate_model(data, text, catalogue, vocab):
                 f[k] = m
             else:
                 notes.append(f"dropped unknown cuisine {v!r}")
-        elif k == "meal" and v in ("breakfast", "main"):
+        elif k == "meal" and v in MEALS:
             f[k] = v
         elif k in ("include_ingredient", "exclude_ingredient"):
             if str(v).lower() in vocab["ingredients"]:

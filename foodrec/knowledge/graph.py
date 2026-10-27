@@ -1,9 +1,10 @@
 """Food knowledge graph: schema, projection from catalogue + event log, query templates.
 
 Schema (node label: key property)
-  Recipe {uid=recipe:<id>}      title, cuisine, meal, prep_minutes, cost_eur, co2e_kg, kcal,
-                                nutri_grade, score_h, score_s, score_c, score_t
-  Ingredient {ingredient:<n>}   name, category, nutrients per 100 g, price_eur_per_kg, co2e_kg_per_kg
+  Recipe {uid=recipe:<id>}      title, cuisine, meal, n_ingredients, co2e_kg_per_kg, kcal,
+                                health_grade, fsa_score, image_url, score_h, score_s, score_t
+  Ingredient {ingredient:<n>}   name, category (food group), co2e_kg_per_kg (group factor)
+  Category {category:<group>}   label, co2e_kg_per_kg, source
   Cuisine, Category, Allergen, Diet
   User {user:<id>}
   Interaction {interaction:<event_id>}  type (like|save|choose|reject|answer|profile_updated|
@@ -32,7 +33,7 @@ import time
 from collections import Counter, defaultdict
 
 from ..constraints import SUPPORTED_DIETS
-from ..features import nutriscore
+from ..features import health_grade
 
 INTERACTION_EVENTS = ("feedback", "question_answered", "profile_created", "profile_updated",
                       "goal_saved", "proposal_accepted", "proposal_dismissed", "profile_correction")
@@ -67,38 +68,38 @@ class GraphProjection:
         raise NotImplementedError
 
     # ---- catalogue -------------------------------------------------------------------
-    def load_catalogue(self, catalogue, ingredients, scaler, similar_k=3, min_similarity=0.3):
-        for name, info in ingredients.items():
-            iid = f"ingredient:{name}"
-            props = {"name": name, "category": info.get("category")}
-            for k in ("kcal", "protein_g", "sugars_g", "fibre_g", "sat_fat_g", "sodium_mg",
-                      "price_eur_per_kg", "co2e_kg_per_kg"):
-                props[k] = info.get(k)
-            self.merge_node(iid, "Ingredient", props)
-            cat = info.get("category") or "other"
-            self.merge_node(f"category:{cat}", "Category", {"name": cat})
-            self.merge_edge(iid, "IN_CATEGORY", f"category:{cat}")
-            for a in info.get("allergens") or []:
-                self.merge_node(f"allergen:{a}", "Allergen", {"name": a})
-                self.merge_edge(iid, "HAS_ALLERGEN", f"allergen:{a}")
+    def load_catalogue(self, catalogue, scaler):
+        groups = catalogue.groups or {}
+        for key, g in groups.items():
+            self.merge_node(f"category:{key}", "Category", {"name": key, "label": g.get("label"),
+                                                           "co2e_kg_per_kg": g.get("co2e"), "source": g.get("source")})
         for d in SUPPORTED_DIETS:
             self.merge_node(f"diet:{d}", "Diet", {"name": d})
+        seen = set()
         for r in catalogue.recipes:
             u = rid_uid(r["id"])
             sc = scaler.scores(r)
-            ns = nutriscore(r.get("nutrition_per_100g"))
+            fp = r.get("footprint") or {}
             self.merge_node(u, "Recipe", {
                 "recipe_id": r["id"], "title": r["title"], "cuisine": r["cuisine"], "meal": r.get("meal"),
-                "prep_minutes": r.get("prep_minutes"), "cost_eur": r.get("cost_eur_per_serving"),
-                "co2e_kg": r.get("co2e_kg_per_serving"), "kcal": r.get("kcal_per_serving"),
-                "nutri_grade": ns["grade"] if ns else None,
-                **{f"score_{k}": sc[k] for k in ("h", "s", "c", "t")}})
+                "n_ingredients": r.get("n_ingredients"), "co2e_kg_per_kg": fp.get("kg_co2e_per_kg"),
+                "kcal": r.get("kcal_per_serving"), "fsa_score": r.get("fsa_score"),
+                "health_grade": health_grade(sc["h"]), "image_url": r.get("image_url"),
+                **{f"score_{k}": sc[k] for k in ("h", "s", "t")}})
             self.merge_node(f"cuisine:{r['cuisine']}", "Cuisine", {"name": r["cuisine"]})
             self.merge_edge(u, "OF_CUISINE", f"cuisine:{r['cuisine']}")
             for i in r["ingredients"]:
                 iid = f"ingredient:{i['name']}"
-                if i["name"] not in ingredients:
-                    self.merge_node(iid, "Ingredient", {"name": i["name"], "category": i.get("category")})
+                if iid not in seen:
+                    seen.add(iid)
+                    cat = i.get("category") or "unclassified"
+                    self.merge_node(iid, "Ingredient", {"name": i["name"], "category": cat,
+                                                        "co2e_kg_per_kg": i.get("co2e_factor")})
+                    self.merge_node(f"category:{cat}", "Category", {"name": cat})
+                    self.merge_edge(iid, "IN_CATEGORY", f"category:{cat}")
+                    for a in i.get("allergens") or []:
+                        self.merge_node(f"allergen:{a}", "Allergen", {"name": a})
+                        self.merge_edge(iid, "HAS_ALLERGEN", f"allergen:{a}")
                 self.merge_edge(u, "CONTAINS", iid, {"grams": i["grams"]})
             for a in r.get("allergens") or []:
                 self.merge_node(f"allergen:{a}", "Allergen", {"name": a})
@@ -106,12 +107,16 @@ class GraphProjection:
             for d, ok in (r.get("diet") or {}).items():
                 if ok:
                     self.merge_edge(u, "SUITS", f"diet:{d}")
+        # neighbours are precomputed by the ingest step (vectorised); fall back to pairwise for
+        # small catalogues without them
         for r in catalogue.recipes:
-            sims = sorted(((catalogue.similarity(r, o), o["id"]) for o in catalogue.recipes
-                           if o["id"] != r["id"]), reverse=True)
-            for s, oid in sims[:similar_k]:
-                if s >= min_similarity:
-                    self.merge_edge(rid_uid(r["id"]), "SIMILAR_TO", rid_uid(oid), {"score": round(s, 3)})
+            sims = r.get("similar")
+            if sims is None and len(catalogue) <= 500:
+                sims = sorted(([o["id"], catalogue.similarity(r, o)] for o in catalogue.recipes
+                               if o["id"] != r["id"]), key=lambda x: -x[1])[:3]
+            for oid, sc_ in sims or []:
+                if sc_ >= 0.3 and oid in catalogue.by_id:
+                    self.merge_edge(rid_uid(r["id"]), "SIMILAR_TO", rid_uid(oid), {"score": round(sc_, 3)})
         self.flush()
 
     # ---- events --------------------------------------------------------------------
@@ -311,7 +316,7 @@ class MemoryGraph(GraphProjection):
 
     def alternatives(self, recipe_id, criterion, k=3):
         """Recipes that share ingredients or a cuisine with `recipe_id` and score better on
-        `criterion` (h, s, c or t). Used for counterfactual questions ("what is similar but greener?")."""
+        `criterion` (h, s or t). Used for counterfactual questions ("what is similar but greener?")."""
         u = rid_uid(recipe_id)
         if u not in self.nodes:
             return []

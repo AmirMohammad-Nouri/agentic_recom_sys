@@ -1,0 +1,3205 @@
+{
+"ingredients": {
+"(": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(2 sprinkles from the jar)": {
+"group": "condiments",
+"rule": "sugar",
+"source": "model"
+},
+"(2-2.5 pounds)": {
+"group": "cheese",
+"rule": "unclassified",
+"source": "model"
+},
+"(3 blocks of cream cheese)": {
+"group": "condiments",
+"rule": "cheese",
+"source": "model"
+},
+"(4 serving size)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(5 ounces)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(about 1 c.)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(about a quart)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(already posted on genius kitchen)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(and cayenne": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"(any amount desired)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(approximately 2 cups)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(beaten)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(celestial seasonings)": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"(comes in envelopes in a box": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(cool whip)": {
+"group": "condiments",
+"rule": "cream",
+"source": "model"
+},
+"(fat-free okay)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(for frying": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(for frying)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(freezerable)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(good dark tea": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(i use 2 eggs for one sandwich)": {
+"group": "condiments",
+"rule": "eggs",
+"source": "model"
+},
+"(i use el paso": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(i use mccormicks)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(i use tony chachere's": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(i use wishbone)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(i used sage and onion)": {
+"group": "condiments",
+"rule": "onions",
+"source": "model"
+},
+"(large)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(looks better with it) (optional)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(mccormick)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(melt butter": {
+"group": "condiments",
+"rule": "butter",
+"source": "model"
+},
+"(might need 2)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(might use two)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(more": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(new york strip": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(no milk": {
+"group": "condiments",
+"rule": "milk",
+"source": "model"
+},
+"(not the dip)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(old el paso works well)": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"(or 1 drop each of yellow and blue food coloring) (optional)": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"(or 2 egg whites)": {
+"group": "condiments",
+"rule": "eggs",
+"source": "model"
+},
+"(or any combo of the above!)": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"(or any other spice blend you like with potatoes)": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"(or ask the butcher for the sausage meat..it saves time)": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"(or burying": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(or equivalent amount of egg substitute)": {
+"group": "eggs",
+"rule": "eggs",
+"source": "model"
+},
+"(or equivalent)": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"(or even slightly larger)": {
+"group": "beef",
+"rule": "unclassified",
+"source": "model"
+},
+"(or regular)": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(or sour cream": {
+"group": "cheese",
+"rule": "cream",
+"source": "model"
+},
+"(or stubby pasta of choice)": {
+"group": "pork",
+"rule": "wheat",
+"source": "model"
+},
+"(or to taste": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(or try chocolate for an extra special treat!)": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"(preferably a cold brew variety)": {
+"group": "coffee",
+"rule": "unclassified",
+"source": "model"
+},
+"(red rose": {
+"group": "wine",
+"rule": "unclassified",
+"source": "model"
+},
+"(regular": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(regular size)": {
+"group": "pork",
+"rule": "unclassified",
+"source": "model"
+},
+"(room temp)": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(room temperature": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(see tip)": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"(served in high ball)": {
+"group": "beef",
+"rule": "unclassified",
+"source": "model"
+},
+"(slightly beaten)": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(small size)": {
+"group": "pork",
+"rule": "unclassified",
+"source": "model"
+},
+"(standard golden lager preferred; not authentic) (optional)": {
+"group": "wine",
+"rule": "unclassified",
+"source": "model"
+},
+"(suggested)": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(to garnish) (optional)": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"(to taste)": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(toasted these briefly first on a cookie sheet in the oven at 350 degrees": {
+"group": "beef",
+"rule": "cheese",
+"source": "model"
+},
+"(use colors of choice)": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"(very fresh)": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"(you may need two)": {
+"group": "beef",
+"rule": "unclassified",
+"source": "model"
+},
+")": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"5.0": {
+"group": "spices",
+"rule": "unclassified",
+"source": "model"
+},
+"a & h baking soda": {
+"group": "potatoes",
+"rule": "spices",
+"source": "model"
+},
+"a fine grind works best": {
+"group": "spices",
+"rule": "unclassified",
+"source": "model"
+},
+"a original sauce": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"a roast": {
+"group": "beef",
+"rule": "unclassified",
+"source": "model"
+},
+"a white onion": {
+"group": "vegetables",
+"rule": "onions",
+"source": "model"
+},
+"aberdeen angus steaks": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"about - tablespoons": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"about a": {
+"group": "potatoes",
+"rule": "unclassified",
+"source": "model"
+},
+"about inches in length": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"about oz each": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"about potato": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"about very banana": {
+"group": "fruit",
+"rule": "bananas",
+"source": "model"
+},
+"absolute citrus-infused vodka": {
+"group": "wine",
+"rule": "wine",
+"source": "model"
+},
+"accent seasoning": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"accompaniments": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"acini di pepe pasta": {
+"group": "pulses",
+"rule": "wheat",
+"source": "model"
+},
+"acorn squash": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"active culture buttermilk": {
+"group": "milk",
+"rule": "milk",
+"source": "model"
+},
+"active dry yeast": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"actually use any meat combination": {
+"group": "unclassified",
+"rule": "meat_other",
+"source": "model"
+},
+"add garlic": {
+"group": "vegetables",
+"rule": "onions",
+"source": "model"
+},
+"add in more": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"add in more cheese if desired": {
+"group": "cheese",
+"rule": "cheese",
+"source": "model"
+},
+"add more": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"add more if you like 'em hot": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"add more if you like a big punch": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"add more later if you want to": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"add up to cup": {
+"group": "milk",
+"rule": "unclassified",
+"source": "model"
+},
+"additional all-purpose flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"additional barbecue sauce": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"additional berries": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"additional breadcrumbs": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"additional brown sugar": {
+"group": "sugar",
+"rule": "sugar",
+"source": "model"
+},
+"additional butter": {
+"group": "butter",
+"rule": "butter",
+"source": "model"
+},
+"additional cheddar cheese": {
+"group": "cheese",
+"rule": "cheese",
+"source": "model"
+},
+"additional chili powder": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"additional chives": {
+"group": "vegetables",
+"rule": "onions",
+"source": "model"
+},
+"additional cinnamon sugar": {
+"group": "spices",
+"rule": "sugar",
+"source": "model"
+},
+"additional confectioners' sugar": {
+"group": "sugar",
+"rule": "sugar",
+"source": "rules"
+},
+"additional egg": {
+"group": "eggs",
+"rule": "eggs",
+"source": "rules"
+},
+"additional flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "rules"
+},
+"additional herbs and spices": {
+"group": "spices",
+"rule": "spices",
+"source": "rules"
+},
+"additional hot cocoa mix": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "rules"
+},
+"additional milk": {
+"group": "milk",
+"rule": "milk",
+"source": "rules"
+},
+"additional oil": {
+"group": "vegetable_oil",
+"rule": "vegetable_oil",
+"source": "rules"
+},
+"additional onion": {
+"group": "onions",
+"rule": "onions",
+"source": "rules"
+},
+"additional parmesan cheese": {
+"group": "cheese",
+"rule": "cheese",
+"source": "rules"
+},
+"additional picante sauce": {
+"group": "condiments",
+"rule": "condiments",
+"source": "rules"
+},
+"additional pizza sauce": {
+"group": "condiments",
+"rule": "tomatoes",
+"source": "model"
+},
+"additional rosemary": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"additional soft butter": {
+"group": "butter",
+"rule": "butter",
+"source": "model"
+},
+"additional sugar": {
+"group": "sugar",
+"rule": "sugar",
+"source": "model"
+},
+"additional whipped cream": {
+"group": "cream",
+"rule": "cream",
+"source": "model"
+},
+"adjust": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"adjust to heat level": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"adobo sauce": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"adobo seasoning": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"adolphs meat tenderizer": {
+"group": "unclassified",
+"rule": "meat_other",
+"source": "model"
+},
+"afford": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"agave nectar": {
+"group": "fruit",
+"rule": "sugar",
+"source": "model"
+},
+"ahi tuna": {
+"group": "fish",
+"rule": "fish",
+"source": "model"
+},
+"ahi tuna steaks": {
+"group": "fish",
+"rule": "fish",
+"source": "model"
+},
+"ajinomoto": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"al dente and cooled thin pasta": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"albacore tuna": {
+"group": "fish",
+"rule": "fish",
+"source": "model"
+},
+"albacore tuna in water": {
+"group": "fish",
+"rule": "fish",
+"source": "model"
+},
+"albers yellow cornmeal": {
+"group": "wheat",
+"rule": "maize",
+"source": "model"
+},
+"alcohol": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"alfalfa sprouts": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"alfredo sauce": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"all natural wonton wrappers": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"all purpose greek seasoning": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"all purpose wheat flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"all-bran cereal": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"all-puroose flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"all-purpose flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"all-purpose flour and cup wheat flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"all-purpose flour may need up to cups": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"all-purpose gluten-free flour": {
+"group": "unclassified",
+"rule": "wheat",
+"source": "model"
+},
+"all-purpose white flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"all-purpose whole wheat flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"allspice": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"allspice berries": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"allspice berry": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"almond": {
+"group": "nuts",
+"rule": "nuts",
+"source": "model"
+},
+"almond bark": {
+"group": "unclassified",
+"rule": "nuts",
+"source": "model"
+},
+"almond essence": {
+"group": "unclassified",
+"rule": "nuts",
+"source": "model"
+},
+"almond extract": {
+"group": "unclassified",
+"rule": "nuts",
+"source": "model"
+},
+"almond flavored liqueur": {
+"group": "fruit",
+"rule": "wine",
+"source": "model"
+},
+"almond flavoring": {
+"group": "spices",
+"rule": "nuts",
+"source": "model"
+},
+"almond flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"almond paste": {
+"group": "fruit",
+"rule": "nuts",
+"source": "model"
+},
+"almonds": {
+"group": "nuts",
+"rule": "nuts",
+"source": "model"
+},
+"also be used": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"also be used and is easier than thawing": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"also be used for a different taste": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"also sprinkled on top": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"also use bacon": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"also use beef broth": {
+"group": "beef",
+"rule": "broth",
+"source": "model"
+},
+"also use cherry tomatoes": {
+"group": "tomatoes",
+"rule": "tomatoes",
+"source": "model"
+},
+"also use heavy cream": {
+"group": "cream",
+"rule": "cream",
+"source": "model"
+},
+"also use italian turkey sausage": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"also use lime juice": {
+"group": "citrus",
+"rule": "citrus",
+"source": "model"
+},
+"also use orange juice": {
+"group": "citrus",
+"rule": "citrus",
+"source": "model"
+},
+"also use seasoned crumbs": {
+"group": "unclassified",
+"rule": "wheat",
+"source": "model"
+},
+"also use semi-sweet": {
+"group": "chocolate",
+"rule": "unclassified",
+"source": "model"
+},
+"also use thai red curry paste": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"also use toast if you want": {
+"group": "wheat",
+"rule": "unclassified",
+"source": "model"
+},
+"also use turkey": {
+"group": "poultry",
+"rule": "poultry",
+"source": "model"
+},
+"also use whole wheat": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"also use ziti": {
+"group": "wheat",
+"rule": "unclassified",
+"source": "model"
+},
+"always add in more water during cooking": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"amaranth flour": {
+"group": "vegetables",
+"rule": "wheat",
+"source": "model"
+},
+"amaretto": {
+"group": "chocolate",
+"rule": "wine",
+"source": "model"
+},
+"amarula cream liqueur": {
+"group": "cream",
+"rule": "wine",
+"source": "model"
+},
+"amchoor powder": {
+"group": "unclassified",
+"rule": "spices",
+"source": "model"
+},
+"ammonia": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"an onion": {
+"group": "vegetables",
+"rule": "onions",
+"source": "model"
+},
+"anaheim chiles": {
+"group": "condiments",
+"rule": "vegetables",
+"source": "model"
+},
+"anaheim chili": {
+"group": "condiments",
+"rule": "vegetables",
+"source": "model"
+},
+"anaheim chilies": {
+"group": "condiments",
+"rule": "vegetables",
+"source": "model"
+},
+"ancho chile powder": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"anchovy fillets": {
+"group": "fish",
+"rule": "fish",
+"source": "model"
+},
+"anchovy paste": {
+"group": "fish",
+"rule": "fish",
+"source": "model"
+},
+"and": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and -inch thick fries": {
+"group": "wheat",
+"rule": "unclassified",
+"source": "model"
+},
+"and add in more": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and apples": {
+"group": "fruit",
+"rule": "apples",
+"source": "model"
+},
+"and bell peppers": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"and carrot": {
+"group": "root_veg",
+"rule": "root_veg",
+"source": "model"
+},
+"and chunky salsa": {
+"group": "condiments",
+"rule": "tomatoes",
+"source": "model"
+},
+"and crumbled bacon": {
+"group": "beef",
+"rule": "pork",
+"source": "model"
+},
+"and cubed potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"and cubed sweet potatoes not yams": {
+"group": "root_veg",
+"rule": "potatoes",
+"source": "model"
+},
+"and cucumbers": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"and cut - inches thick": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and deseeded green chili pepper": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"and dusting": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"and ginger": {
+"group": "spices",
+"rule": "unclassified",
+"source": "model"
+},
+"and green bell pepper": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"and inch in diameter": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and it worked out fine": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and mashed sweet potatoes": {
+"group": "root_veg",
+"rule": "potatoes",
+"source": "model"
+},
+"and mint": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"and new mexico pepper": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"and peaches": {
+"group": "fruit",
+"rule": "fruit",
+"source": "model"
+},
+"and pecans": {
+"group": "nuts",
+"rule": "nuts",
+"source": "model"
+},
+"and pie filling": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and pie filling mix": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and plum tomato": {
+"group": "vegetables",
+"rule": "tomatoes",
+"source": "model"
+},
+"and plum tomatoes": {
+"group": "vegetables",
+"rule": "tomatoes",
+"source": "model"
+},
+"and potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"and quartered potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"and quartered turnips": {
+"group": "root_veg",
+"rule": "root_veg",
+"source": "model"
+},
+"and seasoning mix": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"and slender-chinese groceries will have them": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and tomatoes": {
+"group": "vegetables",
+"rule": "tomatoes",
+"source": "model"
+},
+"and use egg": {
+"group": "milk",
+"rule": "eggs",
+"source": "model"
+},
+"and wiped clean": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"and yellow onions": {
+"group": "vegetables",
+"rule": "onions",
+"source": "model"
+},
+"and zucchini": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"andes mints candies": {
+"group": "unclassified",
+"rule": "vegetables",
+"source": "model"
+},
+"andouille sausage": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"andouille sausages": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"angel food cake": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"angel food cake mix": {
+"group": "unclassified",
+"rule": "soup_mix",
+"source": "model"
+},
+"angel hair pasta": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"angostura bitters": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"anise extract": {
+"group": "unclassified",
+"rule": "spices",
+"source": "model"
+},
+"anise seed": {
+"group": "spices",
+"rule": "nuts",
+"source": "model"
+},
+"aniseed": {
+"group": "spices",
+"rule": "nuts",
+"source": "model"
+},
+"ants": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"any blend cheese": {
+"group": "cheese",
+"rule": "cheese",
+"source": "model"
+},
+"any flavor preserves": {
+"group": "condiments",
+"rule": "sugar",
+"source": "model"
+},
+"any flavour yogurt": {
+"group": "milk",
+"rule": "milk",
+"source": "model"
+},
+"any other dry seasoning": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"any potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"any type pasta": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"apple": {
+"group": "fruit",
+"rule": "apples",
+"source": "model"
+},
+"apple butter": {
+"group": "condiments",
+"rule": "apples",
+"source": "model"
+},
+"apple cider": {
+"group": "wine",
+"rule": "apples",
+"source": "model"
+},
+"apple cider vinegar": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"apple fruit filling and topping": {
+"group": "wheat",
+"rule": "apples",
+"source": "model"
+},
+"apple jelly": {
+"group": "condiments",
+"rule": "apples",
+"source": "model"
+},
+"apple juice": {
+"group": "wine",
+"rule": "apples",
+"source": "model"
+},
+"apple juice concentrate": {
+"group": "fruit",
+"rule": "apples",
+"source": "model"
+},
+"apple juice may substitute sweet cider": {
+"group": "wine",
+"rule": "apples",
+"source": "model"
+},
+"apple pie filling": {
+"group": "wheat",
+"rule": "apples",
+"source": "model"
+},
+"apple pie filling with cinnamon": {
+"group": "wheat",
+"rule": "apples",
+"source": "model"
+},
+"apple pie spice": {
+"group": "spices",
+"rule": "apples",
+"source": "model"
+},
+"apples": {
+"group": "fruit",
+"rule": "apples",
+"source": "model"
+},
+"apples and up into pieces": {
+"group": "potatoes",
+"rule": "apples",
+"source": "model"
+},
+"apples i recommend rome": {
+"group": "wheat",
+"rule": "apples",
+"source": "model"
+},
+"apples i use granny smith": {
+"group": "fruit",
+"rule": "apples",
+"source": "model"
+},
+"applesauce": {
+"group": "condiments",
+"rule": "apples",
+"source": "model"
+},
+"applewood smoked bacon": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"apricot": {
+"group": "fruit",
+"rule": "fruit",
+"source": "model"
+},
+"apricot jam": {
+"group": "condiments",
+"rule": "fruit",
+"source": "model"
+},
+"apricot preserves": {
+"group": "condiments",
+"rule": "fruit",
+"source": "model"
+},
+"apricots": {
+"group": "fruit",
+"rule": "fruit",
+"source": "model"
+},
+"arborio rice": {
+"group": "rice",
+"rule": "rice",
+"source": "model"
+},
+"are good": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"arm & hammer super washing soda laundry detergent": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"armour all cleaner": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"arrowroot": {
+"group": "wheat",
+"rule": "unclassified",
+"source": "model"
+},
+"artichoke heart": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"artichoke hearts": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"artichokes": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"artificial sweetener": {
+"group": "unclassified",
+"rule": "sugar",
+"source": "model"
+},
+"arugula": {
+"group": "brassicas",
+"rule": "vegetables",
+"source": "model"
+},
+"as much bacon as you wish": {
+"group": "beef",
+"rule": "pork",
+"source": "model"
+},
+"as needed fruit": {
+"group": "fruit",
+"rule": "fruit",
+"source": "model"
+},
+"asafoetida powder": {
+"group": "unclassified",
+"rule": "spices",
+"source": "model"
+},
+"asiago cheese": {
+"group": "cheese",
+"rule": "cheese",
+"source": "model"
+},
+"asian chili sauce": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"asian chili-garlic sauce": {
+"group": "condiments",
+"rule": "onions",
+"source": "model"
+},
+"asian fish sauce": {
+"group": "unclassified",
+"rule": "condiments",
+"source": "model"
+},
+"asian hot chili sauce": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"asian plum sauce": {
+"group": "condiments",
+"rule": "fruit",
+"source": "model"
+},
+"asparagus": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"asparagus spear": {
+"group": "vegetables",
+"rule": "fruit",
+"source": "model"
+},
+"asparagus spears": {
+"group": "vegetables",
+"rule": "fruit",
+"source": "model"
+},
+"assorted cracker": {
+"group": "unclassified",
+"rule": "wheat",
+"source": "model"
+},
+"assorted cut up vegetables": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"assorted fruit such as strawberry": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"assorted fruits": {
+"group": "fruit",
+"rule": "fruit",
+"source": "model"
+},
+"assorted fruity decorative candies": {
+"group": "unclassified",
+"rule": "fruit",
+"source": "model"
+},
+"assorted snipped herb": {
+"group": "condiments",
+"rule": "vegetables",
+"source": "model"
+},
+"assorted vegetable": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"assorted vegetables": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"assorted wild mushrooms": {
+"group": "unclassified",
+"rule": "vegetables",
+"source": "model"
+},
+"at a time to avoid making it": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"au jus mix": {
+"group": "soup_mix",
+"rule": "unclassified",
+"source": "model"
+},
+"aunt jane's krazy mixed up salt": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"avocado": {
+"group": "fruit",
+"rule": "fruit",
+"source": "model"
+},
+"avocado dip": {
+"group": "condiments",
+"rule": "fruit",
+"source": "model"
+},
+"avocados": {
+"group": "fruit",
+"rule": "fruit",
+"source": "model"
+},
+"baby back rib racks": {
+"group": "beef",
+"rule": "unclassified",
+"source": "model"
+},
+"baby back ribs": {
+"group": "beef",
+"rule": "pork",
+"source": "model"
+},
+"baby back ribs pork": {
+"group": "beef",
+"rule": "pork",
+"source": "model"
+},
+"baby bath soap": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"baby bella mushrooms": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"baby bok choy": {
+"group": "brassicas",
+"rule": "brassicas",
+"source": "model"
+},
+"baby butter beans": {
+"group": "pulses",
+"rule": "pulses",
+"source": "model"
+},
+"baby carrots": {
+"group": "vegetables",
+"rule": "root_veg",
+"source": "model"
+},
+"baby clams": {
+"group": "molluscs",
+"rule": "molluscs",
+"source": "model"
+},
+"baby food": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"baby greens": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"baby lima beans": {
+"group": "pulses",
+"rule": "pulses",
+"source": "model"
+},
+"baby new potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"baby oil": {
+"group": "unclassified",
+"rule": "vegetable_oil",
+"source": "model"
+},
+"baby peas": {
+"group": "peas",
+"rule": "peas",
+"source": "model"
+},
+"baby portabella mushrooms": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"baby potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"baby red potato": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"baby red potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"baby shrimp": {
+"group": "crustaceans",
+"rule": "crustaceans",
+"source": "model"
+},
+"baby spinach": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"baby spinach leaves": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"baby sweet corn cobs": {
+"group": "maize",
+"rule": "maize",
+"source": "model"
+},
+"baby yukon gold potato": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"baby-cut carrot": {
+"group": "root_veg",
+"rule": "root_veg",
+"source": "model"
+},
+"bacardi dark rum proof": {
+"group": "unclassified",
+"rule": "wine",
+"source": "model"
+},
+"backed brown sugar": {
+"group": "sugar",
+"rule": "sugar",
+"source": "model"
+},
+"bacon": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bacon bits": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bacon drippings": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bacon fat": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bacon grease": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bacos bacon bits": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bag": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"bagels": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"bagged lettuce": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"baguette": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"bailey irish cream": {
+"group": "cheese",
+"rule": "cream",
+"source": "model"
+},
+"baileys irish cream": {
+"group": "cheese",
+"rule": "cream",
+"source": "model"
+},
+"baileys original irish cream": {
+"group": "cheese",
+"rule": "cream",
+"source": "model"
+},
+"baked -inch baked pie crust": {
+"group": "unclassified",
+"rule": "wheat",
+"source": "model"
+},
+"baked -inch pie shell": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"baked and mashed sweet potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"baked beans": {
+"group": "pulses",
+"rule": "pulses",
+"source": "model"
+},
+"baked beans in tomato sauce": {
+"group": "tomatoes",
+"rule": "tomatoes",
+"source": "model"
+},
+"baked beans with molasses": {
+"group": "sugar",
+"rule": "pulses",
+"source": "model"
+},
+"baked cookies in": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"baked corn tortilla chips": {
+"group": "maize",
+"rule": "maize",
+"source": "model"
+},
+"baked ham": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"baked inch pie shell": {
+"group": "unclassified",
+"rule": "wheat",
+"source": "model"
+},
+"baked pastry shells": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"baked pie crust": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"baked pie crusts": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"baked pie pastry": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"baked potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"baked sweet potato": {
+"group": "root_veg",
+"rule": "potatoes",
+"source": "model"
+},
+"baking butter": {
+"group": "butter",
+"rule": "butter",
+"source": "model"
+},
+"baking chocolate": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"baking cocoa": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"baking mix": {
+"group": "soup_mix",
+"rule": "unclassified",
+"source": "model"
+},
+"baking pan": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"baking potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"baking powder": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"baking powder heaping": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"baking sheet": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"baking soda": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"baking soda i also add tsp baking powder": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"ball traditional pizza dough": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"balsamic vinaigrette": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"balsamic vinegar": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"balsamic vinegar year old is best": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"bamboo shoot": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"bamboo shoots": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"banana": {
+"group": "fruit",
+"rule": "bananas",
+"source": "model"
+},
+"banana extract": {
+"group": "condiments",
+"rule": "bananas",
+"source": "model"
+},
+"banana flavoring": {
+"group": "condiments",
+"rule": "bananas",
+"source": "model"
+},
+"banana instant pudding": {
+"group": "soup_mix",
+"rule": "bananas",
+"source": "model"
+},
+"banana pepper": {
+"group": "vegetables",
+"rule": "bananas",
+"source": "model"
+},
+"bananas": {
+"group": "fruit",
+"rule": "bananas",
+"source": "model"
+},
+"bar bath soap": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"barbecue sauce": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"barbecue sauce whatever else floats your boat sour cream": {
+"group": "cream",
+"rule": "condiments",
+"source": "model"
+},
+"barilla marinara sauce": {
+"group": "soup_mix",
+"rule": "tomatoes",
+"source": "model"
+},
+"barilla plus spaghetti": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"barley": {
+"group": "unclassified",
+"rule": "wheat",
+"source": "model"
+},
+"bartlett pears": {
+"group": "fruit",
+"rule": "fruit",
+"source": "model"
+},
+"basa fillets": {
+"group": "fish",
+"rule": "unclassified",
+"source": "model"
+},
+"basic creamy vinaigrette dressing": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"basic pizza dough": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"basic vinaigrette": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"basil": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"basil leaf": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"basil leaves": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"basil pesto": {
+"group": "vegetables",
+"rule": "condiments",
+"source": "model"
+},
+"basil sprig": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"basmati rice": {
+"group": "rice",
+"rule": "rice",
+"source": "model"
+},
+"batch cornbread batter": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"bath soap": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"battered fish fillets": {
+"group": "fish",
+"rule": "fish",
+"source": "model"
+},
+"bay leaf": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"bay leaf powder": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"bay leaves": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"bay scallops": {
+"group": "molluscs",
+"rule": "molluscs",
+"source": "model"
+},
+"bbq chicken pizza dough": {
+"group": "wheat",
+"rule": "poultry",
+"source": "model"
+},
+"be": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be added": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be added as needed after soup is completed": {
+"group": "soup_mix",
+"rule": "soup_mix",
+"source": "model"
+},
+"be added later if you want to": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be adjusted to your taste": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be any kind": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be devils food": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be found usually in deli section of supermarket": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be gritty if not thoroughly cleaned": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"be lb deli ham chunk": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"be left out": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be light": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be low-fat": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be made by pulverising rolled oats in a blender": {
+"group": "oats",
+"rule": "oats",
+"source": "model"
+},
+"be purchased i": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be reduced fat": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be salty": {
+"group": "unclassified",
+"rule": "spices",
+"source": "model"
+},
+"be subbed": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be used": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be used also": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be used as well": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be used but the sorghum produces a lighter flavor": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"be used for a spicier final dish": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"be used if preferred": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be used in this recipe": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be used instead": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be used-decrease water to c": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"be white": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"bean dip": {
+"group": "pulses",
+"rule": "pulses",
+"source": "model"
+},
+"bean sprout": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"bean sprouts": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"bean with bacon soup": {
+"group": "beef",
+"rule": "soup_mix",
+"source": "model"
+},
+"beans": {
+"group": "pulses",
+"rule": "pulses",
+"source": "model"
+},
+"bear shaped graham crackers": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"bearnaise sauce mix": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"beaters": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"beaters to cut some calories": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"becel margarine": {
+"group": "beef",
+"rule": "vegetable_oil",
+"source": "model"
+},
+"beef": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef and pound pork will work well also": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef bones with marrow": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef bottom round steaks": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef bouillon": {
+"group": "broth",
+"rule": "broth",
+"source": "model"
+},
+"beef bouillon cube": {
+"group": "broth",
+"rule": "broth",
+"source": "model"
+},
+"beef bouillon cubes": {
+"group": "broth",
+"rule": "broth",
+"source": "model"
+},
+"beef bouillon granules": {
+"group": "broth",
+"rule": "broth",
+"source": "model"
+},
+"beef bouillon powder": {
+"group": "beef",
+"rule": "broth",
+"source": "model"
+},
+"beef brisket": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef broth": {
+"group": "broth",
+"rule": "broth",
+"source": "model"
+},
+"beef chuck": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef chuck roast": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef chuck shoulder pot roast": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef chuck underblade steak": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef consomme": {
+"group": "broth",
+"rule": "broth",
+"source": "model"
+},
+"beef cube steaks": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef cubes": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef cutlets": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef double bouillon cubes": {
+"group": "beef",
+"rule": "broth",
+"source": "model"
+},
+"beef drippings": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef eye round": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef flank steak": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef frankfurters": {
+"group": "pork",
+"rule": "beef",
+"source": "model"
+},
+"beef gravy": {
+"group": "condiments",
+"rule": "beef",
+"source": "model"
+},
+"beef hot dogs": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef kielbasa": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef liver": {
+"group": "meat_other",
+"rule": "beef",
+"source": "model"
+},
+"beef mince": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef ravioli": {
+"group": "meat_other",
+"rule": "beef",
+"source": "model"
+},
+"beef rib roast": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef ribs": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef roast": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef round": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef round roast": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef round steak": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef short ribs": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef shoulder": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef sirloin": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef sirloin steaks": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef sirloin tip": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef steak": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef stew meat": {
+"group": "meat_other",
+"rule": "beef",
+"source": "model"
+},
+"beef stock": {
+"group": "broth",
+"rule": "broth",
+"source": "model"
+},
+"beef t-bone steaks": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef tenderloin": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef tips": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef top round steak": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef top sirloin steak": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef top sirloin steaks": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"beef tri-tip roast": {
+"group": "meat_other",
+"rule": "beef",
+"source": "model"
+},
+"beef-flavor ramen noodles": {
+"group": "unclassified",
+"rule": "beef",
+"source": "model"
+},
+"beefsteak tomatoes": {
+"group": "tomatoes",
+"rule": "beef",
+"source": "model"
+},
+"beer": {
+"group": "wine",
+"rule": "wine",
+"source": "model"
+},
+"beet juice": {
+"group": "fruit",
+"rule": "root_veg",
+"source": "model"
+},
+"beet leaves": {
+"group": "root_veg",
+"rule": "root_veg",
+"source": "model"
+},
+"beets": {
+"group": "root_veg",
+"rule": "root_veg",
+"source": "model"
+},
+"bell pepper": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"bell peppers": {
+"group": "vegetables",
+"rule": "spices",
+"source": "model"
+},
+"bell seasoning": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"bermuda onion": {
+"group": "root_veg",
+"rule": "onions",
+"source": "model"
+},
+"bermuda onions": {
+"group": "root_veg",
+"rule": "onions",
+"source": "model"
+},
+"berries": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"berries thawed if": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"berry blue gelatin mix": {
+"group": "unclassified",
+"rule": "soup_mix",
+"source": "model"
+},
+"best quality dark chocolate": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"best-quality chocolate": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"best-quality semi-sweet chocolate chips": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"best-quality semisweet chocolate": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"better than bouillon beef base": {
+"group": "beef",
+"rule": "broth",
+"source": "model"
+},
+"better than cream cheese cream cheese substitute": {
+"group": "cheese",
+"rule": "cheese",
+"source": "model"
+},
+"betty crocker au gratin potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"betty crocker golden poundcake mix": {
+"group": "poultry",
+"rule": "soup_mix",
+"source": "model"
+},
+"bias carrot": {
+"group": "root_veg",
+"rule": "root_veg",
+"source": "model"
+},
+"bicarbonate of soda": {
+"group": "spices",
+"rule": "unclassified",
+"source": "model"
+},
+"big country-style biscuits": {
+"group": "poultry",
+"rule": "wheat",
+"source": "model"
+},
+"big potato": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"billybee honey": {
+"group": "fruit",
+"rule": "sugar",
+"source": "model"
+},
+"birds eye chile": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"biscuit mix": {
+"group": "wheat",
+"rule": "soup_mix",
+"source": "model"
+},
+"biscuits": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"bisquick": {
+"group": "poultry",
+"rule": "soup_mix",
+"source": "model"
+},
+"bisquick baking mix": {
+"group": "poultry",
+"rule": "soup_mix",
+"source": "model"
+},
+"bisquick heart smart mix": {
+"group": "poultry",
+"rule": "soup_mix",
+"source": "model"
+},
+"bisquick low-fat baking mix": {
+"group": "poultry",
+"rule": "soup_mix",
+"source": "model"
+},
+"bisquick reduced-fat baking mix": {
+"group": "poultry",
+"rule": "soup_mix",
+"source": "model"
+},
+"bisquik baking mix": {
+"group": "cheese",
+"rule": "unclassified",
+"source": "model"
+},
+"bit of cheese": {
+"group": "cheese",
+"rule": "cheese",
+"source": "model"
+},
+"bite-size cheddar cheese goldfish crackers": {
+"group": "cheese",
+"rule": "cheese",
+"source": "model"
+},
+"bite-size garlic bagel chips": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"bittersweet chocolate": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"bittersweet chocolate chips": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"bittersweet chocolate squares": {
+"group": "chocolate",
+"rule": "chocolate",
+"source": "model"
+},
+"black and red pepper blend": {
+"group": "spices",
+"rule": "vegetables",
+"source": "model"
+},
+"black angus beef brisket": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"black beans": {
+"group": "pulses",
+"rule": "pulses",
+"source": "model"
+},
+"black black pepper": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"black cardamom pod": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"black cherries": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"black coffee": {
+"group": "coffee",
+"rule": "coffee",
+"source": "model"
+},
+"black currants": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"black fungus": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"black greek olives": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"black grouper fillets": {
+"group": "fish",
+"rule": "unclassified",
+"source": "model"
+},
+"black mushrooms": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"black olives": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"black pepper": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"black pepper and kosher salt": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"black pepper i like to also add in some cayenne pepper also for a little heat": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"black peppercorns": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"black plantains": {
+"group": "fruit",
+"rule": "unclassified",
+"source": "model"
+},
+"black sesame seed": {
+"group": "nuts",
+"rule": "nuts",
+"source": "model"
+},
+"black sesame seeds": {
+"group": "nuts",
+"rule": "nuts",
+"source": "model"
+},
+"black soybeans": {
+"group": "pulses",
+"rule": "soy",
+"source": "model"
+},
+"black tea": {
+"group": "coffee",
+"rule": "unclassified",
+"source": "model"
+},
+"black tea leaves": {
+"group": "spices",
+"rule": "unclassified",
+"source": "model"
+},
+"black walnut": {
+"group": "nuts",
+"rule": "nuts",
+"source": "model"
+},
+"black-eyed peas": {
+"group": "pulses",
+"rule": "peas",
+"source": "model"
+},
+"black-eyed peas with jalapenos": {
+"group": "vegetables",
+"rule": "peas",
+"source": "model"
+},
+"blackberries": {
+"group": "berries",
+"rule": "berries",
+"source": "model"
+},
+"blackberry": {
+"group": "berries",
+"rule": "berries",
+"source": "model"
+},
+"blackberry preserves": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"blackening seasoning": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"blackstrap molasses": {
+"group": "sugar",
+"rule": "sugar",
+"source": "model"
+},
+"blade pot roast": {
+"group": "meat_other",
+"rule": "unclassified",
+"source": "model"
+},
+"bleach": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"bleached all purpose flour": {
+"group": "wheat",
+"rule": "wheat",
+"source": "model"
+},
+"blend": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"blend cheese": {
+"group": "unclassified",
+"rule": "cheese",
+"source": "model"
+},
+"blend is good": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"blend would be good too": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"blend-the one with radish": {
+"group": "vegetables",
+"rule": "root_veg",
+"source": "model"
+},
+"blended oatmeal": {
+"group": "oats",
+"rule": "oats",
+"source": "model"
+},
+"bleu cheese salad dressing": {
+"group": "cheese",
+"rule": "condiments",
+"source": "model"
+},
+"blue bonnet margarine": {
+"group": "meat_other",
+"rule": "vegetable_oil",
+"source": "model"
+},
+"blue cheese": {
+"group": "cheese",
+"rule": "cheese",
+"source": "model"
+},
+"blue food coloring": {
+"group": "unclassified",
+"rule": "spices",
+"source": "model"
+},
+"blue mountain curry powder": {
+"group": "spices",
+"rule": "spices",
+"source": "model"
+},
+"blueberries": {
+"group": "berries",
+"rule": "berries",
+"source": "model"
+},
+"blueberries unthawed": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"blueberry jam": {
+"group": "fruit",
+"rule": "berries",
+"source": "model"
+},
+"boboli pizza crusts": {
+"group": "wheat",
+"rule": "unclassified",
+"source": "model"
+},
+"boil it first": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"boiled baby potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"boiled ham": {
+"group": "meat_other",
+"rule": "pork",
+"source": "model"
+},
+"boiled hot water": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"boiled potatoes": {
+"group": "potatoes",
+"rule": "potatoes",
+"source": "model"
+},
+"boiling chicken stock": {
+"group": "broth",
+"rule": "broth",
+"source": "model"
+},
+"boiling water": {
+"group": "unclassified",
+"rule": "water",
+"source": "model"
+},
+"bok choy": {
+"group": "vegetables",
+"rule": "brassicas",
+"source": "model"
+},
+"bomba": {
+"group": "vegetables",
+"rule": "unclassified",
+"source": "model"
+},
+"bon appetit seasoning": {
+"group": "condiments",
+"rule": "spices",
+"source": "model"
+},
+"bone in chicken parts": {
+"group": "meat_other",
+"rule": "poultry",
+"source": "model"
+},
+"bone in country-style spareribs": {
+"group": "meat_other",
+"rule": "pork",
+"source": "model"
+},
+"bone in pork chops": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bone-in chicken breast halves": {
+"group": "poultry",
+"rule": "poultry",
+"source": "model"
+},
+"bone-in chicken breasts": {
+"group": "poultry",
+"rule": "poultry",
+"source": "model"
+},
+"bone-in chicken parts": {
+"group": "meat_other",
+"rule": "poultry",
+"source": "model"
+},
+"bone-in chicken pieces": {
+"group": "beef",
+"rule": "poultry",
+"source": "model"
+},
+"bone-in chuck roast": {
+"group": "beef",
+"rule": "beef",
+"source": "model"
+},
+"bone-in ham": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bone-in turkey breast": {
+"group": "poultry",
+"rule": "poultry",
+"source": "model"
+},
+"boned and lamb shoulder": {
+"group": "lamb",
+"rule": "lamb",
+"source": "model"
+},
+"bonelss pork loin chops": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"bonless pork loin chops": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+},
+"borax": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"boric acid": {
+"group": "condiments",
+"rule": "unclassified",
+"source": "model"
+},
+"boston butt": {
+"group": "beef",
+"rule": "unclassified",
+"source": "model"
+},
+"boston lettuce leaves": {
+"group": "vegetables",
+"rule": "vegetables",
+"source": "model"
+},
+"both work": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"bottle -up soda": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"bottle barbecue sauce": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"bottle beer": {
+"group": "wine",
+"rule": "wine",
+"source": "model"
+},
+"bottle blue cheese dressing": {
+"group": "cheese",
+"rule": "condiments",
+"source": "model"
+},
+"bottle british beer": {
+"group": "wine",
+"rule": "wine",
+"source": "model"
+},
+"bottle burgundy wine": {
+"group": "wine",
+"rule": "wine",
+"source": "model"
+},
+"bottle catalina dressing": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"bottle catalina french dressing": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"bottle champagne": {
+"group": "wine",
+"rule": "unclassified",
+"source": "model"
+},
+"bottle chili sauce": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"bottle clam juice": {
+"group": "unclassified",
+"rule": "molluscs",
+"source": "model"
+},
+"bottle dark beer": {
+"group": "wine",
+"rule": "wine",
+"source": "model"
+},
+"bottle dry white wine": {
+"group": "wine",
+"rule": "wine",
+"source": "model"
+},
+"bottle fat-free italian salad dressing": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"bottle favorite barbecue sauce": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"bottle ginger ale": {
+"group": "unclassified",
+"rule": "unclassified",
+"source": "model"
+},
+"bottle guinness draught": {
+"group": "wine",
+"rule": "unclassified",
+"source": "model"
+},
+"bottle hidden valley&reg original ranch&reg dressing": {
+"group": "condiments",
+"rule": "condiments",
+"source": "model"
+},
+"bottle hormel real bacon bits": {
+"group": "pork",
+"rule": "pork",
+"source": "model"
+}
+},
+"recipes": {}
+}
