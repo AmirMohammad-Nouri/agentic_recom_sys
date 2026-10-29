@@ -50,7 +50,11 @@ taste(concept) = (1 + likes) / (2 + likes + dislikes)        0.5 = no opinion ye
 | Like, or reject with "not my taste" | 1 |
 | *I'll cook this* | 0.8 (1.0 with the reason "it sounds tasty") |
 | Save | 0.6 |
-| Other rejections without a value reason | 0.5 dislike |
+| Other rejections without a value reason ("other") | 0.5 dislike |
+| "Had it recently" | nothing: it is a recency signal, not a dislike (see below) |
+
+Repeated clicks count once: a like or save once per recipe, *I'll cook this* once per recipe
+per list, a rejection once per recipe, list and reason.
 
 A recipe's taste match is the weighted mean over its concepts (cuisine 35 %, ingredients 45 %
 by mass, food groups 20 %). The user can correct any concept on the Insights page; the
@@ -69,8 +73,32 @@ values. They start equal to the stated weights and move only on informative even
 | Answered a trade-off question | winner × e^0.2, loser × e^−0.2 |
 | Saved a new goal | o moves halfway to the new goal; the event count restarts |
 
+Before each update every o_k is lifted to at least 0.02 (the floor), so a value the user set to
+0 % can still grow when their choices favour it; without the floor 0 × e^(d) stays 0 forever.
 After every update o is rescaled to sum to 1 and mixed with 5 % of the stated goal, so a run
-of unusual choices moves the estimate but cannot wipe a priority out.
+of unusual choices moves the estimate but cannot wipe a priority out. The observed weights
+never change the saved goal; only a goal the user saves or a proposal they accept does.
+
+### Temporary circumstances vs lasting preferences
+
+*I'll cook this* with a reason and every *Not for me* reason except "had it recently" ask one
+more thing: **Update my preference** (lasting, the updates above) or **Only today**. An
+"only today" signal changes neither model. It adjusts today's lists only: the named value gets
++10 points of weight for the rest of the day and a rejected dish is hidden until tomorrow.
+
+Supervisor questions and proposals offer the same choice:
+
+| Answer | Effect |
+| --- | --- |
+| Name a winner / *Update my goal* | lasting: recorded as evidence, or the proposal is saved as a new goal version |
+| *Only today* | today's lists use the proposed weights (or a +10 point nudge); the value model is rolled back to how it was at the start of the day |
+| *Keep my goal* | the observed weights are reset to the saved goal and the event count restarts |
+
+### Recency ("had it recently")
+
+Choosing a dish, or rejecting it as "had it recently", stores when it was eaten. For 14 days the
+dish loses `0.15 × 0.5^(days since / 3)` utility (0.15 today, 0.075 after three days), shown on
+its card as "Had it ...". Its ingredients and cuisine get no dislikes.
 
 **Worked example.** Stated (h, s, t) = (0.40, 0.40, 0.20). The five dishes shown average
 convenience 0.50; the user picks one with convenience 0.90 and average health and footprint.
@@ -136,6 +164,11 @@ onboarding ──▶ rules + stated weights w + health goal + taste counts
 | Learning rate η | 1.0 | `learner.py: PARAMS["eta"]` |
 | Reason / answer nudge | 0.2 | `PARAMS["nudge"]` |
 | Goal anchor | 0.05 | `PARAMS["anchor"]` |
+| Observed-weight floor | 0.02 | `PARAMS["floor"]` |
+| "Only today" nudge | 0.10 | `PARAMS["today_nudge"]` |
+| Repetition penalty / half-life / window | 0.15 / 3 days / 14 days | `engine.py: DEFAULT_CONFIG` |
+| Minimum nutrient coverage | 0.6 | `FOODREC_MIN_NUTRIENT_COVERAGE` |
+| Maximum missing value weight | 0.5 | `FOODREC_MAX_MISSING_SHARE` |
 | Confidence constant | 5 | `PARAMS["conf_k"]` |
 | Declared like / dislike | 2 counts | `PARAMS["declared_count"]` |
 | Ask / propose gap | 0.10 / 0.15 | `agent/policy.py: THRESHOLDS` |

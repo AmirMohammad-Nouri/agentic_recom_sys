@@ -53,6 +53,7 @@ class Skills:
             Skill("explain_recipe", "Evidence for one recipe: fit, weighted contributions, compromises, gaps", "none", self.explain_recipe),
             Skill("compare_recipes", "Criterion-by-criterion comparison of two recipes under the current goal", "none", self.compare_recipes),
             Skill("what_if", "Counterfactual ranking with one priority changed; nothing is saved", "none", self.what_if),
+            Skill("goal_options", "Several small goal changes (e.g. more convenience, small health reduction) with their lists; saved only when the user picks one", "proposal", self.goal_options),
             Skill("explain_preference", "What the system believes about a priority or taste, with confidence and evidence", "none", self.explain_preference),
             Skill("history", "Interactions, recommendations and supervisor decisions from the knowledge graph", "none", self.history),
             Skill("search_knowledge", "Hybrid (BM25 + vector) search over recipes, ingredients, method notes and user documents", "none", self.search_knowledge),
@@ -271,6 +272,31 @@ class Skills:
                            {"what_if": {"weights": w, "base": wi["base"], "alternative": wi["alternative"],
                                         "comparison": cmp_}},
                            facts, nums, list(titles.values()), evidence={"weights": {k: round(v, 3) for k, v in w.items()}})
+
+    def goal_options(self, ctx, increase, decrease=None, max_drop=0.10):
+        app = self.app
+        d = app.goal_options(ctx.user_id, increase, decrease, max_drop)
+        b = d["body"]
+        facts = [f"Your saved goal: " + ", ".join(f"{CRITERION_LABELS[k].lower()} {round(100 * b['stated'][k])}%"
+                                                  for k in VALUE_CRITERIA) + "."]
+        nums = [round(100 * b["stated"][k]) for k in VALUE_CRITERIA]
+        titles = []
+        for o in b["options"]:
+            ch = o["avg_change"]
+            moved = ", ".join(f"average {CRITERION_LABELS[k].lower()} {ch[k]:+.2f}" for k in VALUE_CRITERIA
+                              if abs(ch[k]) >= 0.005) or "the top five barely change"
+            facts.append(f"Option {o['id'][1:]}: {o['label']}; {moved}; "
+                         f"{len(o['entered'])} new recipe(s) in the top five.")
+            nums += [round(100 * o["weights"][k]) for k in VALUE_CRITERIA] + \
+                    [round(ch[k], 2) for k in VALUE_CRITERIA] + [int(o["id"][1:]), len(o["entered"])]
+            titles += [r["title"] for r in o["recipes"]]
+        if not b["options"]:
+            facts.append("There is no room to move that priority with small steps.")
+        facts.append("Nothing is saved until you pick an option.")
+        return SkillResult(f"Prepared {len(b['options'])} goal options (waiting for your choice)",
+                           {"decisions": [d]}, facts, nums, titles,
+                           evidence={"decision_id": d["decision_id"],
+                                     "options": [{k: o[k] for k in ("id", "label", "weights")} for o in b["options"]]})
 
     def explain_preference(self, ctx, criterion=None, concept=None):
         app = self.app

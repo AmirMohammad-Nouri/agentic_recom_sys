@@ -20,7 +20,7 @@ from .engine import public, recommend
 from .features import DEFAULT_GOAL, GOALS, Scorer
 from .knowledge import make_graph, make_retriever
 from .knowledge.documents import build_corpus
-from .learner import Learner
+from .learner import SCOPES, Learner
 from .llm import OllamaLLM
 from .ranker import DEFAULT_WEIGHTS, resolve_weights
 from .router import MODES
@@ -45,7 +45,7 @@ class App:
         self.lock = threading.RLock()
         self.store = Store(settings.db_path)
         self.catalogue, self.catalogue_import = self._load_catalogue(settings.catalogue_path)
-        self.scaler = Scorer(self.catalogue)
+        self.scaler = Scorer(self.catalogue, getattr(settings, "min_nutrient_coverage", 0.6))
         self.llm = llm if llm is not None else OllamaLLM(settings)
         self.graph, self.graph_note = make_graph(settings)
         self.retriever, self.retriever_note = make_retriever(settings, self.llm)
@@ -97,7 +97,8 @@ class App:
                             "meal_contexts": MEAL_CONTEXTS,
                             "ingredients": self._common_ingredients(),
                             "health_goals": [{"id": k, "label": v["label"]} for k, v in GOALS.items()],
-                            "reject_reasons": REJECT_REASONS, "choose_reasons": CHOOSE_REASONS},
+                            "reject_reasons": REJECT_REASONS, "choose_reasons": CHOOSE_REASONS,
+                            "feedback_scopes": SCOPES},
                 "criteria": CRITERION_LABELS, "value_criteria": VALUE_CRITERIA, "taste_share": TASTE_SHARE}
 
     def _common_ingredients(self, min_recipes=5):
@@ -137,10 +138,13 @@ class App:
     def _emit(self, user_id, type_, payload, context=None):
         """Append to the log, update learner and graph. Returns (event, update trail)."""
         with self.lock:
+            # Build (or replay) the learner BEFORE logging, so a fresh replay does not see the new
+            # event and then apply it a second time.
+            lr = self.learner(user_id) if type_ in LEARNER_EVENTS else None
             ev = self.store.append_event(user_id, type_, payload, context)
             trail = []
-            if type_ in LEARNER_EVENTS:
-                trail = self.learner(user_id).apply(self._learner_event(ev))
+            if lr is not None:
+                trail = lr.apply(self._learner_event(ev))
             self.graph.record_event(ev)
             return ev, trail
 
@@ -211,24 +215,49 @@ class App:
         return {"event_id": ev["event_id"], "trail": trail}
 
     # ---- recommendations -----------------------------------------------------------------
-    def recommend(self, user_id, overrides=None, origin="ui", save=True):
+    def today_weights(self, user_id, base, now=None):
+        """Saved weights with today's temporary adjustments ("only today" answers and feedback).
+        Returns (weights, note) where note is None when nothing applies."""
+        temp = self.learner(user_id).temporary_effects(now or time.time())
+        if not temp["weights"] and not temp["nudges"]:
+            return dict(base), None
+        w = dict(temp["weights"] or base)
+        for k, v in temp["nudges"].items():
+            w[k] = max(0.0, w.get(k, 0.0) + v)
+        w, _ = resolve_weights(w, base)
+        parts = [f"{CRITERION_LABELS[k].lower()} {'+' if v > 0 else ''}{round(100 * v)} pts"
+                 for k, v in temp["nudges"].items()]
+        note = "adjusted for today" + (f" ({', '.join(parts)})" if parts else " (weights you chose for today)")
+        return w, note
+
+    def recommend(self, user_id, overrides=None, origin="ui", save=True, use_temporary=True):
+        """use_temporary=False ranks with exactly the saved (or given) weights, ignoring today's
+        adjustments; counterfactual previews use it so they compare like with like."""
         overrides = overrides or {}
+        now = time.time()
         prof = self.store.profile(user_id) or {"version": 0, "declared": {}}
         goal = self.store.goal(user_id) or {"version": 0, "weights": dict(DEFAULT_WEIGHTS),
                                             "diversity": 0.3, "mode": "lightweight"}
-        cfg = {"weights": overrides.get("weights") or goal["weights"],
+        weights, today_note = overrides.get("weights"), None
+        if not weights:
+            weights = goal["weights"]
+            if use_temporary:
+                weights, today_note = self.today_weights(user_id, goal["weights"], now)
+        cfg = {"weights": weights,
                "health_goal": prof["declared"].get("health_goal") or DEFAULT_GOAL,
                "diversity": goal["diversity"] if overrides.get("diversity") is None else overrides["diversity"],
                "mode": overrides.get("mode") or goal["mode"],
                "request_filters": overrides.get("request_filters") or [],
-               "last_valid_weights": goal["weights"], "k": 5}
+               "last_valid_weights": goal["weights"], "k": 5,
+               "max_missing_share": getattr(self.s, "max_missing_share", 0.5)}
         with self.lock:
             res = public(recommend(self.catalogue, self.scaler, self.learner(user_id), prof["declared"], cfg,
-                                   now=time.time(), cache=self.score_cache))
+                                   now=now, cache=self.score_cache))
         res.update({"origin": origin, "user_id": user_id,
                     "versions": {**res["versions"], "profile": prof["version"], "goal": goal["version"]},
                     "goal_weights": goal["weights"],
-                    "weights_source": f"saved goal v{goal['version']}" if all(
+                    "weights_source": f"saved goal v{goal['version']}, {today_note}" if today_note else
+                    f"saved goal v{goal['version']}" if all(
                         abs(res["config"]["values_applied"][k] - goal["weights"][k]) < 1e-6 for k in VALUE_CRITERIA)
                     else "adjusted for this request"})
         if save:
@@ -249,24 +278,122 @@ class App:
     def what_if(self, user_id, weights=None, diversity=None, mode=None):
         """Counterfactual: rank with changed settings WITHOUT saving anything, and compare
         with the same ranking under the current goal (both computed now, same learner state)."""
-        base = self.recommend(user_id, origin="whatif_base", save=False)
+        base = self.recommend(user_id, origin="whatif_base", save=False, use_temporary=False)
         alt = self.recommend(user_id, {"weights": weights, "diversity": diversity, "mode": mode},
-                             origin="whatif", save=False)
+                             origin="whatif", save=False, use_temporary=False)
         if not base.get("results") or not alt.get("results"):
             return {"base": base, "alternative": alt, "comparison": None}
         return {"base": base, "alternative": alt, "comparison": compare(base, alt)}
 
+    # ---- several small goal changes to choose from ---------------------------------------------
+    def goal_option_weights(self, weights, increase, decrease=None, max_drop=0.10, steps=(0.05, 0.10, 0.15)):
+        """Small, normalised weight adjustments: `increase` gains a step; with `decrease` given it
+        pays at most `max_drop` of it and the third criterion pays the rest, otherwise both others
+        pay in proportion. Returns a list of weight dicts (sum 1, all >= 0), smallest change first."""
+        if increase not in VALUE_CRITERIA or (decrease is not None and decrease not in VALUE_CRITERIA):
+            raise ValueError("criteria must be h, s or t")
+        if decrease == increase:
+            raise ValueError("increase and decrease must differ")
+        w = {k: float(weights[k]) for k in VALUE_CRITERIA}
+        others = [k for k in VALUE_CRITERIA if k != increase]
+        out, seen = [], set()
+        for step in steps:
+            step = min(step, 1.0 - w[increase])
+            if step <= 1e-9:
+                continue
+            if decrease is None:
+                pool = sum(w[k] for k in others)
+                if pool <= 0:
+                    continue
+                cand = dict(w)
+                cand[increase] += step
+                for k in others:
+                    cand[k] -= step * w[k] / pool
+                splits = [cand]
+            else:
+                third = next(k for k in others if k != decrease)
+                splits = []
+                for share in (0.5, 1.0):
+                    drop = min(step * share, max_drop, w[decrease])
+                    rest = step - drop
+                    if rest > w[third] + 1e-9:
+                        continue
+                    cand = dict(w)
+                    cand[increase] += step
+                    cand[decrease] -= drop
+                    cand[third] -= rest
+                    splits.append(cand)
+            for cand in splits:
+                cand = {k: max(0.0, v) for k, v in cand.items()}
+                tot = sum(cand.values())
+                cand = {k: v / tot for k, v in cand.items()}
+                key = tuple(round(cand[k], 4) for k in VALUE_CRITERIA)
+                if key not in seen:
+                    seen.add(key)
+                    out.append(cand)
+        return out[:4]
+
+    def goal_options(self, user_id, increase, decrease=None, max_drop=0.10, source="assistant"):
+        """Preview a few small goal changes with the lists they would produce, and store them as one
+        decision. Nothing is saved until the user picks an option (resolve_decision accept)."""
+        goal = self.store.goal(user_id)
+        if goal is None:
+            raise ValueError("complete onboarding first")
+        cands = self.goal_option_weights(goal["weights"], increase, decrease, max_drop)
+        base = self.recommend(user_id, origin="options_base", save=False, use_temporary=False)
+
+        def summary(res):
+            rs = res.get("results") or []
+            avg = {k: (sum(r["scores"][k] for r in rs if r["scores"].get(k) is not None) /
+                       max(1, sum(1 for r in rs if r["scores"].get(k) is not None))) for k in VALUE_CRITERIA}
+            return {"recipes": [{"recipe_id": r["recipe_id"], "title": r["title"]} for r in rs],
+                    "avg_scores": avg}
+
+        b = summary(base)
+        options = []
+        for i, w in enumerate(cands, 1):
+            alt = self.recommend(user_id, {"weights": w}, origin="options", save=False, use_temporary=False)
+            a = summary(alt)
+            cmp_ = compare(base, alt) if base.get("results") and alt.get("results") else None
+            changes = [f"{CRITERION_LABELS[k]} {round(100 * goal['weights'][k])}% to {round(100 * w[k])}%"
+                       for k in VALUE_CRITERIA if abs(w[k] - goal["weights"][k]) >= 0.005]
+            options.append({"id": f"o{i}", "label": ", ".join(changes), "weights": w,
+                            "recipes": a["recipes"], "avg_scores": a["avg_scores"],
+                            "avg_change": {k: a["avg_scores"][k] - b["avg_scores"][k] for k in VALUE_CRITERIA},
+                            "entered": (cmp_ or {}).get("entered", []), "left": (cmp_ or {}).get("left", [])})
+        inc = CRITERION_LABELS[increase].lower()
+        title = f"More {inc}" + (f", with only a small reduction in {CRITERION_LABELS[decrease].lower()}"
+                                 if decrease else "") + ": pick one"
+        d = self.add_decision(user_id, "goal_options", title, {
+            "topic": f"options:{increase}:{decrease}", "criterion": increase, "decrease": decrease,
+            "max_drop": max_drop, "stated": dict(goal["weights"]),
+            "base": {"weights": dict(goal["weights"]), **b}, "options": options,
+            "explanation": (f"{len(options)} small changes to your saved goal, each with the five recipes it would give. "
+                            + (f"{CRITERION_LABELS[decrease]} drops by at most {round(100 * max_drop)} points. "
+                               if decrease else "")
+                            + "Nothing is saved until you pick one; you can also use one for today only.")}, source)
+        return d
+
     # ---- feedback ---------------------------------------------------------------------------
-    def feedback(self, user_id, request_id, recipe_id, ftype, reason=None, context=None):
+    def feedback(self, user_id, request_id, recipe_id, ftype, reason=None, context=None, scope="lasting"):
+        """scope "today": a temporary circumstance; it adjusts today's lists but never the models.
+        A repeated click (same button, same recipe, same list) is not logged again."""
         if ftype not in FEEDBACK_TYPES:
             raise ValueError(f"feedback type must be one of {FEEDBACK_TYPES}")
         if recipe_id not in self.catalogue.by_id:
             raise ValueError(f"unknown recipe {recipe_id}")
-        req = self.store.request(request_id) if request_id else None
-        shown = [{"recipe_id": r["recipe_id"], "scores": r["scores"]} for r in (req or {}).get("results", [])]
-        ev, trail = self._emit(user_id, "feedback", {"type": ftype, "recipe_id": recipe_id, "reason": reason,
-                                                     "request_id": request_id, "shown": shown}, context)
-        return {"event_id": ev["event_id"], "trail": trail}
+        scope = scope or "lasting"
+        if scope not in SCOPES:
+            raise ValueError(f"scope must be one of {SCOPES}")
+        pl = {"type": ftype, "recipe_id": recipe_id, "reason": reason, "request_id": request_id, "scope": scope}
+        with self.lock:
+            if self.learner(user_id).is_duplicate(pl):
+                return {"event_id": None, "duplicate": True, "trail": []}
+            req = self.store.request(request_id) if request_id else None
+            pl["shown"] = [{"recipe_id": r["recipe_id"], "scores": r["scores"]}
+                           for r in (req or {}).get("results", [])]
+            ev, trail = self._emit(user_id, "feedback", pl, context)
+        return {"event_id": ev["event_id"], "duplicate": False, "scope": scope, "trail": trail}
 
     # ---- decisions ----------------------------------------------------------------------------
     def add_decision(self, user_id, kind, title, body, source):
@@ -294,6 +421,31 @@ class App:
             effect = self.save_goal(user_id, goal["name"], body["proposed_weights"], goal["diversity"],
                                     goal["mode"], "accepted_proposal", d["title"], decision_id)
             status = "accepted"
+        elif action == "accept" and d["kind"] == "goal_options":
+            opt = next((o for o in body["options"] if o["id"] == answer), None)
+            if opt is None:
+                raise ValueError("pick one of the options")
+            goal = self.store.goal(user_id)
+            effect = self.save_goal(user_id, goal["name"], opt["weights"], goal["diversity"],
+                                    goal["mode"], "accepted_proposal", f"{d['title']} ({opt['label']})", decision_id)
+            status = "accepted"
+        elif action == "answer" and d["kind"] == "goal_proposal" and answer == "keep_goal":
+            ev, trail = self._emit(user_id, "question_answered", {"decision_id": decision_id, "answer": answer,
+                                                                  "scope": "keep_goal"})
+            effect = {"event_id": ev["event_id"], "trail": trail}
+            status = "dismissed"
+        elif action == "answer" and d["kind"] in ("goal_proposal", "goal_options") and str(answer).startswith("today"):
+            if d["kind"] == "goal_proposal":
+                w = body["proposed_weights"]
+            else:
+                opt = next((o for o in body["options"] if o["id"] == str(answer).partition(":")[2]), None)
+                if opt is None:
+                    raise ValueError("unknown option for today")
+                w = opt["weights"]
+            ev, trail = self._emit(user_id, "question_answered", {"decision_id": decision_id, "answer": answer,
+                                                                  "scope": "today", "weights": w})
+            effect = {"event_id": ev["event_id"], "trail": trail, "weights_today": w}
+            status = "answered"
         elif action == "accept" and d["kind"] == "profile_change":
             effect = self.update_profile(user_id, body["proposed_declared"], "accepted_proposal", d["title"])
             status = "accepted"
@@ -303,7 +455,9 @@ class App:
                 raise ValueError("unknown answer option")
             ev, trail = self._emit(user_id, "question_answered", {"decision_id": decision_id, "answer": answer,
                                                                   "winner": opt.get("winner"),
-                                                                  "loser": opt.get("loser")})
+                                                                  "loser": opt.get("loser"),
+                                                                  "scope": opt.get("scope", "lasting"),
+                                                                  "nudge": opt.get("nudge")})
             effect = {"event_id": ev["event_id"], "trail": trail}
             if opt.get("profile_change"):
                 prof = self.store.profile(user_id)

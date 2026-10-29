@@ -95,13 +95,19 @@ def build_evidence(item, ranked, declared, support, bd):
         unc.append({"kind": "measure", "field": "h",
                     "text": f"healthiness is an operational nutrient measure for the goal '{bd['h']['goal_label']}' "
                             f"(grade {bd['h']['grade']}), not dietetic advice"})
+    if bd and bd["h"].get("missing"):
+        unc.append({"kind": "missing", "field": "h",
+                    "text": ("healthiness was not scored because too little nutrient data is known (missing: "
+                             if bd["h"].get("below_min_coverage") else "nutrient data incomplete (missing: ")
+                            + ", ".join(bd["h"]["missing"]).lower() + ")"})
     if bd and bd["s"]["kg_co2e_per_kg"] is not None:
         unc.append({"kind": "estimate", "field": "s",
                     "text": "sustainability is estimated from ingredient amounts and food-group averages"})
     if item["missing_criteria"]:
         names = ", ".join(CRITERION_LABELS[k] for k in item["missing_criteria"])
         unc.append({"kind": "scoring", "field": "missing",
-                    "text": f"{names} could not be scored; remaining weights were renormalised for this recipe"
+                    "text": f"{names} could not be scored; the other value weights were scaled up for this recipe "
+                            f"(taste keeps its fixed share)"
                     if item["missing_policy"] == "renormalize" else f"{names} missing"})
     ev["uncertainty"] = unc
     ev["claims_allowed"] = sorted(claims_allowed(ev))

@@ -15,6 +15,7 @@ INTENTS = {
     "explain_recipe": "why a specific recipe was recommended or how it scores",
     "compare_recipes": "compare two recipes",
     "what_if": "what would change if a priority were higher/lower (counterfactual, nothing saved)",
+    "adjust_goal": "change the saved priorities, e.g. 'more convenient with only a small reduction in healthiness' (offers options to approve)",
     "why_preference": "what the system believes about the user and why (provenance of a preference)",
     "history": "what the user did/was recommended in the past, filtered by time, food or ingredient",
     "knowledge": "a factual question about ingredients, recipes, nutrition values or how the system works",
@@ -41,6 +42,7 @@ SCHEMA = {
         "recipe_refs": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
         "criterion": {"type": ["string", "null"], "enum": list(CRITERIA) + [None]},
         "direction": {"type": ["string", "null"], "enum": ["more", "less", None]},
+        "secondary_criterion": {"type": ["string", "null"], "enum": ["h", "s", "t", None]},
         "filters": {"type": "object", "properties": {
             **{k: {"type": ["number", "null"]} for k in FILTER_KEYS},
             "cuisine": {"type": ["string", "null"]},
@@ -59,7 +61,8 @@ SCHEMA = {
 
 
 def empty_intent(intent="help"):
-    return {"intent": intent, "recipe_refs": [], "criterion": None, "direction": None, "filters": {},
+    return {"intent": intent, "recipe_refs": [], "criterion": None, "direction": None,
+            "secondary_criterion": None, "filters": {},
             "concept": None, "time_window_days": None, "history_types": [], "profile_change": None,
             "query": None}
 
@@ -77,6 +80,34 @@ def _criterion(t):
             if 0 <= i < pos:
                 best, pos = k, i
     return best
+
+
+REDUCE_WORDS = r"(reduction|reduce|drop|decrease|loss|lose|less|lower|sacrifice|cost)"
+
+
+def _tradeoff(t):
+    """'more convenient, with only a small reduction in healthiness' -> ("t", "h").
+    The first value criterion mentioned gains; a later one next to a reduce word pays."""
+    hits = []
+    for k, words in CRITERION_WORDS.items():
+        if k == "p":
+            continue
+        for w in words:
+            for m in re.finditer(re.escape(w), t):
+                hits.append((m.start(), k))
+    hits.sort()
+    order = list(dict.fromkeys(k for _, k in hits))
+    if len(order) < 2:
+        return None
+    first, pos = order[0], None
+    for i, k in hits:
+        if k != first:
+            pos = (i, k)
+            break
+    window = t[max(0, pos[0] - 45):pos[0] + 30]
+    if re.search(REDUCE_WORDS, window) and re.search(r"\bmore\b|\w+er\b|increase|raise|prioriti", t[:pos[0]]):
+        return first, pos[1]
+    return None
 
 
 def recipe_mentions(text, catalogue):
@@ -177,8 +208,16 @@ def parse_rules(text, catalogue, vocab):
     for c in vocab["cuisines"]:
         if re.search(rf"\b{re.escape(c.lower())}\b", t) and not it["concept"]:
             it["concept"] = f"cuisine:{c}"
+    to = _tradeoff(t)
     if pc:
         it["intent"], it["profile_change"] = "update_profile", pc
+    elif to or (it["criterion"] in ("h", "s", "t") and
+                _has(t, "change my goal", "update my goal", "adjust my goal", "my priorities", "save more",
+                     "permanently", "from now on")):
+        it["intent"] = "adjust_goal"
+        if to:
+            it["criterion"], it["secondary_criterion"] = to
+        it["direction"] = "more"
     elif _has(t, "compare", " vs ", "versus", "difference between"):
         it["intent"] = "compare_recipes"
     elif _has(t, "what if", "what would happen", "what would change", "if i cared", "if i gave", "if i prioriti"):
@@ -247,6 +286,8 @@ def validate_model(data, text, catalogue, vocab):
     it["recipe_refs"] = list(dict.fromkeys(refs))
     it["criterion"] = data.get("criterion") if data.get("criterion") in CRITERIA else None
     it["direction"] = data.get("direction") if data.get("direction") in ("more", "less") else None
+    sc = data.get("secondary_criterion")
+    it["secondary_criterion"] = sc if sc in ("h", "s", "t") and sc != it["criterion"] else None
     f = {}
     for k, v in (data.get("filters") or {}).items():
         if v is None:

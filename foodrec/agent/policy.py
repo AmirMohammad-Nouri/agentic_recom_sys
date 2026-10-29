@@ -10,7 +10,11 @@ goal) with the OBSERVED weights from the value model (learner.py):
                                                    (shows a what-if first; the user must accept)
 
 The policy never edits a saved goal or a mandatory constraint. Its outputs are decisions
-(proposals and questions) that wait for the user.
+(proposals and questions) that wait for the user. Every question and proposal lets the user
+say how far the answer should reach:
+    "update my preference"   lasting: recorded as evidence (question) or saved (proposal)
+    "only today"             today's lists are adjusted; the day's drift is rolled back
+    "keep my goal"           the drift since the goal was saved is forgotten
 """
 from .. import VALUE_CRITERIA, CRITERION_LABELS
 
@@ -154,7 +158,9 @@ def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result):
                                  "explanation": (f"Your saved goal gives {CRITERION_LABELS[k].lower()} "
                                                  f"{stated[k]:.2f}, but your choices behave like "
                                                  f"{vm.observed[k]:.2f} ({vm.n} events). Accepting "
-                                                 f"moves it halfway, to {proposed[k]:.2f}."),
+                                                 f"moves it halfway, to {proposed[k]:.2f}. \"Only today\" uses "
+                                                 f"it for today's lists without saving or learning; \"Keep my "
+                                                 f"goal\" forgets this drift."),
                                  "stated": stated, "observed": dict(vm.observed),
                                  "proposed_weights": proposed, "gap": gap[k],
                                  "evidence_events": evidence_events, "counterfactual": cf,
@@ -170,11 +176,16 @@ def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result):
             "topic": f"criterion:{k}", "criterion": k,
             "explanation": (f"Your recent choices lean {'more' if gap[k] > 0 else 'less'} towards "
                             f"{CRITERION_LABELS[k].lower()} than your saved goal, but there is not yet enough "
-                            f"evidence to suggest a change. Your answer is recorded as evidence; it does not "
-                            f"edit your goal."),
-            "options": [{"id": hi, "label": CRITERION_LABELS[hi], "winner": hi, "loser": lo},
-                        {"id": lo, "label": CRITERION_LABELS[lo], "winner": lo, "loser": hi},
-                        {"id": "depends", "label": "It depends on the meal"}],
+                            f"evidence to suggest a change. Naming a winner updates what I have learned about "
+                            f"you; \"Only today\" adjusts today's lists without learning anything; \"Keep my "
+                            f"goal\" tells me to stop drawing conclusions. None of them edits your saved goal."),
+            "options": [{"id": hi, "label": f"{CRITERION_LABELS[hi]} usually wins", "winner": hi, "loser": lo,
+                         "scope": "lasting"},
+                        {"id": lo, "label": f"{CRITERION_LABELS[lo]} usually wins", "winner": lo, "loser": hi,
+                         "scope": "lasting"},
+                        {"id": "today", "label": "Only today", "scope": "today",
+                         "nudge": {k: 0.10 if gap[k] > 0 else -0.10}},
+                        {"id": "keep_goal", "label": "Keep my goal", "scope": "keep_goal"}],
             "evidence_events": evidence_events, "recipes": [r["recipe_id"] for r in support if r.get("recipe_id")][:6]},
             "policy")
     trace.step("decide", "Raised: " + d["title"], d["body"]["explanation"],

@@ -109,7 +109,7 @@ def create_app(settings=None, llm=None):
         if goal is None and uid:
             goal = ((core.store.profile(uid) or {}).get("declared") or {}).get("health_goal")
         r = core.catalogue.get(rid)
-        return {**_brief(r), "breakdown": breakdown(r, goal), "url": r.get("url"),
+        return {**_brief(r), "breakdown": breakdown(r, goal, core.scaler.min_coverage), "url": r.get("url"),
                 "nutrition_per_100g": r.get("nutrition_per_100g"), "nutrition_per_serving": r.get("nutrition_per_serving"),
                 "fsa_score": r.get("fsa_score"), "allergens_complete": r.get("allergens_complete"),
                 "ingredients_detail": [{k: i.get(k) for k in ("name", "text", "grams", "grams_basis", "category")}
@@ -168,6 +168,13 @@ def create_app(settings=None, llm=None):
                            wi["base"].get("results", [])},
                 "weights_applied": wi["alternative"]["config"]["weights_applied"]}
 
+    @api.post("/api/users/{uid}/goal-options")
+    def goal_options(uid: str, body: dict = Body(...)):
+        """Several small goal changes with their lists, stored as one decision; nothing is saved
+        until the user picks an option (POST /decisions/{id} with action=accept, answer=o1...)."""
+        return core.goal_options(uid, body["increase"], body.get("decrease"), float(body.get("max_drop", 0.10)),
+                                 source="ui")
+
     @api.get("/api/requests/{rid}")
     def get_request(rid: str):
         r = core.store.request(rid)
@@ -183,11 +190,17 @@ def create_app(settings=None, llm=None):
     @api.post("/api/users/{uid}/feedback")
     def feedback(uid: str, body: dict = Body(...)):
         out = core.feedback(uid, body.get("request_id"), body["recipe_id"], body["type"], body.get("reason"),
-                            body.get("context"))
+                            body.get("context"), body.get("scope") or "lasting")
         tr = Trace()
+        if out.get("duplicate"):
+            tr.step("perceive", "Repeated click ignored",
+                    f"{body['type']} on {core.catalogue.get(body['recipe_id'])['title']} was already recorded "
+                    "for this list, so it is not counted twice.", source="learner")
+            return {**out, "review": {"status": "duplicate", "decisions": [], "trace": tr.steps}}
         tr.step("perceive", "Feedback recorded",
                 f"{body['type']} on {core.catalogue.get(body['recipe_id'])['title']}"
                 + (f" (reason: {body['reason'].replace('_', ' ')})" if body.get("reason") else "")
+                + (" for today only; nothing lasting was learned" if out.get("scope") == "today" else "")
                 + f"; event {out['event_id']}. Your saved goal is not changed by feedback.",
                 evidence=out["trail"][:12], source="learner")
         rv = policy.review(core, uid, tr, trigger="feedback")
@@ -297,9 +310,11 @@ def main():
 
     import uvicorn
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per Ollama call is noise
     uvicorn.run(create_app(), host=os.environ.get("FOODREC_HOST", "127.0.0.1"),
                 port=int(os.environ.get("FOODREC_PORT", 8000)))
 
 
 if __name__ == "__main__":
     main()
+

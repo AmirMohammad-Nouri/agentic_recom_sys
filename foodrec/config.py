@@ -65,6 +65,12 @@ class Settings:
     # "memory" = numpy index without Qdrant.
     qdrant: str = field(default_factory=lambda: _env("FOODREC_QDRANT", "local"))
 
+    # Missing data. Healthiness needs at least this share of its (goal-weighted) nutrient factors;
+    # below it the score is treated as missing. A recipe whose missing criteria carry more than
+    # max_missing_share of the user's value weight is not ranked (see ranker.py).
+    min_nutrient_coverage: float = field(default_factory=lambda: float(_env("FOODREC_MIN_NUTRIENT_COVERAGE", 0.6)))
+    max_missing_share: float = field(default_factory=lambda: float(_env("FOODREC_MAX_MISSING_SHARE", 0.5)))
+
     # Supervisor policy limits.
     max_agent_steps: int = field(default_factory=lambda: int(_env("FOODREC_MAX_STEPS", 3)))
 

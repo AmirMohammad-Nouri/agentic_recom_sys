@@ -70,6 +70,17 @@ The trace streams to the UI as NDJSON (`step`, `step_update`, `model_token`, `do
 labelled **unverified**: the verified steps are the agent's, the model's reasoning is shown
 for transparency but never trusted.
 
+**Answers control what is learned.** Questions offer the two winners (lasting evidence),
+*Only today* (today's lists change, the day's drift is rolled back) and *Keep my goal* (the
+drift is forgotten). Proposals offer *Update my goal*, *Only today* and *Keep my goal*.
+
+**Several small options.** A message such as "more convenient, with only a small reduction in
+healthiness" is parsed as `adjust_goal`. The `goal_options` skill builds up to four normalised
+weight changes (convenience +5/+10/+15 points, healthiness down by at most 10 points, the third
+value pays the rest), ranks with each, and stores them as one `goal_options` decision showing
+every option's top five and how the average scores move. Nothing is saved until the user picks
+*Save this goal* (or *Only today*). Also available as `POST /api/users/{uid}/goal-options`.
+
 ## 3. Skills
 
 | Skill | Side effect |

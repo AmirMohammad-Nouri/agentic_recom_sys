@@ -17,6 +17,9 @@ ValueModel   How much the user's behaviour actually weighs healthiness, sustaina
                                        d_k = mean_k(shown) - score_k(rejected)
                  answered a question   winner * exp(ETA * NUDGE), loser * exp(-ETA * NUDGE)
                  saved a new goal      o <- (o + w_new) / 2
+             Before every multiplicative step each o_k is lifted to at least FLOOR (2%), so a priority
+             the user set to zero can still grow when their behaviour favours it (a pure
+             multiplicative update would keep it at 0 forever).
              then renormalise, and keep a little of the goal: o <- (1 - ANCHOR) * o + ANCHOR * w,
              so a run of unusual choices moves the estimate but cannot wipe a priority out. Read-outs:
                  gap_k            = o_k - w_k
@@ -25,9 +28,24 @@ ValueModel   How much the user's behaviour actually weighs healthiness, sustaina
              The observed weights NEVER change the saved goal. The supervisor may propose a
              change (policy.py) that the user has to accept.
 
+Temporary vs lasting (the "scope" of a signal)
+             Feedback and answers carry scope "lasting" (default) or "today". A "today" signal never
+             touches either model; it only adds a same-day adjustment (temporary_effects): a small
+             weight nudge, a replacement weight set, or hiding a recipe until the end of the day.
+             Answering "only today" also rolls the value model back to how it was at the start of
+             the day; "keep my goal" resets the observed weights to the saved goal.
+
+Recency      Choosing a recipe or rejecting it as "had it recently" stores WHEN it was eaten
+             (recent[recipe_id] = ts). The engine applies a temporary repetition penalty that
+             fades out; it never adds dislikes to the recipe's ingredients or cuisine.
+
+Repeated clicks on the same button are ignored: a like/save counts once per recipe, a choice
+once per recipe per list, a rejection once per recipe, list and reason.
+
 All constants are design choices, documented in docs/user-model.md.
 """
 import math
+import time
 
 from . import VALUE_CRITERIA
 
@@ -35,12 +53,20 @@ PARAMS = {
     "eta": 1.0,          # learning rate of the value model
     "nudge": 0.2,        # size of an explicit signal (reason chip, answered question)
     "anchor": 0.05,      # share of the stated goal mixed back in after every update
+    "floor": 0.02,       # minimum observed weight before a multiplicative step (lets zero weights grow)
+    "today_nudge": 0.10, # weight added to a criterion for the rest of the day by a "today" signal
     "conf_k": 5,         # confidence = n / (n + conf_k)
     "declared_count": 2.0,
 }
 CHOOSE_REASONS = {"health": "h", "climate": "s", "easy": "t"}
 REJECT_REASONS = {"not_healthy_enough": "h", "not_sustainable": "s", "too_complicated": "t"}
 STRENGTH = {"like": 1.0, "save": 0.6, "choose": 0.8, "onboarding_like": 1.0}
+SCOPES = ("lasting", "today")
+
+
+def day_key(ts):
+    """Local calendar day of a timestamp; "today" signals expire when it changes."""
+    return time.strftime("%Y-%m-%d", time.localtime(ts or 0.0))
 
 
 # ======================================================================================
@@ -128,10 +154,20 @@ class ValueModel:
         self.n = 0                  # informative events since the last goal save
         self.counts = {"choices": 0, "reasons": 0, "rejections": 0, "answers": 0, "goal_saves": 0}
         self.evidence = []          # last 40 updates, newest last
+        self.ts = None              # timestamp of the event being applied (set by Learner)
+        self.day_start = {}         # day -> (observed, n) before the first update of that day
 
     def _apply(self, factors, kind, event_id, extra=None):
         before = dict(self.observed)
-        o = {k: self.observed[k] * math.exp(self.p["eta"] * factors.get(k, 0.0)) for k in VALUE_CRITERIA}
+        if self.ts is not None:
+            d = day_key(self.ts)
+            if d not in self.day_start:
+                self.day_start[d] = (dict(self.observed), self.n)
+                for old in sorted(self.day_start)[:-7]:
+                    del self.day_start[old]
+        floor = self.p.get("floor", 0.0)
+        o = {k: max(self.observed[k], floor) * math.exp(self.p["eta"] * factors.get(k, 0.0))
+             for k in VALUE_CRITERIA}
         tot = sum(o.values())
         a = self.p["anchor"]
         self.observed = {k: (1 - a) * v / tot + a * self.stated[k] for k, v in o.items()}
@@ -193,8 +229,25 @@ class ValueModel:
         self.stated = {k: float(weights[k]) for k in VALUE_CRITERIA}
         self.observed = {k: (self.observed[k] + self.stated[k]) / 2 for k in VALUE_CRITERIA}
         self.n = 0
+        self.day_start = {}
         self.counts["goal_saves"] += 1
         self._log("goal_saved", event_id, before, {"weights": {k: round(self.stated[k], 3) for k in VALUE_CRITERIA}})
+
+    def rollback_day(self, ts, event_id):
+        """Undo every update made on the day of `ts` ("that was only today")."""
+        snap = self.day_start.pop(day_key(ts), None)
+        if snap is None:
+            return False
+        before = dict(self.observed)
+        self.observed, self.n = dict(snap[0]), snap[1]
+        self._log("rolled_back_today", event_id, before)
+        return True
+
+    def reset_to_goal(self, event_id):
+        """"Keep my goal": forget the drift since the goal was saved."""
+        before = dict(self.observed)
+        self.observed, self.n, self.day_start = dict(self.stated), 0, {}
+        self._log("kept_goal", event_id, before)
 
     # ---- read-outs ---------------------------------------------------------------------
     def gap(self, stated=None):
@@ -224,6 +277,9 @@ class Learner:
         self.values = None
         self.history = []       # (recipe_id, y, strength) for the extended taste scorer
         self.n_events = 0
+        self.recent = {}        # recipe_id -> ts it was last eaten (choice or "had it recently")
+        self.temporary = []     # same-day adjustments from "today" signals, see temporary_effects
+        self._seen = set()      # feedback keys already applied (repeated clicks)
 
     @property
     def stated(self):
@@ -257,6 +313,9 @@ class Learner:
         before = self._snapshot()
         why = typ
         self.n_events += 1
+        self._ts = ev.get("ts") or 0.0
+        if self.values is not None:
+            self.values.ts = self._ts
         if typ == "profile_created":
             self._declare(pl["declared"], eid, only_new=False)
             for rid in pl["declared"].get("liked_recipes", []):
@@ -276,6 +335,21 @@ class Learner:
         elif typ == "profile_updated":
             self._declare(pl["declared"], eid, only_new=True)
             why = "you updated your profile"
+        elif typ == "question_answered" and pl.get("scope") == "today":
+            if self.values:
+                self.values.rollback_day(self._ts, eid)
+            if pl.get("weights"):
+                self.temporary.append({"ts": self._ts, "type": "weights", "weights": dict(pl["weights"]),
+                                       "event_id": eid})
+            for k, v in (pl.get("nudge") or {}).items():
+                if k in VALUE_CRITERIA:
+                    self.temporary.append({"ts": self._ts, "type": "nudge", "criterion": k, "amount": float(v),
+                                           "event_id": eid})
+            why = "you said this was only for today (no lasting change)"
+        elif typ == "question_answered" and pl.get("scope") == "keep_goal":
+            if self.values:
+                self.values.reset_to_goal(eid)
+            why = "you chose to keep your goal"
         elif typ == "question_answered":
             w, l = pl.get("winner"), pl.get("loser")
             if self.values and w in VALUE_CRITERIA and l in VALUE_CRITERIA and w != l:
@@ -286,7 +360,42 @@ class Learner:
         elif typ == "profile_correction" and pl.get("kind") == "taste_override":
             self.taste.override(pl["concept"], pl["mean"], eid)
             why = "you corrected " + pl["concept"]
+        if self.values is not None:
+            self.values.ts = None
         return self._trail(before, self._snapshot(), eid, why)
+
+    # ---- repeated clicks, recency and same-day adjustments -------------------------------
+    @staticmethod
+    def feedback_key(pl):
+        """Identity of a click; None when it may legitimately repeat (no list to tie it to)."""
+        typ, rid, req = pl.get("type"), pl.get("recipe_id"), pl.get("request_id")
+        if typ in ("like", "save"):
+            return (typ, rid)
+        if not req:
+            return None
+        if typ == "choose":
+            return (typ, req, rid)
+        return (typ, req, rid, pl.get("reason"))
+
+    def is_duplicate(self, pl):
+        key = self.feedback_key(pl)
+        return key is not None and key in self._seen
+
+    def temporary_effects(self, now):
+        """Adjustments from "today" signals that are still valid at `now` (same local day)."""
+        today = day_key(now)
+        out = {"weights": None, "nudges": {}, "hidden": [], "events": []}
+        for t in self.temporary:
+            if day_key(t["ts"]) != today:
+                continue
+            out["events"].append(t["event_id"])
+            if t["type"] == "weights":
+                out["weights"] = dict(t["weights"])
+            elif t["type"] == "nudge":
+                out["nudges"][t["criterion"]] = out["nudges"].get(t["criterion"], 0.0) + t["amount"]
+            elif t["type"] == "hide" and t["recipe_id"] not in out["hidden"]:
+                out["hidden"].append(t["recipe_id"])
+        return out
 
     def _declare(self, d, eid, only_new):
         """Declared likes/dislikes. A profile edit only adds concepts that have no belief yet,
@@ -301,6 +410,17 @@ class Learner:
     def _feedback(self, pl, eid):
         typ, rid, reason = pl["type"], pl["recipe_id"], pl.get("reason")
         recipe = self.cat.get(rid)
+        key = self.feedback_key(pl)
+        if key is not None and key in self._seen:
+            return "repeated click on " + recipe["title"] + " (ignored)"
+        if key is not None:
+            self._seen.add(key)
+        if typ == "choose" or (typ == "reject" and reason == "had_recently"):
+            self.recent[rid] = self._ts
+        if typ == "reject" and reason == "had_recently":
+            return f"you had {recipe['title']} recently (temporary repetition penalty, no dislike)"
+        if pl.get("scope") == "today" and typ in ("choose", "reject"):
+            return self._today_feedback(typ, rid, reason, recipe, eid)
         conc = self.cat.concepts(recipe)
         shown = pl.get("shown") or []
         ids = [s["recipe_id"] for s in shown]
@@ -324,6 +444,19 @@ class Learner:
             return "you rejected " + recipe["title"]
         return typ
 
+    def _today_feedback(self, typ, rid, reason, recipe, eid):
+        """A choice or rejection that only applies today: no lasting update to either model."""
+        k = CHOOSE_REASONS.get(reason) if typ == "choose" else REJECT_REASONS.get(reason)
+        if k is not None:
+            self.temporary.append({"ts": self._ts, "type": "nudge", "criterion": k,
+                                   "amount": self.p.get("today_nudge", 0.10), "event_id": eid})
+        if typ == "reject":
+            self.temporary.append({"ts": self._ts, "type": "hide", "recipe_id": rid, "event_id": eid})
+        del self.temporary[:-50]
+        verb = "chose" if typ == "choose" else "rejected"
+        return f"you {verb} {recipe['title']} for today only (no lasting change)"
+
     def state_dict(self):
         return {"taste": self.taste.to_dict(), "values": self.values.to_dict() if self.values else None,
-                "history": self.history, "n_events": self.n_events}
+                "history": self.history, "n_events": self.n_events, "recent": self.recent,
+                "temporary": self.temporary}

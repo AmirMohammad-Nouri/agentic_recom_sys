@@ -5,7 +5,8 @@ import { changeSummary, compareTable, decisionCard, personalFits, scoreBreakdown
 import { traceView } from "./trace.js";
 
 const SUGGEST = ["Something easy with few ingredients", "Why is #1 first?", "Compare #1 and #2",
-  "What if I cared more about sustainability?", "What do you know about me?",
+  "What if I cared more about sustainability?", "More convenient, with only a small reduction in healthiness",
+  "What do you know about me?",
   "How is healthiness calculated?", "What did I reject this week?"];
 
 const feed = []; // supervisor activity for this session: {title, steps, ts}

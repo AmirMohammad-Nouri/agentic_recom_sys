@@ -6,13 +6,17 @@ const REJECT = [["not_my_taste", "Not my taste"], ["not_healthy_enough", "Not he
 const CHOOSE = [["taste", "It sounds tasty"], ["health", "It is healthy"], ["climate", "It is climate-friendly"],
   ["easy", "It is easy to make"], [null, "No particular reason"]];
 
-export async function sendFeedback(r, requestId, type, reason) {
+// Reasons that may be a one-off: the user says whether they should change what is learned.
+const SCOPED = new Set(["not_my_taste", "not_healthy_enough", "not_sustainable", "too_complicated", "health", "climate", "easy", "taste"]);
+
+export async function sendFeedback(r, requestId, type, reason, scope = "lasting") {
   try {
     const out = await api(userPath("/feedback"), {
       method: "POST",
-      body: { request_id: requestId, recipe_id: r.recipe_id, type, reason, context: state.context || {} },
+      body: { request_id: requestId, recipe_id: r.recipe_id, type, reason, scope, context: state.context || {} },
     });
-    emit("review", { ...out.review, recipe: r.title, type, reason, ts: Date.now() / 1000 });
+    if (out.duplicate) { toast("Already recorded for this list"); return out; }
+    emit("review", { ...out.review, recipe: r.title, type, reason, scope, ts: Date.now() / 1000 });
     if (out.review.decisions.length) toast("The supervisor has a question for you");
     return out;
   } catch (e) {
@@ -56,11 +60,19 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
   const total = Object.values(rk.contributions).reduce((a, c) => a + c.contribution, 0) || 1;
   for (const k of CRIT) contribW[k] = (rk.contributions[k]?.contribution || 0) / total;
 
-  const act = async (type, reason) => {
+  const act = async (type, reason, scope = "lasting") => {
     try {
-      await sendFeedback(r, requestId, type, reason);
-      clear(status, icon("check"), ` ${human(type === "choose" ? "chosen" : type + "d")}${reason ? " · " + human(reason) : ""}`);
+      const out = await sendFeedback(r, requestId, type, reason, scope);
+      if (out.duplicate) return;
+      clear(status, icon("check"), ` ${human(type === "choose" ? "chosen" : type + "d")}${reason ? " · " + human(reason) : ""}${scope === "today" ? " · today only" : ""}`);
     } catch { /* toast already shown */ }
+  };
+  // Second step for reasons that may be temporary: only today, or update what is learned.
+  const scoped = (anchor, type, reason) => {
+    if (!SCOPED.has(reason)) return act(type, reason);
+    setTimeout(() => menu(anchor, [{ label: "Is this lasting?" },
+      { text: "Update my preference", run: () => act(type, reason, "lasting") },
+      { text: "Only today", run: () => act(type, reason, "today") }]), 0);
   };
 
   return h("article.recipe",
@@ -87,13 +99,17 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
       ruleCount(r) ? h("div.small.muted", { style: { marginTop: "4px" }, title: r.evidence.fit.filter((f) => f.type === "constraint").map((f) => f.text).join("\n") },
         `Passes your ${ruleCount(r)} mandatory rule${ruleCount(r) === 1 ? "" : "s"}`) : null,
       r.reasons.compromises.length ? h("ul.reason-list.comp", r.reasons.compromises.slice(0, 1).map((x) => h("li", x))) : null,
+      (r.missing_info?.length || r.repetition) ? h("div.row.wrap", { style: { marginTop: "4px", gap: "4px" } },
+        r.repetition ? h("span.tag.warn", { title: `Temporary penalty; utility ${f2(r.repetition.utility_before_penalty)} before it` },
+          `Had it ${ago(r.repetition.last_eaten_ts)} · -${f2(r.repetition.penalty)}`) : null,
+        (r.missing_info || []).map((m) => h("span.tag.warn", { title: m.text }, m.criterion ? `Missing data: ${CRIT_META[m.criterion].long.toLowerCase()}` : "Weights adjusted for missing data"))) : null,
       h("div.recipe-actions",
         h("button.btn.sm", { onclick: () => act("like") }, icon("heart"), "Like"),
         h("button.btn.sm", { onclick: () => act("save") }, icon("bookmark"), "Save"),
-        h("button.btn.sm", { onclick: (e) => menu(e.currentTarget, [{ label: "Why this one?" },
-          ...CHOOSE.map(([k, t]) => ({ text: t, run: () => act("choose", k) }))]) }, icon("check"), "I'll cook this"),
-        h("button.btn.sm.ghost", { onclick: (e) => menu(e.currentTarget, [{ label: "What is wrong with it?" },
-          ...REJECT.map(([k, t]) => ({ text: t, run: () => act("reject", k) }))]) }, icon("x"), "Not for me"),
+        h("button.btn.sm", { onclick: (e) => { const b = e.currentTarget; menu(b, [{ label: "Why this one?" },
+          ...CHOOSE.map(([k, t]) => ({ text: t, run: () => scoped(b, "choose", k) }))]); } }, icon("check"), "I'll cook this"),
+        h("button.btn.sm.ghost", { onclick: (e) => { const b = e.currentTarget; menu(b, [{ label: "What is wrong with it?" },
+          ...REJECT.map(([k, t]) => ({ text: t, run: () => scoped(b, "reject", k) }))]); } }, icon("x"), "Not for me"),
         h("span.grow"),
         status,
         h("button.btn.sm.ghost", { onclick: () => ask(`Why is #${r.final_rank} ${r.title} recommended?`), title: "Ask the assistant about this recipe" },
@@ -212,7 +228,7 @@ export function changeSummary(cmp, titles) {
 
 export function decisionCard(d, { onResolved } = {}) {
   const b = d.body;
-  const kindLabel = { goal_proposal: "Proposal", tradeoff_question: "Question", taste_question: "Question", profile_change: "Needs your confirmation" }[d.kind] || d.kind;
+  const kindLabel = { goal_proposal: "Proposal", goal_options: "Pick an option", tradeoff_question: "Question", taste_question: "Question", profile_change: "Needs your confirmation" }[d.kind] || d.kind;
   const box = h("div.decision.k-" + d.kind);
   const resolve = async (action, answer) => {
     try {
@@ -220,8 +236,11 @@ export function decisionCard(d, { onResolved } = {}) {
       toast(action === "accept" ? "Saved. A new version was created; you can revert it in Profile." : "Recorded");
       emit("decision", out);
       onResolved?.(out);
+      const today = String(answer || "").startsWith("today");
       clear(box, h("div.small.muted", `${kindLabel} · ${out.decision.status}`), h("h4", d.title),
-        h("div.resolved", action === "dismiss" ? "Dismissed. The supervisor will not raise this again for a while." :
+        h("div.resolved", action === "dismiss" ? "Dismissed. Your saved goal is unchanged." :
+          answer === "keep_goal" ? "Keeping your goal. The drift since it was saved is forgotten." :
+          today ? "Used for today only. Nothing lasting was saved or learned." :
           action === "answer" ? "Thanks — recorded as evidence. Your saved goal was not changed." : "Applied as a new version."));
     } catch (e) { toast(e.message, "err"); }
   };
@@ -242,11 +261,36 @@ export function decisionCard(d, { onResolved } = {}) {
   if (d.kind === "profile_change") {
     kids.push(h("div.small.muted", { style: { marginTop: "6px" } }, `Eligible recipes: ${b.eligible_before} → ${b.eligible_after}`));
   }
+  if (d.kind === "goal_options") {
+    const avg = (a) => VALUES.map((k) => `${CRIT_META[k].label} ${f2(a[k])}`).join(" · ");
+    kids.push(h("div.stack.tight", { style: { marginTop: "10px" } },
+      h("div.small.muted", "Saved goal now"), weightBar(b.base.weights, VALUES),
+      h("details.attach-details", h("summary", "Current top five"), h("ol.small", b.base.recipes.map((r) => h("li", r.title))),
+        h("div.small.muted", "Average scores: " + avg(b.base.avg_scores)))));
+    for (const o of b.options) {
+      const delta = VALUES.filter((k) => Math.abs(o.avg_change[k]) >= 0.005)
+        .map((k) => h("span" + (o.avg_change[k] > 0 ? ".delta-up" : ".delta-down"), `${CRIT_META[k].label} ${o.avg_change[k] > 0 ? "+" : ""}${f2(o.avg_change[k])}`));
+      kids.push(h("div.card", { style: { padding: "8px 10px", marginTop: "8px" } },
+        h("div.row.between", h("b.small", o.label), h("span.small.muted", `${o.entered.length} new`)),
+        weightBar(o.weights, VALUES),
+        h("div.row.wrap.small", { style: { gap: "4px 12px", marginTop: "4px" } }, delta.length ? delta : h("span.muted", "Top five averages barely change")),
+        h("ol.small", { style: { margin: "6px 0 0 18px" } }, o.recipes.map((r) => h("li" + (o.entered.includes(r.recipe_id) ? ".delta-up" : ""), r.title))),
+        d.status === "open" ? h("div.btn-row",
+          h("button.btn.primary.sm", { onclick: () => resolve("accept", o.id) }, "Save this goal"),
+          h("button.btn.sm", { onclick: () => resolve("answer", `today:${o.id}`) }, "Only today")) : null));
+    }
+  }
   if (d.status !== "open") {
     kids.push(h("div.resolved", `Status: ${d.status}${d.resolved_ts ? " · " + ago(d.resolved_ts) : ""}`));
-  } else if (d.kind === "goal_proposal" || d.kind === "profile_change") {
-    kids.push(h("div.btn-row", h("button.btn.primary.sm", { onclick: () => resolve("accept") }, d.kind === "profile_change" ? "Confirm" : "Accept"),
-      h("button.btn.sm", { onclick: () => resolve("dismiss") }, d.kind === "profile_change" ? "Cancel" : "Keep my goal")));
+  } else if (d.kind === "goal_proposal") {
+    kids.push(h("div.btn-row", h("button.btn.primary.sm", { onclick: () => resolve("accept") }, "Update my goal"),
+      h("button.btn.sm", { onclick: () => resolve("answer", "today") }, "Only today"),
+      h("button.btn.sm", { onclick: () => resolve("answer", "keep_goal") }, "Keep my goal")));
+  } else if (d.kind === "goal_options") {
+    kids.push(h("div.btn-row", h("button.btn.sm", { onclick: () => resolve("dismiss") }, "Keep my goal")));
+  } else if (d.kind === "profile_change") {
+    kids.push(h("div.btn-row", h("button.btn.primary.sm", { onclick: () => resolve("accept") }, "Confirm"),
+      h("button.btn.sm", { onclick: () => resolve("dismiss") }, "Cancel")));
   } else {
     kids.push(h("div.btn-row", b.options.map((o) => h("button.btn.sm", { onclick: () => resolve("answer", o.id) }, o.label)),
       h("button.btn.sm.ghost", { onclick: () => resolve("dismiss") }, "Not now")));

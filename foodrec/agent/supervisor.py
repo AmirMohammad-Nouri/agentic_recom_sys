@@ -182,6 +182,11 @@ class Supervisor:
             if not it["criterion"]:
                 return [], ("Which priority should change? Healthiness, sustainability or convenience.")
             return [("what_if", {"criterion": it["criterion"], "direction": it["direction"] or "more"})], None
+        if i == "adjust_goal":
+            if it["criterion"] not in ("h", "s", "t"):
+                return [], "Which priority should get more weight? Healthiness, sustainability or convenience."
+            return [("goal_options", {"increase": it["criterion"],
+                                      "decrease": it.get("secondary_criterion")})], None
         if i == "why_preference":
             return [("explain_preference", {"criterion": None if it["concept"] else it["criterion"],
                                             "concept": it["concept"]})], None
@@ -209,6 +214,7 @@ class Supervisor:
             "explain_recipe": "Rebuild the recorded evidence for that recipe instead of generating a new explanation.",
             "compare_recipes": "Compare recorded criterion scores under your current weights.",
             "what_if": "Rerun the ranking with one changed weight and diff it against the current one; nothing is saved.",
+            "adjust_goal": "Generate a few small weight changes, rank with each, and let you pick one; nothing is saved before that.",
             "why_preference": "Read the preference model and trace each belief back to the events that support it.",
             "history": "Query the knowledge graph with the time window and filters from your message.",
             "knowledge": "Look up structured facts in the graph and passages in the knowledge base.",
@@ -276,6 +282,7 @@ class Supervisor:
     def _template(it, facts):
         lead = {"recommend": "Here are five recipes for you.", "no_match": "Nothing matched this request.", "explain_recipe": "Here is what the evidence says.",
                 "compare_recipes": "Side by side:", "what_if": "This is a preview only; nothing was saved.",
+                "adjust_goal": "Here are a few small changes to pick from. Nothing is saved until you choose one.",
                 "why_preference": "Here is what I believe and where it comes from.",
                 "history": "From your history:", "knowledge": "From the knowledge base:",
                 "update_profile": "", "review": "I checked your goal against your recent behaviour.", "help": ""}[it["intent"]]

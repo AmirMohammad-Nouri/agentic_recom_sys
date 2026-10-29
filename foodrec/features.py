@@ -15,6 +15,10 @@ Healthiness (h)
     Healthiness = weighted mean of the factors. The weights come from the user's health
     goal (GOALS below); "eat healthier" weights all nine equally. Missing factors are left
     out and the rest re-weighted (disclosed in the breakdown).
+    Nutrient coverage = goal weight of the factors present / goal weight of all nine. Below
+    the minimum coverage (FOODREC_MIN_NUTRIENT_COVERAGE, default 0.6) healthiness is treated
+    as missing instead of being computed from a few factors; the missing-value policy in
+    ranker.py then decides what happens, and the card says which nutrients are missing.
     This is an operational measure for ranking, not medical or dietetic advice.
 
 Sustainability (s)
@@ -29,6 +33,7 @@ import math
 
 VALUE_CRITERIA = ("h", "s", "t")
 SCORER_VERSION = "criteria_v2"
+MIN_NUTRIENT_COVERAGE = 0.6
 
 # ---- healthiness ------------------------------------------------------------------------
 #  key: (label, nutrient key or special, unit, good, poor, source)
@@ -110,6 +115,12 @@ def healthiness(recipe, goal=None):
     return (num / den if den else None), rows
 
 
+def health_coverage(rows):
+    """Share of the goal's factor weight that has data (1 = all nine factors known)."""
+    total = sum(r["weight"] for r in rows)
+    return sum(r["weight"] for r in rows if r["score"] is not None) / total if total else 0.0
+
+
 def sustainability(recipe):
     fp = recipe.get("footprint") or {}
     x = fp.get("kg_co2e_per_kg")
@@ -137,9 +148,13 @@ def health_grade(score):
     return "A" if score >= 0.8 else "B" if score >= 0.65 else "C" if score >= 0.5 else "D" if score >= 0.35 else "E"
 
 
-def breakdown(recipe, goal=None):
+def breakdown(recipe, goal=None, min_coverage=MIN_NUTRIENT_COVERAGE):
     """Everything needed to explain the three scores of one recipe."""
     h, rows = healthiness(recipe, goal)
+    cov = health_coverage(rows)
+    below = cov < min_coverage
+    if below:
+        h = None
     fp = recipe.get("footprint") or {}
     s, t = sustainability(recipe), convenience(recipe)
     g = GOALS.get(goal or DEFAULT_GOAL, GOALS[DEFAULT_GOAL])
@@ -148,6 +163,7 @@ def breakdown(recipe, goal=None):
         "recipe_id": recipe["id"], "title": recipe["title"],
         "h": {"score": h, "grade": health_grade(h), "goal": goal or DEFAULT_GOAL, "goal_label": g["label"],
               "factors": rows, "missing": [r["label"] for r in rows if r["score"] is None],
+              "coverage": round(cov, 4), "min_coverage": min_coverage, "below_min_coverage": below,
               "formula": "sum(weight x factor score) / sum(weight) over " + f"{len(used)} factors"},
         "s": {"score": s, "kg_co2e_per_kg": fp.get("kg_co2e_per_kg"), "kg_co2e_per_serving": fp.get("kg_co2e_per_serving"),
               "anchors": {"best": CO2_BEST, "worst": CO2_WORST}, "mass_classified": fp.get("mass_classified"),
@@ -165,18 +181,31 @@ class Scorer:
 
     version = SCORER_VERSION
 
-    def __init__(self, catalogue):
+    def __init__(self, catalogue, min_coverage=MIN_NUTRIENT_COVERAGE):
         self.catalogue_version = catalogue.version
+        self.min_coverage = float(min_coverage)
+        self.version = f"{SCORER_VERSION}+cov{self.min_coverage:g}"
         self._cache = {}
+        self._cov = {}
 
     def scores(self, recipe, goal=None):
         key = (recipe["id"], goal or DEFAULT_GOAL)
         if key not in self._cache:
-            self._cache[key] = {"h": healthiness(recipe, goal)[0], "s": sustainability(recipe),
+            h, rows = healthiness(recipe, goal)
+            cov = health_coverage(rows)
+            self._cov[key] = {"coverage": cov, "missing": [r["label"] for r in rows if r["score"] is None],
+                              "below_min": cov < self.min_coverage}
+            self._cache[key] = {"h": None if cov < self.min_coverage else h, "s": sustainability(recipe),
                                 "t": convenience(recipe)}
         return dict(self._cache[key])
 
+    def coverage(self, recipe, goal=None):
+        """Nutrient coverage of one recipe: {"coverage", "missing" factor labels, "below_min"}."""
+        self.scores(recipe, goal)
+        return dict(self._cov[(recipe["id"], goal or DEFAULT_GOAL)])
+
     def describe(self):
-        return {"version": self.version, "health_factors": {k: v[:5] for k, v in HEALTH_FACTORS.items()},
+        return {"version": self.version, "min_nutrient_coverage": self.min_coverage,
+                "health_factors": {k: v[:5] for k, v in HEALTH_FACTORS.items()},
                 "goals": {k: v["label"] for k, v in GOALS.items()},
                 "sustainability_anchors": [CO2_BEST, CO2_WORST], "convenience_anchors": [ING_BEST, ING_WORST]}

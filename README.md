@@ -210,8 +210,11 @@ removes the most recipes.
 **Request-only filters.** "Something high in protein with at most 8 ingredients" and the meal
 selector on Discover become visible filters for that request only. They are never saved.
 
-**Missing values.** The default policy *renormalises* the remaining weights for that recipe and
-discloses it. A missing value is never treated as average.
+**Missing values.** The default policy *renormalises* the remaining value weights for that
+recipe (taste keeps its fixed share) and discloses it. A recipe whose missing criteria carry
+more than half of the user's value weight, or with less than 60 % nutrient coverage for
+healthiness, is not ranked on what is left; the card and the response say what is missing.
+A missing value is never treated as average.
 
 **Diversity.** Greedy maximal marginal relevance. Each card shows when a recipe moved up for
 variety, which higher-utility recipe it displaced, and why.
@@ -325,6 +328,8 @@ All settings are environment variables (or `.env`; see `.env.example`).
 | `FOODREC_DATA_DIR` | `data/runtime` | SQLite (`foodrec_v2.db`), Qdrant files, index metadata |
 | `FOODREC_CATALOGUE` | `data/hummus/catalogue.json.gz` | Portable catalogue imported on start |
 | `FOODREC_MAX_STEPS` | `3` | Maximum skills per chat turn |
+| `FOODREC_MIN_NUTRIENT_COVERAGE` | `0.6` | Share of (goal-weighted) nutrient factors healthiness needs |
+| `FOODREC_MAX_MISSING_SHARE` | `0.5` | A recipe whose missing criteria carry more of the value weight is not ranked |
 
 | Missing service | Fallback |
 | --- | --- |
@@ -349,7 +354,8 @@ Click the status pill for the live state of every component.
 | POST | `/api/users/{id}/goal`, `/goal/revert` | Save or restore a goal version |
 | POST | `/api/users/{id}/recommend` | Top five + evidence + comparison + pipeline trace (stored snapshot) |
 | POST | `/api/users/{id}/preview` | Counterfactual for unsaved settings (nothing stored) |
-| POST | `/api/users/{id}/feedback` | Record feedback; returns the supervisor's review trace |
+| POST | `/api/users/{id}/goal-options` | `{increase, decrease?, max_drop?}`: several small goal changes with their lists, saved only when picked |
+| POST | `/api/users/{id}/feedback` | Record feedback (`scope`: `lasting` or `today`; repeated clicks are ignored); returns the supervisor's review trace |
 | GET/POST | `/api/users/{id}/decisions[/{did}]` | List; accept / dismiss / answer |
 | POST | `/api/users/{id}/review` | Run the monitoring loop now |
 | POST | `/api/users/{id}/chat` | Chat turn, streamed as NDJSON trace steps |
@@ -378,6 +384,10 @@ python -m pytest
   turns (with a scripted fake model), streaming, unsupported-number rejection, confirmation of
   profile changes, one-question-at-a-time, cool-down, proposals with counterfactuals, taste
   conflicts, replay after restart, graph templates, hybrid retrieval, and the HTTP API.
+* `tests/test_fixes.py`: regression tests for zero weights, the candidate pool (diversity 0 =
+  full-catalogue top five), missing nutrition and coverage, repeated clicks, proposal and
+  option normalisation, full event replay, "only today" / "keep my goal", "had it recently"
+  as recency, and hard constraints after reranking and goal changes.
   They run on a 148-recipe sample of the catalogue (`data/fixture/catalogue.json.gz`).
 
 The Neo4j backend implements the same templates in Cypher but needs a running Neo4j, so it

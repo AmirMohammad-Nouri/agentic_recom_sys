@@ -38,10 +38,11 @@ def test_04_negative_weight_rejected():
         resolve_weights({"h": -1, "s": 1})
 
 
-def test_05_missing_renormalises_instead_of_scoring_zero():
+def test_05_missing_renormalises_values_and_keeps_taste_share():
     u, eff, missing, _ = utility(EFF, {**S, "s": None}, "renormalize")
     assert missing == ["s"] and eff["s"] == 0 and sum(eff.values()) == pytest.approx(1)
-    assert u == pytest.approx((0.78875 - 0.225 * 0.55) / 0.775)
+    assert eff["p"] == pytest.approx(0.25)
+    assert u == pytest.approx(0.25 * 0.8 + 0.75 * (0.5 * 0.9 + 0.2 * 0.85) / 0.7)
 
 
 def test_06_missing_zero_policy_penalises():

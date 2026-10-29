@@ -21,8 +21,23 @@ C ≥ 0.50, D ≥ 0.35, else E.
 Utility: `U = 0.25 · p + 0.75 · (w_h·h + w_s·s + w_t·t)` with `w ≥ 0`, `Σ w = 1`. Reference:
 w = 0.5/0.3/0.2, scores p/h/s/t = 0.8/0.9/0.55/0.85 → 0.78875 (`tests/test_reference.py`).
 
-**Missing values** (decided before ranking): `renormalize` (default; drop the criterion for
-that recipe and rescale), `zero`, or `exclude`. A missing value is never replaced by an average.
+**Missing values** (decided before ranking): `renormalize` (default), `zero`, or `exclude`.
+A missing value is never replaced by an average. Under `renormalize` only the value weights
+are rescaled; taste keeps its fixed 25 %, so a recipe with no health data cannot be ranked on
+taste alone. If the missing criteria carry more than 50 % of the user's value weight
+(`FOODREC_MAX_MISSING_SHARE`), the recipe is not ranked and counted under
+`eligibility.not_ranked_missing_data`.
+
+**Nutrient coverage.** Coverage = goal weight of the health factors with data / goal weight of all
+nine. Below `FOODREC_MIN_NUTRIENT_COVERAGE` (0.6) healthiness counts as missing. Every result
+lists what is missing (`missing_info`), and the card shows a "Missing data" tag.
+
+**Candidate pool.** With more than `candidate_cap` (60) eligible recipes, the pool keeps the top
+half of the cap (at least k) by exact utility, then fills the rest round-robin with the best
+recipe per criterion. In lightweight mode with diversity 0 the top five equal the top five of
+the whole eligible catalogue (`tests/test_fixes.py`).
+
+**Repetition.** A recipe eaten recently loses `0.15 × 0.5^(days / 3)` utility for 14 days.
 
 ## Mandatory rules (`constraints.py`)
 
@@ -46,7 +61,8 @@ position. `d = 0` reproduces utility order. Utility rank and final rank are both
 ## User model (`learner.py`)
 
 Taste: `(1 + likes) / (2 + likes + dislikes)` per concept. Values: observed weights updated
-multiplicatively from choices, reasoned rejections and answers, anchored 5 % to the goal.
+multiplicatively from choices, reasoned rejections and answers, with a 2 % floor (so zero
+weights can grow) and anchored 5 % to the goal. "Only today" signals change neither model.
 Full explanation, worked example and parameter table: [user-model.md](user-model.md).
 
 ## Computation modes (`router.py`)
