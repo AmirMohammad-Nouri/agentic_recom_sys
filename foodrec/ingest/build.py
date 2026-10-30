@@ -28,14 +28,19 @@ DIET_TAGS = {"Vegetarian": "vegetarian", "Vegan": "vegan"}
 
 
 def _rows(xlsx, limit=None):
+    """Rows in the HUMMUS column layout from .xlsx, .csv or a JSON list of row objects."""
+    path = Path(xlsx)
+    if path.suffix == ".json":
+        rows = json.loads(path.read_text(encoding="utf-8"))
+        return rows[:limit] if limit else rows
     import pandas as pd  # only needed for building, not for running the app
-    df = pd.read_excel(xlsx)
+    df = pd.read_csv(xlsx) if path.suffix == ".csv" else pd.read_excel(xlsx)
     if limit:
         df = df.sample(n=min(limit, len(df)), random_state=7).sort_values("recipe_id")
     return df.to_dict("records")
 
 
-def _recipe(row, labels_ing, labels_rec):
+def _recipe(row, labels_ing, labels_rec, id_prefix="h"):
     per100, serv, serving_g, bad = nutrition(row)
     titles = [str(x) for x in literal(row["ingredients_title"], [])]
     lines = ingredient_lines(row)
@@ -99,7 +104,8 @@ def _recipe(row, labels_ing, labels_rec):
     fsa = row.get("fsa_score")
     fsa = None if fsa is None or (isinstance(fsa, float) and math.isnan(fsa)) else round(float(fsa), 3)
     return {
-        "id": f"h{row['recipe_id']}", "source_id": int(row["recipe_id"]), "title": fix_text(row["title"]).strip(),
+        "id": f"{id_prefix}{row['recipe_id']}", "source_id": _source_id(row["recipe_id"]),
+        "title": fix_text(row["title"]).strip(),
         "url": row.get("recipe_url"), "image_url": row.get("image_url"),
         "cuisine": lab.get("cuisine", "Other"), "meal": lab.get("meal", "main"), "label_source": lab.get("source", "none"),
         "tags": tags, "ingredients": ings, "n_ingredients": len(ings),
@@ -109,6 +115,13 @@ def _recipe(row, labels_ing, labels_rec):
         "unknown_allergen_ingredients": unknown, "diet": diet,
         "quality": {"impossible": bad},
     }
+
+
+def _source_id(x):
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        return str(x)
 
 
 def _similar(recipes, k=3, min_sim=0.3):
@@ -137,9 +150,12 @@ def _similar(recipes, k=3, min_sim=0.3):
     return out
 
 
-def build(xlsx, out, cache_path, llm=None, limit=None, verbose=True):
+def build(xlsx, out, cache_path, llm=None, limit=None, verbose=True, rows=None, name=None, id_prefix="h",
+          note=None):
+    """`rows`: already-loaded rows in the HUMMUS layout (e.g. from ingest.simple); otherwise read `xlsx`.
+    `name`, `id_prefix`, `note`: for a dataset other than HUMMUS."""
     t0 = time.time()
-    rows = _rows(xlsx, limit)
+    rows = rows if rows is not None else _rows(xlsx, limit)
     cache = LabelCache(cache_path)
     names = {clean_name(str(x)) for r in rows for x in literal(r["ingredients_title"], [])}
     prog = printer if verbose else None
@@ -150,7 +166,7 @@ def build(xlsx, out, cache_path, llm=None, limit=None, verbose=True):
                    for r in rows], cache, llm, progress=prog)
     recipes, dropped = [], Counter()
     for r in rows:
-        rec = _recipe(r, cache.data["ingredients"], cache.data["recipes"])
+        rec = _recipe(r, cache.data["ingredients"], cache.data["recipes"], id_prefix)
         if rec["meal"] == "non_food" or NON_FOOD.search(rec["title"]):
             dropped["not food (household or pet recipe)"] += 1
             continue
@@ -168,16 +184,16 @@ def build(xlsx, out, cache_path, llm=None, limit=None, verbose=True):
     rec_src = Counter(r["label_source"] for r in recipes)
     agree = [v["group"] == v["rule"] for v in cache.data["ingredients"].values() if v["source"] == "model"]
     meta = {
-        "name": "hummus" if not limit else f"hummus_sample_{len(recipes)}", "schema": SCHEMA_VERSION,
+        "name": name or ("hummus" if not limit else f"hummus_sample_{len(recipes)}"), "schema": SCHEMA_VERSION,
         "source": Path(xlsx).name, "rows": len(rows), "recipes": len(recipes),
         "dropped": dict(dropped), "built_at": time.strftime("%Y-%m-%d %H:%M"),
         "labeller": getattr(llm, "model", None) or "rules",
         "ingredient_labels": dict(ing_src), "recipe_labels": dict(rec_src),
         "model_rule_agreement": round(sum(agree) / len(agree), 3) if agree else None,
-        "note": ("HUMMUS recipes (food.com). Nutrients and FSA score from the dataset; footprints estimated from "
-                 "ingredient amounts x food-group CO2e factors; cuisine, meal and food groups labelled by "
-                 + (getattr(llm, "model", None) or "keyword rules") + ". Allergens/diets detected from ingredient "
-                 "names: verify before relying on them."),
+        "note": (note or "HUMMUS recipes (food.com). Nutrients and FSA score from the dataset;") +
+                (" footprints estimated from ingredient amounts x food-group CO2e factors; cuisine, meal and food groups "
+                 "labelled by " + (getattr(llm, "model", None) or "keyword rules") + ". Allergens/diets detected from "
+                 "ingredient names: verify before relying on them."),
     }
     payload = {"meta": meta, "groups": reference(), "recipes": recipes}
     text = json.dumps(payload, separators=(",", ":"), sort_keys=True, default=str)

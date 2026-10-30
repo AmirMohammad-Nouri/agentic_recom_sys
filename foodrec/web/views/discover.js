@@ -1,5 +1,5 @@
 // Discover: the three values, the meal, and the top five. The assistant is docked beside it.
-import { api, CRIT, CRIT_META, clear, emit, f2, h, human, icon, on, pct, state, toast, userPath, VALUES, weightBar, legend } from "../lib.js";
+import { api, can, CRIT, CRIT_META, clear, emit, f2, h, human, icon, on, pct, state, toast, userPath, VALUES, visibleCriteria, weightBar, legend } from "../lib.js";
 import { changeSummary, recipeCard } from "../components.js";
 
 function defaultMeal() {
@@ -113,7 +113,7 @@ export function discoverView() {
       lastResult = res;
       state.lastResult = res;
       renderResults(res);
-      emit("feed", { title: res.results.length ? `Ranked ${res.results.length} recipes` : "No eligible recipes",
+      if (can("agent_trace") && res.pipeline_trace) emit("feed", { title: res.results.length ? `Ranked ${res.results.length} recipes` : "No eligible recipes",
         steps: res.pipeline_trace.map((s, i) => ({ ...s, id: res.request_id + i, status: "done" })), ts: Date.now() / 1000 });
       preview.textContent = "";
     } catch (e) { toast(e.message, "err"); }
@@ -123,10 +123,10 @@ export function discoverView() {
     const titles = {};
     for (const r of res.results) titles[r.recipe_id] = r.title;
     clear(resultsHead,
-      h("div", h("h2", "Your top five"),
-        h("div.small.muted", `${res.weights_source} · ${res.config.mode} · diversity ${f2(res.config.diversity)} · ` +
-          `${res.eligibility.eligible_count} eligible of ${res.eligibility.eligible_count + res.eligibility.excluded_count}`)),
-      h("span.small.muted.mono", { title: "Immutable request snapshot id" }, res.request_id));
+      h("div", h("h2", res.results.length === 5 ? "Your top five" : `Your top ${res.results.length}`),
+        can("explanations") ? h("div.small.muted", `${res.weights_source} · ${res.config.mode} · diversity ${f2(res.config.diversity)} · ` +
+          `${res.eligibility.eligible_count} eligible of ${res.eligibility.eligible_count + res.eligibility.excluded_count}`) : null),
+      can("explanations") ? h("span.small.muted.mono", { title: "Immutable request snapshot id" }, res.request_id) : null);
     if (res.empty && !res.results.length) {
       clear(resultsBody, h("div.card-body.stack",
         h("div.empty", h("h3", "Nothing passes your mandatory rules"), h("p", res.empty.message)),
@@ -137,11 +137,11 @@ export function discoverView() {
     }
     const compareWith = res.results.map((r) => ({ ...r }));
     clear(resultsBody,
-      res.comparison ? changeSummary(res.comparison, titles) : null,
+      res.comparison && can("explanations") ? changeSummary(res.comparison, titles) : null,
       res.config.weights_message && res.config.weights_message.startsWith("All") ? h("div.change", res.config.weights_message) : null,
       res.results.map((r) => recipeCard(r, { requestId: res.request_id, compareWith })),
-      h("div.card-body", { style: { borderTop: "1px solid var(--border)" } }, legend(),
-        h("div.hint", { style: { marginTop: "4px" } }, "Bars show each criterion's share of the utility. Taste match is a model estimate; CO₂e is estimated from ingredient amounts and food-group averages.")));
+      can("utility") && visibleCriteria().length ? h("div.card-body", { style: { borderTop: "1px solid var(--border)" } }, legend(visibleCriteria()),
+        h("div.hint", { style: { marginTop: "4px" } }, "Bars show each criterion's share of the utility. Taste match is a model estimate; CO₂e is estimated from ingredient amounts and food-group averages.")) : null);
   }
 
   async function saveGoal() {
@@ -185,11 +185,13 @@ export function discoverView() {
   if (state.lastResult && state.lastResult.user_id === state.user) { lastResult = state.lastResult; renderResults(lastResult); }
   else run({ weights: goal.weights, diversity: goal.diversity, mode: goal.mode });
 
+  // Without priority controls (an access-role setting) the saved goal is used and the list fills the page.
   const el = h("div",
     h("div.page-head", h("div", h("h1", "Discover"),
-      h("p", "Five recipes ranked by healthiness, sustainability, convenience and your taste. Every reason comes from a recorded evidence record.")),
+      h("p", can("explanations") ? "Five recipes ranked by healthiness, sustainability, convenience and your taste. Every reason comes from a recorded evidence record."
+        : "Recipes picked for you.")),
       h("div.stack.tight", { style: { alignItems: "flex-end" } }, h("span.field-label", "Meal"), mealSeg)),
-    h("div.discover", controls, results));
+    can("weight_controls") ? h("div.discover", controls, results) : results);
   el.cleanup = off;
   return el;
 }

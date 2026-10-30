@@ -1,0 +1,40 @@
+{
+  "name": "study_access_roles",
+  "description": "A small between-subjects study: new participants are assigned round robin to 'full' and 'baseline'. A baseline participant gets recommendations and can give feedback, but no explanations, no supervisor and only food details; the study closes after three participants.",
+  "config": {
+    "llm": {"enabled": false},
+    "study": {"name": "Pilot study", "registration": "open", "max_users": 3,
+              "assignment": "round_robin", "assign_roles": ["full", "baseline"]}
+  },
+  "steps": [
+    {"action": "set_user", "user": "p01"},
+    {"action": "onboard", "declared": {"diets": ["vegetarian"]}, "weights": {"h": 0.4, "s": 0.4, "t": 0.2}},
+    {"action": "expect", "that": "state.access.role", "equals": "full", "label": "p01 is assigned 'full'"},
+    {"action": "recommend"},
+    {"action": "chat", "text": "Why is #1 recommended?"},
+    {"action": "expect", "that": "chat.skills", "contains": "explain_recipe"},
+
+    {"action": "set_user", "user": "p02"},
+    {"action": "onboard", "declared": {"diets": ["vegetarian"]}, "weights": {"h": 0.4, "s": 0.4, "t": 0.2}},
+    {"action": "expect", "that": "state.access.role", "equals": "baseline", "label": "p02 is assigned 'baseline' (round robin)"},
+    {"action": "expect", "that": "state.access.features.explanations", "equals": false},
+    {"action": "expect", "that": "state.access.visible_criteria.length", "equals": 0},
+    {"action": "recommend"},
+    {"action": "feedback", "recipe": "#2", "type": "choose", "reason": "taste"},
+    {"action": "expect", "that": "feedback.review", "exists": false, "label": "the supervisor does not review baseline feedback"},
+    {"action": "chat", "text": "Why is #1 recommended?"},
+    {"action": "expect", "that": "chat.text", "matches": "not available", "label": "explanations are refused for baseline"},
+
+    {"action": "set_user", "user": "p03"},
+    {"action": "onboard", "declared": {}, "weights": {"h": 0.3, "s": 0.3, "t": 0.4}},
+    {"action": "expect", "that": "state.access.role", "equals": "full"},
+
+    {"action": "set_user", "user": "p04"},
+    {"action": "onboard", "declared": {}, "allow_error": true},
+    {"action": "expect", "that": "error", "matches": "full \\(3 participants\\)", "label": "the fourth participant is refused"},
+
+    {"action": "set_user", "user": "admin"},
+    {"action": "onboard", "declared": {}, "weights": {"h": 0.3, "s": 0.3, "t": 0.4}},
+    {"action": "expect", "that": "state.access.role", "equals": "admin", "label": "administrators are not counted"}
+  ]
+}

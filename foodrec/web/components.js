@@ -1,5 +1,5 @@
 // Reusable UI pieces: recipe card, decision card, change summary, comparison table.
-import { api, ask, co2, CRIT, CRIT_META, clear, emit, f2, grade, h, human, icon, menu, pct, state, toast, userPath, VALUES, weightBar, ago } from "./lib.js";
+import { api, ask, can, co2, CRIT, CRIT_META, clear, emit, f2, grade, h, human, icon, menu, pct, state, toast, track, userPath, VALUES, visibleCriteria, weightBar, ago } from "./lib.js";
 
 const REJECT = [["not_my_taste", "Not my taste"], ["not_healthy_enough", "Not healthy enough"],
   ["not_sustainable", "Not sustainable enough"], ["too_complicated", "Too many ingredients"], ["had_recently", "Had it recently"]];
@@ -25,8 +25,8 @@ export async function sendFeedback(r, requestId, type, reason, scope = "lasting"
   }
 }
 
-export const personalFits = (r) => r.evidence.fit.filter((f) => f.type !== "constraint").map((f) => f.text);
-const ruleCount = (r) => r.evidence.fit.filter((f) => f.type === "constraint").length;
+export const personalFits = (r) => (r.evidence?.fit || []).filter((f) => f.type !== "constraint").map((f) => f.text);
+const ruleCount = (r) => (r.evidence?.fit || []).filter((f) => f.type === "constraint").length;
 
 function thumb(r) {
   const box = h("div.thumb", icon("bowl"));
@@ -40,7 +40,9 @@ function thumb(r) {
 
 // Three small score chips: what the recipe scores on each value criterion.
 export function scoreChips(r) {
-  return h("div.score-chips", VALUES.map((k) => {
+  const keys = visibleCriteria(VALUES);
+  if (!keys.length) return null;
+  return h("div.score-chips", keys.map((k) => {
     const v = r.scores?.[k];
     return h("span.score-chip", { title: `${CRIT_META[k].long}: ${CRIT_META[k].what}` },
       h("span.sc-bar", h("span", { style: { width: pct(v || 0), background: CRIT_META[k].color } })),
@@ -48,17 +50,23 @@ export function scoreChips(r) {
   }));
 }
 
+// What a card shows depends on the user's access role (Config page); the server has already
+// removed the fields the role may not see, so every part below also checks that its data exists.
 export function recipeCard(r, { requestId, compareWith = [] } = {}) {
-  const ev = r.evidence;
-  const rk = ev.ranking;
+  const ev = r.evidence || {};
+  const rk = ev.ranking || {};
   const top = rk.top_contributor;
-  const dv = rk.diversity;
+  const dv = rk.diversity || {};
   const status = h("span.done");
   const detailBox = h("div.hidden");
+  const explain = can("explanations");
+  const details = can("food_details");
+  const showUtility = can("utility") && r.utility != null;
 
   const contribW = {};
-  const total = Object.values(rk.contributions).reduce((a, c) => a + c.contribution, 0) || 1;
-  for (const k of CRIT) contribW[k] = (rk.contributions[k]?.contribution || 0) / total;
+  const contribs = rk.contributions || {};
+  const total = Object.values(contribs).reduce((a, c) => a + c.contribution, 0) || 1;
+  for (const k of CRIT) contribW[k] = (contribs[k]?.contribution || 0) / total;
 
   const act = async (type, reason, scope = "lasting") => {
     try {
@@ -83,44 +91,48 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
           h("h3", r.url ? h("a.title-link", { href: r.url, target: "_blank", rel: "noopener" }, r.title) : r.title),
           h("div.meta",
             h("span.m", r.cuisine === "Other" ? human(r.meal) : `${r.cuisine} · ${human(r.meal)}`),
-            h("span.m", { title: "Health grade" }, grade(r.health_grade)),
-            h("span.m", icon("list"), `${r.n_ingredients} ingredients`),
-            h("span.m", icon("flame"), r.kcal == null ? "kcal unknown" : `${Math.round(r.kcal)} kcal`),
-            h("span.m", icon("leaf"), co2(r.co2e_kg_per_kg)))),
-        h("div.util", h("div", f2(r.utility)), h("div.small.muted", "utility"))),
+            details ? [
+              h("span.m", { title: "Health grade" }, grade(r.health_grade)),
+              h("span.m", icon("list"), `${r.n_ingredients} ingredients`),
+              h("span.m", icon("flame"), r.kcal == null ? "kcal unknown" : `${Math.round(r.kcal)} kcal`),
+              h("span.m", icon("leaf"), co2(r.co2e_kg_per_kg))] : null)),
+        showUtility ? h("div.util", h("div", f2(r.utility)), h("div.small.muted", "utility")) : null),
       scoreChips(r),
-      h("div.contrib", { title: "Share of the utility contributed by each criterion" }, weightBar(contribW)),
-      h("div.reason",
-        top ? [h("b", CRIT_META[top].long), ` contributes most (${f2(rk.contributions[top].contribution)} of ${f2(r.utility)}). `] : null,
+      showUtility && rk.contributions ? h("div.contrib", { title: "Share of the utility contributed by each criterion" }, weightBar(contribW, visibleCriteria())) : null,
+      explain ? h("div.reason",
+        top && contribs[top] ? [h("b", CRIT_META[top].long), ` contributes most (${f2(contribs[top].contribution)} of ${f2(r.utility)}). `] : null,
         dv.promoted ? h("span.tag.info", { title: r.reasons.ranked_here.find((x) => x.includes("diversity")) || "" },
           `moved up from utility rank ${rk.utility_rank} for variety`) : null,
-        dv.demoted ? h("span.tag", `utility rank ${rk.utility_rank}`) : null),
-      personalFits(r).length ? h("ul.reason-list.fit", personalFits(r).slice(0, 2).map((x) => h("li", x))) : null,
-      ruleCount(r) ? h("div.small.muted", { style: { marginTop: "4px" }, title: r.evidence.fit.filter((f) => f.type === "constraint").map((f) => f.text).join("\n") },
+        dv.demoted ? h("span.tag", `utility rank ${rk.utility_rank}`) : null) : null,
+      explain && personalFits(r).length ? h("ul.reason-list.fit", personalFits(r).slice(0, 2).map((x) => h("li", x))) : null,
+      explain && ruleCount(r) ? h("div.small.muted", { style: { marginTop: "4px" }, title: r.evidence.fit.filter((f) => f.type === "constraint").map((f) => f.text).join("\n") },
         `Passes your ${ruleCount(r)} mandatory rule${ruleCount(r) === 1 ? "" : "s"}`) : null,
-      r.reasons.compromises.length ? h("ul.reason-list.comp", r.reasons.compromises.slice(0, 1).map((x) => h("li", x))) : null,
-      (r.missing_info?.length || r.repetition) ? h("div.row.wrap", { style: { marginTop: "4px", gap: "4px" } },
-        r.repetition ? h("span.tag.warn", { title: `Temporary penalty; utility ${f2(r.repetition.utility_before_penalty)} before it` },
+      explain && r.reasons?.compromises?.length ? h("ul.reason-list.comp", r.reasons.compromises.slice(0, 1).map((x) => h("li", x))) : null,
+      (r.missing_info?.length || (explain && r.repetition)) ? h("div.row.wrap", { style: { marginTop: "4px", gap: "4px" } },
+        explain && r.repetition ? h("span.tag.warn", { title: `Temporary penalty; utility ${f2(r.repetition.utility_before_penalty)} before it` },
           `Had it ${ago(r.repetition.last_eaten_ts)} · -${f2(r.repetition.penalty)}`) : null,
         (r.missing_info || []).map((m) => h("span.tag.warn", { title: m.text }, m.criterion ? `Missing data: ${CRIT_META[m.criterion].long.toLowerCase()}` : "Weights adjusted for missing data"))) : null,
       h("div.recipe-actions",
-        h("button.btn.sm", { onclick: () => act("like") }, icon("heart"), "Like"),
-        h("button.btn.sm", { onclick: () => act("save") }, icon("bookmark"), "Save"),
-        h("button.btn.sm", { onclick: (e) => { const b = e.currentTarget; menu(b, [{ label: "Why this one?" },
-          ...CHOOSE.map(([k, t]) => ({ text: t, run: () => scoped(b, "choose", k) }))]); } }, icon("check"), "I'll cook this"),
-        h("button.btn.sm.ghost", { onclick: (e) => { const b = e.currentTarget; menu(b, [{ label: "What is wrong with it?" },
-          ...REJECT.map(([k, t]) => ({ text: t, run: () => scoped(b, "reject", k) }))]); } }, icon("x"), "Not for me"),
+        can("feedback") ? [
+          h("button.btn.sm", { onclick: () => act("like") }, icon("heart"), "Like"),
+          h("button.btn.sm", { onclick: () => act("save") }, icon("bookmark"), "Save"),
+          h("button.btn.sm", { onclick: (e) => { const b = e.currentTarget; menu(b, [{ label: "Why this one?" },
+            ...CHOOSE.map(([k, t]) => ({ text: t, run: () => scoped(b, "choose", k) }))]); } }, icon("check"), "I'll cook this"),
+          h("button.btn.sm.ghost", { onclick: (e) => { const b = e.currentTarget; menu(b, [{ label: "What is wrong with it?" },
+            ...REJECT.map(([k, t]) => ({ text: t, run: () => scoped(b, "reject", k) }))]); } }, icon("x"), "Not for me")] : null,
         h("span.grow"),
         status,
-        h("button.btn.sm.ghost", { onclick: () => ask(`Why is #${r.final_rank} ${r.title} recommended?`), title: "Ask the assistant about this recipe" },
-          icon("spark"), "Ask"),
-        h("button.btn.sm.ghost", {
+        can("assistant") && explain ? h("button.btn.sm.ghost", { onclick: () => ask(`Why is #${r.final_rank} ${r.title} recommended?`), title: "Ask the assistant about this recipe" },
+          icon("spark"), "Ask") : null,
+        hasDetails(r) ? h("button.btn.sm.ghost", {
           onclick: (e) => {
             detailBox.classList.toggle("hidden");
             if (!detailBox.firstChild) detailBox.append(recipeDetails(r, compareWith));
-            e.currentTarget.lastChild.textContent = detailBox.classList.contains("hidden") ? "How it's scored" : "Hide";
+            const label = detailsLabel();
+            e.currentTarget.lastChild.textContent = detailBox.classList.contains("hidden") ? label : "Hide";
+            if (!detailBox.classList.contains("hidden")) track("details_opened", { recipe_id: r.recipe_id, rank: r.final_rank });
           },
-        }, icon("info"), "How it's scored")),
+        }, icon("info"), detailsLabel()) : null),
       detailBox));
 }
 
@@ -157,12 +169,18 @@ export function scoreBreakdown(bd) {
       h("div.formula", `Score = (${tt.anchors.worst} − n) / (${tt.anchors.worst} − ${tt.anchors.best}), clipped to 0–1.`)));
 }
 
+// The details panel: "How it's scored" when scores are visible, otherwise just the food details.
+const hasDetails = (r) => (can("utility") && r.contributions) || (can("score_breakdown") && r.breakdown) ||
+  can("explanations") || (can("food_details") && r.ingredients_detail);
+const detailsLabel = () => (can("utility") || can("score_breakdown") || can("explanations") ? "How it's scored" : "Details");
+
 function recipeDetails(r, compareWith) {
-  const ev = r.evidence;
-  const rk = ev.ranking;
-  const rows = CRIT.map((k) => {
-    const c = rk.contributions[k];
-    const w = r.effective_weights[k];
+  const ev = r.evidence || {};
+  const rk = ev.ranking || {};
+  const explain = can("explanations");
+  const rows = visibleCriteria().map((k) => {
+    const c = rk.contributions?.[k];
+    const w = r.effective_weights?.[k];
     return h("tr",
       h("td", h("span.row", h("span.swatch", { style: { background: CRIT_META[k].color } }), CRIT_META[k].long)),
       h("td.num", c ? f2(c.score) : h("span.tag.warn", "missing")),
@@ -177,33 +195,35 @@ function recipeDetails(r, compareWith) {
     const o = compareWith.find((x) => x.recipe_id === cmpSel.value);
     clear(cmpBox, o ? compareTable(r, o) : null);
   });
+  const rs = r.reasons || {};
   return h("div.details",
-    h("div",
+    can("utility") && r.utility != null && rows.length ? h("div",
       h("div.section-label", "Why it ranked here"),
       h("table.t", h("thead", h("tr", h("th", "Criterion"), h("th.num", "Score"), h("th.num", "Weight"), h("th.num", "Contribution"), h("th", ""))), h("tbody", rows)),
       h("div.small.muted", { style: { marginTop: "6px" } },
         `Utility ${f2(r.utility)} = Σ weight × score (taste keeps a fixed share). Utility rank ${rk.utility_rank}, final rank ${rk.final_rank}.`,
-        rk.diversity.max_similarity_to_earlier ? ` Similarity to earlier picks ${f2(rk.diversity.max_similarity_to_earlier)}.` : "")),
-    h("div", h("div.section-label", "How each score is calculated"), scoreBreakdown(r.breakdown)),
-    r.reasons.ranked_here.length ? h("div", h("div.section-label", "Ranking notes"), h("ul.reason-list", r.reasons.ranked_here.map((x) => h("li", x)))) : null,
-    h("div", h("div.section-label", "Fits you because"), h("ul.reason-list.fit", r.reasons.fits.map((x) => h("li", x)))),
-    r.reasons.compromises.length ? h("div", h("div.section-label", "Compromises"), h("ul.reason-list.comp", r.reasons.compromises.map((x) => h("li", x)))) : null,
-    h("div", h("div.section-label", "Uncertain or estimated"), h("ul.reason-list", r.reasons.gaps.map((x) => h("li", x)))),
-    h("div", h("div.section-label", "Ingredients"),
-      h("ul.ing-list", r.ingredients_detail.map((i) => h("li", i.text || i.name, h("span.small.muted", ` · ≈${Math.round(i.grams)} g`))))),
-    compareWith.length > 1 ? h("div", h("div.section-label", "Compare"), h("div", { style: { margin: "6px 0" } }, cmpSel), cmpBox) : null);
+        rk.diversity?.max_similarity_to_earlier ? ` Similarity to earlier picks ${f2(rk.diversity.max_similarity_to_earlier)}.` : "")) : null,
+    can("score_breakdown") && r.breakdown ? h("div", h("div.section-label", "How each score is calculated"), scoreBreakdown(r.breakdown)) : null,
+    explain && rs.ranked_here?.length ? h("div", h("div.section-label", "Ranking notes"), h("ul.reason-list", rs.ranked_here.map((x) => h("li", x)))) : null,
+    explain && rs.fits?.length ? h("div", h("div.section-label", "Fits you because"), h("ul.reason-list.fit", rs.fits.map((x) => h("li", x)))) : null,
+    explain && rs.compromises?.length ? h("div", h("div.section-label", "Compromises"), h("ul.reason-list.comp", rs.compromises.map((x) => h("li", x)))) : null,
+    explain && rs.gaps?.length ? h("div", h("div.section-label", "Uncertain or estimated"), h("ul.reason-list", rs.gaps.map((x) => h("li", x)))) : null,
+    r.ingredients_detail ? h("div", h("div.section-label", "Ingredients"),
+      h("ul.ing-list", r.ingredients_detail.map((i) => h("li", i.text || i.name, h("span.small.muted", ` · ≈${Math.round(i.grams)} g`))))) : null,
+    compareWith.length > 1 && visibleCriteria().length ? h("div", h("div.section-label", "Compare"), h("div", { style: { margin: "6px 0" } }, cmpSel), cmpBox) : null);
 }
 
 export function compareTable(a, b) {
+  const showU = can("utility") && a.utility != null && b.utility != null && !Number.isNaN(a.utility);
   return h("table.t",
     h("thead", h("tr", h("th", ""), h("th.num", a.title), h("th.num", b.title), h("th.num", "Δ"))),
-    h("tbody", CRIT.map((k) => {
+    h("tbody", visibleCriteria().map((k) => {
       const x = a.scores[k], y = b.scores[k];
       const d = x == null || y == null ? null : x - y;
       return h("tr", h("td", CRIT_META[k].long), h("td.num", f2(x)), h("td.num", f2(y)),
         h("td.num" + (d > 0.04 ? ".delta-up" : d < -0.04 ? ".delta-down" : ""), d == null ? "–" : (d > 0 ? "+" : "") + f2(d)));
-    }), h("tr", h("td", h("b", "Utility")), h("td.num", h("b", f2(a.utility))), h("td.num", h("b", f2(b.utility))),
-      h("td.num", (a.utility - b.utility > 0 ? "+" : "") + f2(a.utility - b.utility)))));
+    }), showU ? h("tr", h("td", h("b", "Utility")), h("td.num", h("b", f2(a.utility))), h("td.num", h("b", f2(b.utility))),
+      h("td.num", (a.utility - b.utility > 0 ? "+" : "") + f2(a.utility - b.utility))) : null));
 }
 
 export function changeSummary(cmp, titles) {

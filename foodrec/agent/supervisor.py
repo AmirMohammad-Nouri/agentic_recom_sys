@@ -29,6 +29,7 @@ HELP = ("I can suggest five recipes (\"something with lentils and few ingredient
 class Ctx:
     user_id: str
     trace: Trace
+    blocked: frozenset = frozenset()  # skills this user's access role does not allow
 
 
 class Supervisor:
@@ -48,7 +49,7 @@ class Supervisor:
     def chat(self, user_id, text, sink=None, think=None):
         app = self.app
         trace = Trace(sink)
-        ctx = Ctx(user_id, trace)
+        ctx = Ctx(user_id, trace, frozenset(app.access(user_id)["blocked_skills"]))
         app.store.add_message(user_id, "user", text)
         llm_ok = bool(app.llm.status().get("available")) if hasattr(app.llm, "status") else False
 
@@ -83,12 +84,14 @@ class Supervisor:
         results = []
         for name, args in plan:
             results.append((name, self._run_skill(ctx, name, args)))
+        if plan and all(name in ctx.blocked for name, _ in plan):
+            return self._finish(ctx, "That is not available with your access settings.", {}, [], [], text)
 
         # 5. bounded follow-up chosen by the model (or by rule when offline)
         steps = len(plan)
         while steps < self.app.s.max_agent_steps:
             nxt = self._next_step(ctx, intent, results, text, llm_ok)
-            if nxt is None:
+            if nxt is None or nxt[0] in ctx.blocked:
                 break
             results.append((nxt[0], self._run_skill(ctx, *nxt)))
             steps += 1
@@ -226,6 +229,11 @@ class Supervisor:
 
     def _run_skill(self, ctx, name, args):
         tr = ctx.trace
+        if name in ctx.blocked:
+            from .skills import SkillResult
+            tr.step("check", f"{name} is not available", "Your access role does not include this; the step is "
+                    "skipped (see the Config page, Access roles).", source="access")
+            return SkillResult(f"{name} not available", {}, ["That is not available with your access settings."])
         s = tr.start("tool", f"{name}", ", ".join(f"{k}={_short(v)}" for k, v in args.items() if v not in (None, [], {})),
                      source="skill", data={"skill": name, "args": args})
         try:

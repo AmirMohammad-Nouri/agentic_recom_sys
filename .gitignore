@@ -14,3 +14,6 @@ foodrec.db
 foodrec_v2.db
 data/hummus/*.xlsx
 data/hummus/labels_rules.json
+out/
+data/*/runtime/
+*.config.json.tmp

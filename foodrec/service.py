@@ -5,6 +5,7 @@ and (3) is projected into the knowledge graph. Saved goals and mandatory constra
 ONLY through explicit user actions (saving, or accepting a supervisor proposal); the
 supervisor and the learner never write them.
 """
+import hashlib
 import json
 import logging
 import threading
@@ -13,6 +14,8 @@ import time
 from collections import Counter
 
 from . import CRITERION_LABELS, TASTE_SHARE, VALUE_CRITERIA
+from .access import snapshot
+from .appconfig import FIELDS, AppConfig
 from .catalogue import Catalogue, read_payload
 from .compare import compare
 from .constraints import SUPPORTED_ALLERGENS, SUPPORTED_DIETS, active_constraints, validate_declared
@@ -27,6 +30,9 @@ from .router import MODES
 from .store import Store
 
 log = logging.getLogger("foodrec.service")
+# Interface events the client reports (page views, panels opened); logged for studies only.
+UI_EVENTS = ("page_view", "details_opened", "assistant_opened", "assistant_closed", "export_downloaded",
+             "suggestion_clicked", "session_start")
 LEARNER_EVENTS = ("profile_created", "profile_updated", "goal_saved", "proposal_accepted", "feedback",
                   "profile_correction", "question_answered")
 FEEDBACK_TYPES = ("like", "save", "choose", "reject")
@@ -42,6 +48,8 @@ MEAL_CONTEXTS = {"breakfast": ["breakfast"], "lunch": ["main", "salad", "soup", 
 class App:
     def __init__(self, settings, llm=None):
         self.s = settings
+        self.cfg = getattr(settings, "config", None) or AppConfig({})
+        self.restart_pending = []
         self.lock = threading.RLock()
         self.store = Store(settings.db_path)
         self.catalogue, self.catalogue_import = self._load_catalogue(settings.catalogue_path)
@@ -99,7 +107,101 @@ class App:
                             "health_goals": [{"id": k, "label": v["label"]} for k, v in GOALS.items()],
                             "reject_reasons": REJECT_REASONS, "choose_reasons": CHOOSE_REASONS,
                             "feedback_scopes": SCOPES},
-                "criteria": CRITERION_LABELS, "value_criteria": VALUE_CRITERIA, "taste_share": TASTE_SHARE}
+                "criteria": CRITERION_LABELS, "value_criteria": VALUE_CRITERIA, "taste_share": TASTE_SHARE,
+                "top_k": self.s.top_k,
+                "study": {k: self.cfg.study.get(k) for k in ("name", "description", "registration")},
+                "config": {"path": str(self.cfg.path) if self.cfg.path else None, "version": self.cfg.version,
+                           "restart_pending": self.restart_pending}}
+
+    # ---- access roles and study registration ---------------------------------------------
+    def access(self, user_id):
+        """Role, features and visible criteria of a user (see appconfig.AppConfig.access)."""
+        return self.cfg.access(user_id, self.store.assigned_role(user_id))
+
+    def _is_admin(self, user_id):
+        return self.access(user_id)["features"]["configure"]
+
+    def registration(self, user_id):
+        """May this user (still) complete onboarding? {"allowed": bool, "reason": str|None}."""
+        if self.store.profile(user_id) or self._is_admin(user_id):
+            return {"allowed": True, "reason": None}
+        st, listed = self.cfg.study, user_id in (self.cfg.data["access"].get("users") or {})
+        name = st.get("name") or "this study"
+        reg = st.get("registration", "open")
+        if reg == "closed":
+            return {"allowed": False, "reason": f"Registration for {name} is closed."}
+        if reg == "listed_only" and not listed:
+            return {"allowed": False, "reason": f"The user id '{user_id}' is not registered for {name}. "
+                                                "Check the id you were given."}
+        mu = st.get("max_users")
+        if mu and not listed:
+            n = sum(1 for u in self.store.onboarded_users() if not self._is_admin(u))
+            if n >= mu:
+                return {"allowed": False, "reason": f"{name[0].upper() + name[1:]} is full ({mu} participants)."}
+        return {"allowed": True, "reason": None}
+
+    def _assign_role(self, user_id):
+        """Store a role for a new participant when the study assigns roles (round robin or
+        seeded random). Users named in access.users and the "default" method store nothing."""
+        cfg = self.cfg
+        if user_id in (cfg.data["access"].get("users") or {}) or self.store.assigned_role(user_id):
+            return
+        st = cfg.study
+        method = st.get("assignment", "default")
+        roles = [r for r in st.get("assign_roles") or [] if r in cfg.roles]
+        if method == "round_robin" and roles:
+            counts = self.store.role_counts()
+            role = min(roles, key=lambda r: (counts.get(r, 0), roles.index(r)))
+        elif method == "random" and roles:
+            digest = hashlib.sha256(f"{st.get('seed', 7)}:{user_id}".encode()).digest()
+            role = roles[int.from_bytes(digest[:4], "big") % len(roles)]
+        else:
+            return
+        self.store.assign_role(user_id, role, method)
+
+    def set_role(self, user_id, role):
+        """Admin: store a role for a user (an entry in access.users still takes precedence)."""
+        if role not in self.cfg.roles:
+            raise ValueError(f"unknown role '{role}'")
+        self.store.assign_role(user_id, role, "admin")
+        return self.access(user_id)
+
+    def apply_config(self, cfg):
+        """Use a newly saved config: access and study rules and "live" settings apply at once;
+        returns the settings that need a restart."""
+        from .config import Settings
+        from .appconfig import coerce, resolve_path
+        fresh = Settings()  # environment and defaults, for settings the file leaves unset
+        pending = []
+        for f in FIELDS:
+            v = coerce(f, cfg.value(f["section"], f["key"]))
+            if v is None:
+                v = getattr(fresh, f["attr"])
+            elif f["type"] == "path":
+                v = resolve_path(v)
+            cur = getattr(self.s, f["attr"])
+            if cur == v:
+                continue
+            if f["apply"] == "live":
+                setattr(self.s, f["attr"], v)
+                self.s.sources[f["attr"]] = "config"
+            else:
+                pending.append({"setting": f"{f['section']}.{f['key']}", "label": f["label"],
+                                "running": str(cur), "saved": str(v)})
+        if hasattr(self.llm, "model") and hasattr(self.llm, "s"):
+            self.llm.model = self.s.llm_model
+            self.llm._status = None
+        self.cfg = cfg
+        self.s.config = cfg
+        self.restart_pending = pending
+        return pending
+
+    def log_ui_event(self, user_id, kind, data=None):
+        if kind not in UI_EVENTS:
+            raise ValueError(f"ui event must be one of {UI_EVENTS}")
+        ev = self.store.append_event(user_id, "ui", {"kind": kind, **(data or {}),
+                                                     "role": self.access(user_id)["role"]})
+        return {"event_id": ev["event_id"]}
 
     def _common_ingredients(self, min_recipes=5):
         if not hasattr(self, "_ing_vocab"):
@@ -153,6 +255,7 @@ class App:
         prof = self.store.profile(user_id)
         goal = self.store.goal(user_id)
         return {"user_id": user_id, "onboarded": prof is not None,
+                "access": self.access(user_id), "registration": self.registration(user_id),
                 "profile": prof, "goal": goal,
                 "constraints": [{"code": c, "label": l} for c, l in active_constraints(prof["declared"])] if prof else [],
                 "open_decisions": self.store.decisions(user_id, status="open", limit=20)}
@@ -170,8 +273,14 @@ class App:
         validate_declared(out)
         return out
 
-    def onboard(self, user_id, declared, weights=None, diversity=0.3, mode="lightweight"):
+    def onboard(self, user_id, declared, weights=None, diversity=None, mode=None):
+        reg = self.registration(user_id)
+        if not reg["allowed"]:
+            raise PermissionError(reg["reason"])
+        diversity = self.s.default_diversity if diversity is None else diversity
+        mode = mode or self.s.default_mode
         with self.lock:
+            self._assign_role(user_id)
             declared = self._clean_declared(declared)
             w, _ = resolve_weights(weights or DEFAULT_WEIGHTS)
             pv = self.store.save_profile(user_id, declared, "onboarding")
@@ -248,12 +357,12 @@ class App:
                "diversity": goal["diversity"] if overrides.get("diversity") is None else overrides["diversity"],
                "mode": overrides.get("mode") or goal["mode"],
                "request_filters": overrides.get("request_filters") or [],
-               "last_valid_weights": goal["weights"], "k": 5,
+               "last_valid_weights": goal["weights"], "k": int(getattr(self.s, "top_k", 5)),
                "max_missing_share": getattr(self.s, "max_missing_share", 0.5)}
         with self.lock:
             res = public(recommend(self.catalogue, self.scaler, self.learner(user_id), prof["declared"], cfg,
                                    now=now, cache=self.score_cache))
-        res.update({"origin": origin, "user_id": user_id,
+        res.update({"origin": origin, "user_id": user_id, "access": snapshot(self.access(user_id)),
                     "versions": {**res["versions"], "profile": prof["version"], "goal": goal["version"]},
                     "goal_weights": goal["weights"],
                     "weights_source": f"saved goal v{goal['version']}, {today_note}" if today_note else
@@ -385,7 +494,8 @@ class App:
         scope = scope or "lasting"
         if scope not in SCOPES:
             raise ValueError(f"scope must be one of {SCOPES}")
-        pl = {"type": ftype, "recipe_id": recipe_id, "reason": reason, "request_id": request_id, "scope": scope}
+        pl = {"type": ftype, "recipe_id": recipe_id, "reason": reason, "request_id": request_id, "scope": scope,
+              "role": self.access(user_id)["role"]}
         with self.lock:
             if self.learner(user_id).is_duplicate(pl):
                 return {"event_id": None, "duplicate": True, "trail": []}

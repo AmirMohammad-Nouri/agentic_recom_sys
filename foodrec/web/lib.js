@@ -100,19 +100,46 @@ export function icon(name, cls = "") {
 }
 
 // ---- API ------------------------------------------------------------------------------
+// Every request names the user (the server checks that user's access role) and, when one was
+// entered on the Config page, the admin token.
+export function headers(json = false) {
+  const hd = { "X-User": state.user };
+  const tok = sessionGet("foodrec.admin_token");
+  if (tok) hd["X-Admin-Token"] = tok;
+  if (json) hd["Content-Type"] = "application/json";
+  return hd;
+}
+
 export async function api(path, { method = "GET", body } = {}) {
-  const res = await fetch(path, {
-    method, headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const res = await fetch(path, { method, headers: headers(!!body), body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(data.error || data.detail || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   return data;
+}
+
+// Download a file from the API (exports), keeping the auth headers.
+export async function download(path) {
+  const res = await fetch(path, { headers: headers() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+  }
+  const name = (res.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || "foodrec-export";
+  const url = URL.createObjectURL(await res.blob());
+  const a = h("a", { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 // Read a newline-delimited JSON stream, calling onItem for each object.
 export async function stream(path, body, onItem) {
-  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const res = await fetch(path, { method: "POST", headers: headers(true), body: JSON.stringify(body) });
   if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
   const reader = res.body.getReader();
   const dec = new TextDecoder();
@@ -145,6 +172,23 @@ export function userPath(p = "") { return `/api/users/${encodeURIComponent(state
 
 export function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 export function safeSet(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } }
+export function sessionGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
+export function sessionSet(k, v) {
+  try { if (v) sessionStorage.setItem(k, v); else sessionStorage.removeItem(k); } catch { /* storage unavailable */ }
+}
+
+// ---- access role (set by the Config page; enforced by the server too) --------------------
+export function can(feature) { return state.user_state?.access?.features?.[feature] !== false; }
+export function visibleCriteria(keys = CRIT) {
+  const vis = state.user_state?.access?.visible_criteria;
+  return vis ? keys.filter((k) => vis.includes(k)) : keys;
+}
+// Report an interface interaction for the study log (fire and forget).
+export function track(kind, data = {}) {
+  if (!state.user_state?.onboarded) return;
+  fetch(userPath("/ui-events"), { method: "POST", headers: headers(true), body: JSON.stringify({ kind, ...data }) })
+    .catch(() => {});
+}
 
 // ---- formatting --------------------------------------------------------------------------
 export const f2 = (x) => (x === null || x === undefined ? "–" : Number(x).toFixed(2));

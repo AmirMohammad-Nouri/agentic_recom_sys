@@ -1,13 +1,14 @@
 // The assistant, docked on every page: chat with the supervisor, plus its activity feed and
 // open questions. It stays open across pages; recipe cards can send questions to it.
-import { api, ago, clear, emit, f2, grade, h, human, icon, on, richText, safeGet, safeSet, state, stream, toast, userPath } from "./lib.js";
+import { api, ago, can, clear, emit, f2, grade, h, human, icon, on, richText, safeGet, safeSet, state, stream, toast, track, userPath } from "./lib.js";
 import { changeSummary, compareTable, decisionCard, personalFits, scoreBreakdown } from "./components.js";
 import { traceView } from "./trace.js";
 
-const SUGGEST = ["Something easy with few ingredients", "Why is #1 first?", "Compare #1 and #2",
-  "What if I cared more about sustainability?", "More convenient, with only a small reduction in healthiness",
-  "What do you know about me?",
-  "How is healthiness calculated?", "What did I reject this week?"];
+// [text, feature it needs]: suggestions the user's role cannot use are not offered.
+const SUGGEST = [["Something easy with few ingredients"], ["Why is #1 first?", "explanations"], ["Compare #1 and #2", "explanations"],
+  ["What if I cared more about sustainability?", "weight_controls"], ["More convenient, with only a small reduction in healthiness", "weight_controls"],
+  ["What do you know about me?", "explanations"],
+  ["How is healthiness calculated?"], ["What did I reject this week?"]];
 
 const feed = []; // supervisor activity for this session: {title, steps, ts}
 export function pushFeed(item) { feed.push(item); renderFeed?.(); }
@@ -18,8 +19,9 @@ function attachments(a) {
   const res = a.result;
   if (res?.results?.length) {
     out.push(h("div.mini-recipes", res.results.map((r) => h("div.mini",
-      h("div.row.between", h("span.t", `#${r.final_rank} ${r.title}`), grade(r.health_grade)),
-      h("div.small.muted", `${r.cuisine === "Other" ? human(r.meal) : r.cuisine} · ${r.n_ingredients} ingredients · utility ${f2(r.utility)}`),
+      h("div.row.between", h("span.t", `#${r.final_rank} ${r.title}`), r.health_grade !== undefined ? grade(r.health_grade) : null),
+      h("div.small.muted", [r.cuisine === "Other" ? human(r.meal) : r.cuisine, r.n_ingredients != null && can("food_details") ? `${r.n_ingredients} ingredients` : null,
+        r.utility != null ? `utility ${f2(r.utility)}` : null].filter(Boolean).join(" · ")),
       h("div.small", { style: { marginTop: "4px", color: "var(--text-2)" } }, personalFits(r)[0] || r.reasons.ranked_here[0] || "")))));
     if (res.config.request_filters?.length) {
       out.push(h("div.row.wrap", res.config.request_filters.map((f) => h("span.tag.info", { title: "Applied to this request only; not saved" }, f.label)),
@@ -48,6 +50,13 @@ function attachments(a) {
   for (const d of a.decisions || []) out.push(decisionCard(d));
   return out.length ? h("div.attach", out) : null;
 }
+
+// Without the "agent_trace" feature the answer appears without the step-by-step trace.
+function plainProgress() {
+  const el = h("div.small.muted", { style: { margin: "4px 0" } }, h("span.spinner"), " Working…");
+  return { el, add() {}, update() {}, token() {}, done() { el.remove(); } };
+}
+const newTrace = (opts) => (can("agent_trace") ? traceView(opts) : plainProgress());
 
 function assistantMsg(m, tv) {
   return h("div.msg-assistant",
@@ -78,8 +87,8 @@ export function mountDock() {
     for (const m of msgs.slice(-30)) {
       if (m.role === "user") log.append(h("div.msg-user", m.text));
       else {
-        const tv = traceView({ steps: m.trace });
-        tv.done({ elapsed_ms: m.trace.length ? m.trace[m.trace.length - 1].t_ms : 0 });
+        const tv = can("agent_trace") && m.trace.length ? traceView({ steps: m.trace }) : null;
+        tv?.done({ elapsed_ms: m.trace[m.trace.length - 1].t_ms });
         log.append(assistantMsg(m, tv));
       }
     }
@@ -90,8 +99,10 @@ export function mountDock() {
     return h("div.dock-intro",
       h("div.dock-intro-mark", icon("spark")),
       h("h3", "Ask the assistant"),
-      h("p", "It plans which tools to use, shows every step while it works, and only states what the recorded evidence supports."),
-      h("div.suggestions", SUGGEST.map((s) => h("button.chip", { onclick: () => send(s) }, s))));
+      h("p", can("agent_trace") ? "It plans which tools to use, shows every step while it works, and only states what the recorded evidence supports."
+        : "Ask for recipes or about how the app works."),
+      h("div.suggestions", SUGGEST.filter(([, f]) => !f || can(f)).map(([s]) => h("button.chip", {
+        onclick: () => { track("suggestion_clicked", { text: s }); send(s); } }, s))));
   }
 
   async function send(preset) {
@@ -102,12 +113,12 @@ export function mountDock() {
     input.value = ""; input.style.height = "";
     if (log.querySelector(".dock-intro")) clear(log);
     log.append(h("div.msg-user", text));
-    const tv = traceView({ live: true });
+    const tv = newTrace({ live: true });
     const slot = assistantMsg(null, tv);
     log.append(slot);
     scrollEnd();
     try {
-      await stream(userPath("/chat"), { text, think: think.checked }, (ev) => {
+      await stream(userPath("/chat"), { text, think: can("agent_trace") && think.checked }, (ev) => {
         if (ev.type === "step") tv.add(ev.step);
         else if (ev.type === "step_update") tv.update(ev.step);
         else if (ev.type === "model_token") tv.token(ev.id, ev.text);
@@ -157,6 +168,7 @@ export function mountDock() {
   const badge = h("span.count.hidden");
   const setBadge = (n) => { badge.textContent = n; badge.classList.toggle("hidden", !n); fabBadge.textContent = n; fabBadge.classList.toggle("hidden", !n); };
   const tabs = [h("button.on", { onclick: () => tab(0) }, "Chat"), h("button", { onclick: () => tab(1) }, "Supervisor", badge)];
+  if (!can("supervisor")) tabs[1].classList.add("hidden");
   function tab(i) {
     tabs.forEach((t, j) => t.classList.toggle("on", i === j));
     chatPane.classList.toggle("hidden", i !== 0);
@@ -169,7 +181,7 @@ export function mountDock() {
     h("div.composer-box", input, sendBtn),
     h("div.composer-foot",
       h("span.row.small.muted", h("span.dot." + (llm.available ? "ok" : "warn")), llm.available ? llm.model : "rule-based"),
-      h("label.switch", { title: "Stream the model's own reasoning into the timeline (slower; shown as unverified)" }, think, "Show reasoning"),
+      can("agent_trace") ? h("label.switch", { title: "Stream the model's own reasoning into the timeline (slower; shown as unverified)" }, think, "Show reasoning") : null,
       h("span.grow"),
       h("button.btn.ghost.sm", { onclick: async () => { await api(userPath("/messages"), { method: "DELETE" }); load(); } }, "Clear")));
   const dock = h("aside.dock", { "aria-label": "Assistant" },
@@ -182,7 +194,8 @@ export function mountDock() {
   const fab = h("button.dock-fab", { onclick: () => toggle(true), title: "Open the assistant", "aria-label": "Open the assistant" }, icon("spark"), h("span", "Ask"), fabBadge);
   document.body.append(dock, fab);
 
-  function toggle(open) {
+  function toggle(open, user = true) {
+    if (user && open !== document.body.classList.contains("dock-open")) track(open ? "assistant_opened" : "assistant_closed");
     document.body.classList.toggle("dock-open", open);
     safeSet("foodrec.dock", open ? "1" : "0");
     if (open) { if (!loaded) load(); setTimeout(() => input.focus(), 50); }
@@ -203,6 +216,6 @@ export function mountDock() {
   renderFeed();
   loadDecisions();
   const saved = safeGet("foodrec.dock");
-  toggle(window.innerWidth >= 1100 && (saved === null || saved === "1"));
+  toggle(window.innerWidth >= 1100 && (saved === null || saved === "1"), false);
   return { toggle, send };
 }

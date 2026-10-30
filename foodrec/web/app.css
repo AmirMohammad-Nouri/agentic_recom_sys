@@ -498,3 +498,11 @@ tr.muted td { color: var(--muted); }
 .limit-row input[type=number] { width: 72px; }
 .two-col > .card { overflow-x: auto; }
 table.t .seg button { padding: 3px 7px; font-size: 11.5px; }
+
+/* ---- Config page ---------------------------------------------------------------------- */
+.cfg-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 6px 18px; padding: 10px 0; border-top: 1px solid var(--border); }
+.cfg-field:first-child { border-top: 0; padding-top: 0; }
+.cfg-field .tag { font-size: 10.5px; }
+.matrix td.num, .matrix th.num { text-align: center; }
+.matrix td:first-child { min-width: 220px; }
+@media (max-width: 900px) { .cfg-field { grid-template-columns: minmax(0, 1fr); } }

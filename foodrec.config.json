@@ -1,0 +1,172 @@
+{
+  "$comment": "FoodRec configuration. Edit here or on the Config page (admin role). Precedence: built-in default < environment/.env < this file; null means 'use the environment or the default'. Secrets (NEO4J_PASSWORD, FOODREC_ADMIN_TOKEN) stay in the environment. See docs/configuration.md.",
+  "config_version": 1,
+  "llm": {
+    "enabled": true,
+    "url": null,
+    "model": "qwen3.5:2b-q4_K_M",
+    "ctx": 8192,
+    "think": false,
+    "timeout_s": 60.0,
+    "seed": 7,
+    "embed_model": "nomic-embed-text",
+    "embed_on_cpu": true
+  },
+  "dataset": {
+    "catalogue_path": "data/hummus/catalogue.json.gz",
+    "knowledge_dir": "data/knowledge",
+    "data_dir": "data/runtime"
+  },
+  "services": {
+    "neo4j_uri": null,
+    "neo4j_user": null,
+    "neo4j_database": null,
+    "qdrant": null
+  },
+  "ranking": {
+    "top_k": 5,
+    "default_diversity": 0.3,
+    "default_mode": "lightweight",
+    "max_missing_share": 0.5,
+    "min_nutrient_coverage": 0.6
+  },
+  "supervisor": {
+    "max_agent_steps": 3
+  },
+  "access": {
+    "default_role": "full",
+    "roles": {
+      "admin": {
+        "label": "Administrator",
+        "description": "Everything, including this Config page.",
+        "features": {
+          "assistant": true,
+          "agent_trace": true,
+          "explanations": true,
+          "score_breakdown": true,
+          "utility": true,
+          "food_details": true,
+          "images": true,
+          "feedback": true,
+          "supervisor": true,
+          "weight_controls": true,
+          "page_insights": true,
+          "page_knowledge": true,
+          "page_activity": true,
+          "page_profile": true,
+          "export_own": true,
+          "switch_user": true,
+          "configure": true
+        },
+        "visible_criteria": [
+          "p",
+          "h",
+          "s",
+          "t"
+        ],
+        "blocked_skills": []
+      },
+      "full": {
+        "label": "Full transparency",
+        "description": "All explanations, scores and the assistant.",
+        "features": {
+          "assistant": true,
+          "agent_trace": true,
+          "explanations": true,
+          "score_breakdown": true,
+          "utility": true,
+          "food_details": true,
+          "images": true,
+          "feedback": true,
+          "supervisor": true,
+          "weight_controls": true,
+          "page_insights": true,
+          "page_knowledge": true,
+          "page_activity": true,
+          "page_profile": true,
+          "export_own": true,
+          "switch_user": true,
+          "configure": false
+        },
+        "visible_criteria": [
+          "p",
+          "h",
+          "s",
+          "t"
+        ],
+        "blocked_skills": []
+      },
+      "no_explanations": {
+        "label": "No explanations",
+        "description": "Scores and the assistant, but no why-reasons, traces or score breakdowns.",
+        "features": {
+          "assistant": true,
+          "agent_trace": false,
+          "explanations": false,
+          "score_breakdown": false,
+          "utility": true,
+          "food_details": true,
+          "images": true,
+          "feedback": true,
+          "supervisor": true,
+          "weight_controls": true,
+          "page_insights": true,
+          "page_knowledge": true,
+          "page_activity": true,
+          "page_profile": true,
+          "export_own": true,
+          "switch_user": true,
+          "configure": false
+        },
+        "visible_criteria": [
+          "p",
+          "h",
+          "s",
+          "t"
+        ],
+        "blocked_skills": []
+      },
+      "baseline": {
+        "label": "Baseline list",
+        "description": "A plain list of recipes with food details and feedback buttons. No assistant, scores, explanations or supervisor.",
+        "features": {
+          "assistant": false,
+          "agent_trace": false,
+          "explanations": false,
+          "score_breakdown": false,
+          "utility": false,
+          "food_details": true,
+          "images": true,
+          "feedback": true,
+          "supervisor": false,
+          "weight_controls": false,
+          "page_insights": false,
+          "page_knowledge": false,
+          "page_activity": false,
+          "page_profile": true,
+          "export_own": true,
+          "switch_user": false,
+          "configure": false
+        },
+        "visible_criteria": [],
+        "blocked_skills": []
+      }
+    },
+    "users": {
+      "admin": "admin",
+      "demo": "admin"
+    }
+  },
+  "study": {
+    "name": "",
+    "description": "",
+    "registration": "open",
+    "max_users": null,
+    "assignment": "default",
+    "assign_roles": [
+      "full",
+      "baseline"
+    ],
+    "seed": 7
+  }
+}

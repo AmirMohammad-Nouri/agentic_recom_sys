@@ -1,0 +1,23 @@
+{
+  "name": "model_comparison",
+  "description": "The same conversation for comparing supervisor models. Run it once per model: foodrec scenario run scenarios/model_comparison.json --matrix llm.model=qwen3.5:2b-q4_K_M,qwen3:4b — each report records which skills the model planned, whether its wording passed validation (method 'model') or fell back to the template, and how long each turn took.",
+  "user": "mira",
+  "config": {"llm": {"enabled": true}},
+  "steps": [
+    {"action": "onboard", "declared": {"allergens": ["peanuts"], "preferred_cuisines": ["Italian"], "health_goal": "heart_health"},
+     "weights": {"h": 0.5, "s": 0.3, "t": 0.2}},
+    {"action": "recommend"},
+    {"action": "chat", "text": "Why is #1 recommended?"},
+    {"action": "expect", "that": "chat.skills", "contains": "explain_recipe", "label": "understood: explain #1"},
+    {"action": "chat", "text": "Compare #1 and #3"},
+    {"action": "expect", "that": "chat.skills", "contains": "compare_recipes", "label": "understood: compare"},
+    {"action": "chat", "text": "Something vegetarian with few ingredients"},
+    {"action": "expect", "that": "chat.skills", "contains": "recommend", "label": "understood: new request"},
+    {"action": "chat", "text": "What if sustainability mattered more to me?"},
+    {"action": "expect", "that": "chat.skills", "contains": "what_if", "label": "understood: what-if"},
+    {"action": "chat", "text": "How is the sustainability score calculated?"},
+    {"action": "expect", "that": "chat.skills", "contains": "search_knowledge", "label": "understood: method question"},
+    {"action": "chat", "text": "I can't eat fish anymore"},
+    {"action": "expect", "that": "chat.decisions.length", "gte": 1, "label": "understood: profile change to confirm"}
+  ]
+}

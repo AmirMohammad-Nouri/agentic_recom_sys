@@ -53,8 +53,9 @@ Requires Python 3.11+.
 ```bash
 python -m venv .venv && source .venv/bin/activate        # or: uv venv && source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest                                          # 60 tests, no services needed
+python -m pytest                                          # 96 tests, no services needed
 foodrec                                                   # http://127.0.0.1:8000
+foodrec scenario run scenarios/sara_goal_drift.json       # scripted run, report in out/scenarios
 ```
 
 That already works **without any external service**. The status pill in the top bar shows
@@ -315,7 +316,15 @@ modules, no build step; the only external script is the pinned graph renderer (v
 
 ## Configuration and degradation
 
-All settings are environment variables (or `.env`; see `.env.example`).
+**Config file.** `foodrec.config.json` holds the model, dataset, ranking, **access roles** (what each user
+sees: explanations, scores, food details, the assistant ...) and **study** settings (who may register, how
+many, how roles are assigned). The **Config** page edits the same file; it is visible to roles with the
+`configure` feature (`admin` and `demo` by default). `foodrec export` writes the standard per-user study
+output, and `foodrec scenario run` replays scripted JSON scenarios. All of this is described in
+[docs/configuration.md](docs/configuration.md).
+
+Precedence: built-in default < environment / `.env` < config file. `null` in the file leaves a setting to the
+environment variables below. Secrets stay in the environment.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -384,6 +393,9 @@ python -m pytest
   turns (with a scripted fake model), streaming, unsupported-number rejection, confirmation of
   profile changes, one-question-at-a-time, cool-down, proposals with counterfactuals, taste
   conflicts, replay after restart, graph templates, hybrid retrieval, and the HTTP API.
+* `tests/test_config_access.py`: config precedence and validation, role redaction and API enforcement,
+  study registration and round-robin assignment, the config API and admin token, the export, and
+  scenario runs.
 * `tests/test_fixes.py`: regression tests for zero weights, the candidate pool (diversity 0 =
   full-catalogue top five), missing nutrition and coverage, repeated clicks, proposal and
   option normalisation, full event replay, "only today" / "keep my goal", "had it recently"
@@ -400,13 +412,18 @@ is not covered by the automatic tests. Check it with `docker compose up -d neo4j
 ```
 foodrec/
   api.py  service.py  store.py  config.py  llm.py          application, persistence, model client
+  appconfig.py access.py                                   config file, access roles and their enforcement
+  cli.py  export.py  scenario.py                           command line, study export, scenario runner
   engine.py constraints.py features.py ranker.py diversity.py preference.py
   explain.py compare.py router.py telemetry.py learner.py catalogue.py   recommendation core
-  ingest/     build.py parse.py classify.py foodgroups.py               HUMMUS → catalogue file
+  ingest/     build.py parse.py classify.py foodgroups.py simple.py     HUMMUS or your own recipes → catalogue file
   agent/      supervisor.py policy.py skills.py intent.py trace.py
   knowledge/  graph.py neo4j_graph.py retrieval.py documents.py
   web/        index.html app.css app.js lib.js dock.js trace.js components.js views/*.js
+foodrec.config.json                                        the config file (Config page)
+scenarios/    scripted scenario files (foodrec scenario run)
 data/
+  examples/   my_recipes.json: the simple format for your own dataset
   hummus/     hummus_recipes.xlsx, catalogue.json.gz, labels_*.json (label caches)
   fixture/    148-recipe sample used by the tests
   knowledge/  method notes indexed for retrieval
@@ -427,6 +444,8 @@ python -m foodrec.ingest                       # label with your local Qwen via 
 python -m foodrec.ingest --model qwen3.5:4b    # another local model
 python -m foodrec.ingest --no-llm              # keyword rules only, no model needed (~30 s)
 python -m foodrec.ingest --fixture 150         # small sample for the tests
+python -m foodrec.ingest --recipes data/examples/my_recipes.json --name my_study \
+       --out data/my_study/catalogue.json.gz  # your own dataset (docs/configuration.md)
 ```
 
 What the build does, per recipe:

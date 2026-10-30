@@ -1,0 +1,41 @@
+{
+  "name": "sara_goal_drift",
+  "description": "Sara says 'green and healthy' but behaves 'busy': she keeps choosing the most convenient dish and rejecting the least convenient one. The supervisor should notice the drift and ask or propose, and nothing changes until she accepts.",
+  "user": "sara",
+  "config": {"llm": {"enabled": false}},
+  "steps": [
+    {"action": "onboard", "label": "Onboarding: peanut allergy, vegetarian, sustainability first",
+     "declared": {"allergens": ["peanuts"], "diets": ["vegetarian"], "preferred_cuisines": ["Indian", "Mediterranean"],
+                  "liked_ingredients": ["chickpeas"], "disliked_ingredients": [{"name": "eggplant", "strict": false}],
+                  "health_goal": "eat_healthier"},
+     "weights": {"h": 0.35, "s": 0.50, "t": 0.15}},
+    {"action": "recommend", "meal": "dinner"},
+    {"action": "expect", "that": "result.results.length", "equals": 5, "label": "five dinner recipes"},
+    {"action": "chat", "text": "Why is #1 recommended?"},
+    {"action": "expect", "that": "chat.skills", "contains": "explain_recipe"},
+    {"action": "chat", "text": "What if I cared more about convenience?"},
+    {"action": "expect", "that": "chat.skills", "contains": "what_if"},
+    {"action": "expect", "that": "state.goal.version", "equals": 1, "label": "a what-if never saves the goal"},
+
+    {"action": "note", "text": "Behaviour phase: choose the most convenient dish, reject the least convenient one"},
+    {"action": "repeat", "times": 8, "steps": [
+      {"action": "recommend", "meal": "dinner"},
+      {"action": "feedback", "recipe": "best:t", "type": "choose", "reason": "easy", "context": {"meal": "dinner", "place": "home"}},
+      {"action": "feedback", "recipe": "worst:t", "type": "reject", "reason": "too_complicated", "context": {"meal": "dinner", "place": "home"}}
+    ]},
+    {"action": "insight"},
+    {"action": "expect", "that": "insight.observed.t", "gt": 0.15, "label": "revealed convenience weight is above the saved 0.15"},
+    {"action": "expect", "that": "state.goal.version", "equals": 1, "label": "feedback alone never changes the saved goal"},
+    {"action": "review"},
+    {"action": "expect", "that": "review.status", "in": ["question", "proposal", "conflict", "cooldown", "aligned", "uncertain", "drift"],
+     "label": "the supervisor reached a decision state"},
+    {"action": "chat", "text": "Why do you think convenience matters to me?"},
+    {"action": "expect", "that": "chat.skills", "contains": "explain_preference"},
+    {"action": "chat", "text": "More convenient, with only a small reduction in healthiness"},
+    {"action": "expect", "that": "open_decisions.length", "gte": 1, "label": "goal options are offered"},
+    {"action": "resolve", "decision": "latest:goal_options", "do": "accept", "answer": "o1"},
+    {"action": "expect", "that": "state.goal.version", "equals": 2, "label": "accepting creates goal v2"},
+    {"action": "recommend", "meal": "dinner"},
+    {"action": "expect", "that": "result.comparison", "exists": true, "label": "the new list is compared with the previous one"}
+  ]
+}

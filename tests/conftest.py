@@ -1,9 +1,13 @@
+import os
 import sys
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
+# Tests use the built-in defaults, never the repository's foodrec.config.json.
+os.environ["FOODREC_CONFIG"] = "none"
+os.environ.pop("FOODREC_ADMIN_TOKEN", None)
 
 from fakes import FakeLLM  # noqa: E402
 

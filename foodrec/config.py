@@ -1,4 +1,5 @@
-"""Runtime settings, read once from environment variables (see .env.example).
+"""Runtime settings: built-in defaults < environment variables (.env) < the config file
+(foodrec.config.json, see appconfig.py and docs/configuration.md).
 
 Every optional service degrades to a documented local fallback so the demo always runs:
   Ollama missing   -> rule-based intent parsing, template answers, hashing embeddings
@@ -6,11 +7,13 @@ Every optional service degrades to a documented local fallback so the demo alway
   Qdrant missing   -> in-process numpy vector index
 The active backend of each component is reported by GET /api/system and in every trace.
 """
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+log = logging.getLogger("foodrec.config")
 
 
 def _load_dotenv(path=ROOT / ".env"):
@@ -74,6 +77,16 @@ class Settings:
     # Supervisor policy limits.
     max_agent_steps: int = field(default_factory=lambda: int(_env("FOODREC_MAX_STEPS", 3)))
 
+    # List size and the starting goal of new users.
+    top_k: int = field(default_factory=lambda: int(_env("FOODREC_TOP_K", 5)))
+    default_diversity: float = 0.3
+    default_mode: str = "lightweight"
+
+    # Where each setting came from: "default", "env", "config" or "override".
+    sources: dict = field(default_factory=dict)
+    # The AppConfig the settings were read from (access roles and study settings live there).
+    config: object = None
+
     @property
     def db_path(self):
         # v2: three criteria and the HUMMUS catalogue. The v1 database (foodrec.db) is left untouched.
@@ -84,9 +97,38 @@ class Settings:
         return self.data_dir / "qdrant"
 
 
-def load_settings(**overrides):
+def apply_config(s, cfg):
+    """Copy the values the config file sets onto `s` (paths resolved against the repo root).
+    Returns {attr: (old, new)} for the values that changed."""
+    from .appconfig import FIELDS, coerce, resolve_path
+    changed = {}
+    for f in FIELDS:
+        v = coerce(f, cfg.value(f["section"], f["key"]))
+        if v is None:
+            continue
+        if f["type"] == "path":
+            v = resolve_path(v)
+        old = getattr(s, f["attr"])
+        if old != v:
+            env = f.get("env") and os.environ.get(f["env"])
+            if env and s.sources.get(f["attr"]) == "env":
+                log.info("%s.%s from the config file overrides %s", f["section"], f["key"], f["env"])
+            changed[f["attr"]] = (old, v)
+            setattr(s, f["attr"], v)
+        s.sources[f["attr"]] = "config"
+    return changed
+
+
+def load_settings(config=None, **overrides):
+    """`config`: an AppConfig, or None to read the file named by FOODREC_CONFIG (default
+    foodrec.config.json; FOODREC_CONFIG=none disables it). `overrides` win over everything."""
+    from .appconfig import FIELDS, AppConfig
     s = Settings()
+    s.sources = {f["attr"]: ("env" if f.get("env") and os.environ.get(f["env"]) else "default") for f in FIELDS}
+    s.config = config if config is not None else AppConfig.load()
+    apply_config(s, s.config)
     for k, v in overrides.items():
         setattr(s, k, v)
+        s.sources[k] = "override"
     s.data_dir.mkdir(parents=True, exist_ok=True)
     return s

@@ -92,6 +92,12 @@ CREATE TABLE IF NOT EXISTS recipes (
     pos INTEGER NOT NULL,
     recipe_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS role_assignments (
+    user_id TEXT PRIMARY KEY,
+    role TEXT NOT NULL,
+    method TEXT NOT NULL,
+    assigned_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS documents (
     doc_id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -157,6 +163,43 @@ class Store:
     def users(self):
         with self._conn() as c:
             return [r["user_id"] for r in c.execute("SELECT user_id FROM users ORDER BY created_at")]
+
+    def user_rows(self):
+        """Every user with creation time, onboarding status and stored role assignment."""
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT u.user_id, u.created_at, a.role, a.method, a.assigned_at, "
+                "(SELECT COUNT(*) FROM profile_versions p WHERE p.user_id = u.user_id) AS profiles, "
+                "(SELECT COUNT(*) FROM events e WHERE e.user_id = u.user_id) AS events, "
+                "(SELECT MAX(ts) FROM events e WHERE e.user_id = u.user_id) AS last_ts "
+                "FROM users u LEFT JOIN role_assignments a ON a.user_id = u.user_id ORDER BY u.created_at").fetchall()
+        return [{"user_id": r["user_id"], "created_at": r["created_at"], "onboarded": r["profiles"] > 0,
+                 "assigned_role": r["role"], "assignment_method": r["method"], "assigned_at": r["assigned_at"],
+                 "events": r["events"], "last_active": r["last_ts"]} for r in rows]
+
+    def user_created(self, user_id):
+        with self._conn() as c:
+            r = c.execute("SELECT created_at FROM users WHERE user_id=?", (user_id,)).fetchone()
+        return r["created_at"] if r else None
+
+    # ---- study role assignments ----------------------------------------------------
+    def assigned_role(self, user_id):
+        with self._conn() as c:
+            r = c.execute("SELECT role FROM role_assignments WHERE user_id=?", (user_id,)).fetchone()
+        return r["role"] if r else None
+
+    def assign_role(self, user_id, role, method):
+        self.ensure_user(user_id)
+        with self._conn() as c:
+            c.execute("INSERT OR REPLACE INTO role_assignments VALUES (?,?,?,?)", (user_id, role, method, time.time()))
+
+    def role_counts(self):
+        with self._conn() as c:
+            return {r["role"]: r["n"] for r in c.execute("SELECT role, COUNT(*) AS n FROM role_assignments GROUP BY role")}
+
+    def onboarded_users(self):
+        with self._conn() as c:
+            return [r["user_id"] for r in c.execute("SELECT DISTINCT user_id FROM profile_versions")]
 
     # ---- versioned profile and goal ------------------------------------------------
     def save_profile(self, user_id, declared, source="user", note=None):
@@ -269,6 +312,19 @@ class Store:
             r = c.execute("SELECT result_json FROM requests WHERE request_id=?", (request_id,)).fetchone()
         return None if r is None else json.loads(r["result_json"])
 
+    def requests(self, user_id, limit=None):
+        """Stored request snapshots of one user, oldest first."""
+        q = "SELECT * FROM requests WHERE user_id=? ORDER BY ts"
+        args = [user_id]
+        if limit:
+            q += " LIMIT ?"
+            args.append(limit)
+        with self._conn() as c:
+            rows = c.execute(q, args).fetchall()
+        return [{"request_id": r["request_id"], "ts": r["ts"], "origin": r["origin"],
+                 "profile_version": r["profile_version"], "goal_version": r["goal_version"],
+                 "result": json.loads(r["result_json"])} for r in rows]
+
     def last_list(self, user_id):
         """Most recent snapshot that actually showed recipes (what "#2" refers to)."""
         with self._conn() as c:
@@ -344,6 +400,8 @@ class Store:
         return m
 
     def messages(self, user_id, limit=100):
+        if limit is None:
+            limit = -1  # SQLite: no limit
         with self._conn() as c:
             rows = c.execute("SELECT * FROM messages WHERE user_id=? ORDER BY ts DESC LIMIT ?",
                              (user_id, limit)).fetchall()
