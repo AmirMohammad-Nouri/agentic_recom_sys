@@ -1,1 +1,16 @@
-venv
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.env
+data/runtime/
+foodrec.db
+*.db-wal
+*.db-shm
+.DS_Store
+foodrec_v2.db
+data/hummus/*.xlsx
+data/hummus/labels_rules.json
