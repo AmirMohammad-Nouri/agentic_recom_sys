@@ -9,3 +9,5 @@
   - a "restart" setting, criteria or interactions → the app restarts itself (a few seconds); open pages reconnect.
 
 Open this page from a terminal with `foodrec config open`. It starts the app if needed and opens only the Config page; its link signs you in as administrator on this computer. **Open the app** (top right) replaces the Config page with the app in the same tab. The app has no link back to the Config page: run `foodrec config open` again (it reuses the running app).
+
+`foodrec` opens the app the same way: it starts it only if it is not running yet. `foodrec status` tells whether it runs, `foodrec stop` stops it from any terminal, and `foodrec serve` runs only the server (no browser).

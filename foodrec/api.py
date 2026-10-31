@@ -202,7 +202,7 @@ def create_app(settings=None, llm=None):
     @api.get("/api/system")
     def system():
         return {**core.system(), "skills": sup.skills.catalog(), "thresholds": policy.THRESHOLDS,
-                "boot_id": BOOT_ID, "login_required": login_required(),
+                "boot_id": BOOT_ID, "pid": os.getpid(), "login_required": login_required(),
                 "restarting": getattr(core, "restarting", False)}
 
     def _brief(r):
@@ -613,7 +613,7 @@ def main(host=None, port=None, open_page=None):
                  "on" if settings.auto_reload else "off")
     host, port = host or settings.host, int(port or settings.port)
     if open_page:
-        threading.Timer(1.5, _open_browser, (f"http://{_browser_host(host)}:{port}{open_page}",)).start()
+        threading.Thread(target=_open_when_ready, args=(_browser_host(host), port, open_page), daemon=True).start()
     log.info("Config page: http://%s:%d/config", _browser_host(host), port)
     uvicorn.run(app, host=host, port=port)
 
@@ -622,10 +622,21 @@ def _browser_host(host):
     return "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
 
 
-def _open_browser(url):
+def _open_when_ready(host, port, page, timeout=120):
+    """Open the browser once the server answers (loading a large catalogue can take a while)."""
     import webbrowser
-    print(f"Opening {url}", flush=True)
-    webbrowser.open(url)
+
+    import httpx
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            if httpx.get(f"http://{host}:{port}/api/system", timeout=2.0).status_code == 200:
+                print(f"Opening http://{host}:{port}{page.split('#')[0]}", flush=True)
+                webbrowser.open(f"http://{host}:{port}{page}")
+                return
+        except httpx.HTTPError:
+            pass
+        time.sleep(0.5)
 
 
 if __name__ == "__main__":

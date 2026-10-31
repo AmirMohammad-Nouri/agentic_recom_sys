@@ -54,8 +54,9 @@ Requires Python 3.11+.
 python -m venv .venv && source .venv/bin/activate        # or: uv venv && source .venv/bin/activate
 pip install -e ".[dev]"
 python -m pytest                                          # 108 tests, no services needed
-foodrec                                                   # http://127.0.0.1:8000
+foodrec                                                   # opens http://127.0.0.1:8000 (starts the app if needed)
 foodrec config open                                       # the Config page (model, dataset, criteria, roles, study)
+foodrec status / foodrec stop                             # is it running? stop it from any terminal
 foodrec scenario run scenarios/sara_goal_drift.json       # scripted run, report in out/scenarios
 ```
 

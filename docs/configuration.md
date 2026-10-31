@@ -16,6 +16,22 @@ foodrec config init       # write a fresh file with all defaults (--force to ove
 Every section of the Config page has a **Guide** button with a full explanation (the guides are the
 markdown files in `foodrec/web/guides/`, readable in the repository as well).
 
+## Starting, opening and stopping
+
+| Command | What it does |
+|---|---|
+| `foodrec` (= `foodrec open`) | opens the app in the browser; starts it first if it is not running |
+| `foodrec config open` | opens the Config page; starts the app first if it is not running |
+| `foodrec serve` | runs the server only, without a browser (e.g. on a study server) |
+| `foodrec status` | is the app running, on which port, with which process id |
+| `foodrec stop` | stops the running app, from any terminal |
+
+Only one FoodRec runs per port. If one is already running, `foodrec` and `foodrec config open` just open
+the browser, and `foodrec serve` says so instead of starting a second copy (a second copy could not use
+the port, and would find the embedded vector store locked). If another program uses the port, the command
+says so before loading anything; pick another port with `--port` or `server.port`. All commands accept
+`--host` / `--port`, and `--no-browser` prints the link only.
+
 ## The Config page and reloading
 
 `foodrec config open` checks whether the app is running on the configured host and port. If it is, it

@@ -1,11 +1,13 @@
-"""Command line: foodrec [serve | scenario | export | config | users].
+"""Command line: foodrec [open | serve | status | stop | scenario | export | config | study | users].
 
-    foodrec                                   start the web app (same as: foodrec serve)
+    foodrec                                   open the app in the browser (starts it if it is not running)
+    foodrec config open                       open the Config page (starts the app if it is not running)
+    foodrec serve                             run the server only (no browser), e.g. on a study server
+    foodrec status | stop                     is the app running? stop it (from any terminal)
     foodrec --config study.json serve         use another config file
     foodrec scenario run scenarios/*.json     run scripted scenarios, write reports
     foodrec scenario check scenarios/*.json   validate scenario files without running them
     foodrec export --out study.zip            export every user (JSON or a ZIP of CSV tables)
-    foodrec config open                       open the Config page (starts the app if needed)
     foodrec config show | check | init | path
     foodrec study generate [--write]          create the study population from study.population
     foodrec study list                        participants with their role and password
@@ -24,37 +26,124 @@ def _serve(a, open_page=None):
     main(host=getattr(a, "host", None), port=getattr(a, "port", None), open_page=open_page)
 
 
-def _open(a):
-    """Open the Config page. If the app is already running, only open the browser; otherwise
-    start it here (and keep it running). The link carries this installation's admin token, so
-    the page opens as administrator without choosing a user."""
-    import httpx
-
+def _where(a):
+    """(settings, host, port, host to use in links) for this command."""
     from .appconfig import AppConfig
     from .config import load_settings
-    from .study import admin_link_token
     s = load_settings(config=AppConfig.load())
-    host = a.host or s.host
-    port = a.port or s.port
-    bhost = "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
-    page = f"/config#token={admin_link_token(s.data_dir)}"
+    host = getattr(a, "host", None) or s.host
+    port = int(getattr(a, "port", None) or s.port)
+    return s, host, port, ("127.0.0.1" if host in ("0.0.0.0", "::", "") else host)
+
+
+def probe(host, port):
+    """What answers on host:port: ("foodrec", /api/system data), ("other", None) or ("free", None)."""
+    import socket
+
+    import httpx
     try:
-        running = httpx.get(f"http://{bhost}:{port}/api/system", timeout=2.0).status_code == 200
-    except httpx.HTTPError:
-        running = False
+        r = httpx.get(f"http://{host}:{port}/api/system", timeout=3.0)
+        data = r.json() if r.status_code == 200 else None
+        if isinstance(data, dict) and "boot_id" in data:
+            return "foodrec", data
+    except (httpx.HTTPError, ValueError):
+        pass
+    with socket.socket() as sock:
+        sock.settimeout(1.0)
+        return ("other", None) if sock.connect_ex((host, port)) == 0 else ("free", None)
+
+
+def _port_taken(port, host):
+    print(f"Port {port} on {host} is used by another program, not FoodRec. Stop that program, or use "
+          f"another port: --port 8001 (or server.port in the config file).", file=sys.stderr)
+    return 1
+
+
+def _launch(a, page, what):
+    """Open `page` in the browser. If FoodRec already runs on the configured host and port, only
+    open the browser (no second instance); if the port is free, start the app here (it keeps
+    running in this terminal) and open the page when it is ready."""
+    s, host, port, bhost = _where(a)
     url = f"http://{bhost}:{port}{page}"
-    if running:
-        print(f"FoodRec is running. Config page: {url}")
-        if not a.no_browser:
+    state, info = probe(bhost, port)
+    browser = not getattr(a, "no_browser", False)
+    if state == "foodrec":
+        print(f"FoodRec is already running (pid {info.get('pid', '?')}). {what}: {url.split('#')[0]}")
+        if browser:
             import webbrowser
             webbrowser.open(url)
         return 0
-    print(f"Starting FoodRec on {bhost}:{port}; the Config page opens when it is ready.\n  {url}")
+    if state == "other":
+        return _port_taken(port, bhost)
+    print(f"Starting FoodRec on {bhost}:{port}; {what.lower()} opens when it is ready.\n  {url.split('#')[0]}\n"
+          "Stop it with Ctrl+C here, or `foodrec stop` from another terminal.")
     a.host, a.port = host, port
     # a restart after a config change must not open the browser again: restart as a plain server
     from . import reload
     reload.LAUNCH_ARGV = ["serve", "--host", str(host), "--port", str(port)]
-    return _serve(a, open_page=None if a.no_browser else page)
+    return _serve(a, open_page=page if browser else None)
+
+
+def _open_app(a):
+    return _launch(a, "/", "The app")
+
+
+def _open(a):
+    """The Config page. Its link carries this installation's admin token, so the page opens as
+    administrator without choosing a user."""
+    from .study import admin_link_token
+    s, *_ = _where(a)
+    return _launch(a, f"/config#token={admin_link_token(s.data_dir)}", "The Config page")
+
+
+def _serve_cmd(a):
+    """`foodrec serve`: the server only. A running FoodRec is reported, not duplicated."""
+    s, host, port, bhost = _where(a)
+    state, info = probe(bhost, port)
+    if state == "foodrec":
+        print(f"FoodRec is already running on {bhost}:{port} (pid {info.get('pid', '?')}). "
+              "Use `foodrec stop` first to start it again.")
+        return 0
+    if state == "other":
+        return _port_taken(port, bhost)
+    return _serve(a)
+
+
+def _status(a):
+    s, host, port, bhost = _where(a)
+    state, info = probe(bhost, port)
+    if state == "foodrec":
+        print(f"running   http://{bhost}:{port}   pid {info.get('pid', '?')}   model "
+              f"{(info.get('llm') or {}).get('model')}   catalogue {(info.get('catalogue') or {}).get('recipes')} recipes")
+        return 0
+    print(f"not running on {bhost}:{port}" + (" (the port is used by another program)" if state == "other" else ""))
+    return 1
+
+
+def _stop(a):
+    import signal
+    import time
+    s, host, port, bhost = _where(a)
+    state, info = probe(bhost, port)
+    if state != "foodrec" or not info.get("pid"):
+        print(f"FoodRec is not running on {bhost}:{port}.")
+        return 0 if state == "free" else 1
+    pid = int(info["pid"])
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        print(f"FoodRec answers on {bhost}:{port} but process {pid} is not on this computer.")
+        return 1
+    except PermissionError:
+        print(f"Not allowed to stop process {pid} (started by another user).")
+        return 1
+    for _ in range(50):
+        time.sleep(0.2)
+        if probe(bhost, port)[0] == "free":
+            print(f"Stopped FoodRec (pid {pid}).")
+            return 0
+    print(f"Sent the stop signal to pid {pid}, but port {port} is still in use.")
+    return 1
 
 
 def _study(a):
@@ -193,9 +282,19 @@ def main(argv=None):
     ap.add_argument("--config", help="config file (default foodrec.config.json; 'none' for built-in defaults)")
     sub = ap.add_subparsers(dest="command")
 
-    sp = sub.add_parser("serve", help="start the web app (default)")
+    op = sub.add_parser("open", help="open the app in the browser, starting it if needed (default)")
+    op.add_argument("--host")
+    op.add_argument("--port", type=int)
+    op.add_argument("--no-browser", action="store_true", help="print the link only")
+
+    sp = sub.add_parser("serve", help="run the server only, without opening a browser")
     sp.add_argument("--host")
     sp.add_argument("--port", type=int)
+
+    for name, text in (("status", "is the app running?"), ("stop", "stop the running app")):
+        x = sub.add_parser(name, help=text)
+        x.add_argument("--host")
+        x.add_argument("--port", type=int)
 
     sc = sub.add_parser("scenario", help="run or check scenario files")
     sc.add_argument("cmd", choices=["run", "check"])
@@ -243,14 +342,14 @@ def main(argv=None):
         os.execv(sys.executable, [sys.executable, "-m", "foodrec", *raw_argv])
     from . import reload
     reload.LAUNCH_ARGV = raw_argv
-    cmd = a.command or "serve"
-    if cmd == "serve":
-        if not a.command:
-            a.host = a.port = None
-        return _serve(a)
+    cmd = a.command or "open"
+    if not a.command:
+        a.host = a.port = None
+        a.no_browser = False
     if cmd == "config" and a.cmd == "open":
         return _open(a)
-    return {"scenario": _scenario, "export": _export, "config": _config, "users": _users, "study": _study}[cmd](a)
+    return {"open": _open_app, "serve": _serve_cmd, "status": _status, "stop": _stop, "scenario": _scenario,
+            "export": _export, "config": _config, "users": _users, "study": _study}[cmd](a)
 
 
 if __name__ == "__main__":

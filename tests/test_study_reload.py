@@ -249,3 +249,16 @@ def test_secret_endpoint_writes_dotenv(tmp_path, monkeypatch):
     keys = c.get("/api/config", headers={"X-User": "admin"}).json()["api_keys"]
     assert keys["TEST_PROVIDER_API_KEY"] is True
     monkeypatch.delenv("TEST_PROVIDER_API_KEY", raising=False)
+
+
+# ---- one app per port ----------------------------------------------------------------------------------
+def test_probe_tells_foodrec_from_other_programs():
+    import socket
+    from foodrec.cli import probe
+    with socket.socket() as srv:                       # some other program listening
+        srv.bind(("127.0.0.1", 0))
+        srv.listen()
+        port = srv.getsockname()[1]
+        threading.Thread(target=lambda: srv.accept()[0].close(), daemon=True).start()
+        assert probe("127.0.0.1", port)[0] == "other"
+    assert probe("127.0.0.1", port)[0] == "free"
