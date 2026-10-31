@@ -1,149 +1,342 @@
 # FoodRec: transparent, agentic food recommendation
 
-FoodRec recommends five recipes from the real **HUMMUS** dataset (9,891 food.com recipes),
-ranked by three values the user controls: **healthiness, sustainability and convenience**,
-plus a fixed share for learned taste. A **supervisor agent**
-watches over the learning process: it notices when what you *say* you want and what you
-*do* drift apart. It then searches your history in a **knowledge graph** and either asks a
-targeted question or proposes a change you can accept. The question or proposal is shown
-with the evidence behind it, and nothing changes until you accept.
+FoodRec recommends recipes from the **HUMMUS** dataset (about 9,600 food.com recipes), ranked by
+values each user controls (by default **healthiness, sustainability and convenience**) plus a learned
+share for taste. A **supervisor agent** watches the learning process: when what a user *says* they want
+and what they *do* drift apart, it looks up their history in a **knowledge graph** and asks a question or
+proposes a change, always with the evidence. Nothing about a user's goal changes until they accept.
 
-Like Claude's thinking view, every step the supervisor takes appears **live under your
-prompt**: what it loaded, how it understood you, which tools it called with which arguments,
-what came back, and why it answered as it did.
+FoodRec is built for **research on transparent recommendation**: every score can be opened, every step
+of the agent is shown live, and a study administrator decides who sees what, creates participant
+accounts, and exports one standard record per user.
 
-> **The agent manages the learning process; it does not pick the food.** The ranking is done
-> by a deterministic multi-criteria engine you can audit. The language model only classifies,
-> chooses among fixed options and phrases answers, and its phrasing is rejected if it states
-> anything the evidence does not support.
+> **The agent manages the learning process; it does not pick the food.** Ranking is done by a
+> deterministic multi-criteria engine you can audit. The language model only classifies messages,
+> chooses among fixed options and phrases answers, and its wording is rejected if it states anything
+> the evidence does not support.
 
-> **Data.** Nutrients and the FSA score come from the HUMMUS dataset. Footprints are *estimated*
-> from ingredient amounts × food-group CO₂e factors (Poore & Nemecek 2018). Cuisine, meal type
-> and food groups are labelled by your local Qwen model (or keyword rules) when the catalogue is
-> built. Allergens and diets are detected from ingredient names: verify before relying on them.
-> See [The catalogue](#the-catalogue-hummus) and the plain-language
-> [user model guide](docs/user-model.md).
+**Highlights**
+
+* Multi-criteria ranking with mandatory rules (allergies, diets), missing-data policy, diversity, and
+  lists that stay fresh over days.
+* A supervisor agent with a live, inspectable trace; works with a local model (Ollama), any
+  OpenAI-compatible API or the Claude API, and without any model at all.
+* Everything configurable in one file or on the **Config page**: model, dataset, the criteria users weigh,
+  feedback options, access roles, and the study population.
+* Sign-in for everyone, generated participant accounts, a standard **export** for analysis, and scripted
+  **scenarios** for reproducible tests.
 
 ---
 
 ## Contents
 
-1. [Quick start](#quick-start)
-2. [Choosing the supervisor model (4 GB GPU)](#choosing-the-supervisor-model-4-gb-gpu)
-3. [How it works](#how-it-works)
-4. [The decision system](#the-decision-system)
-5. [Core concepts](#core-concepts)
-6. [Transparency model](#transparency-model)
-7. [Knowledge graph](#knowledge-graph)
-8. [Vector database and retrieval](#vector-database-and-retrieval)
-9. [The interface](#the-interface)
-10. [Configuration and degradation](#configuration-and-degradation)
-11. [API](#api)
-12. [Testing](#testing)
-13. [Project layout](#project-layout)
-14. [The catalogue (HUMMUS)](#the-catalogue-hummus)
-15. [Limitations](#limitations)
+1. [Requirements](#requirements)
+2. [Installation: step by step](#installation-step-by-step)
+3. [A tour of the app](#a-tour-of-the-app)
+4. [Optional: language model and services](#optional-language-model-and-services)
+5. [Running a study](#running-a-study)
+6. [Configuration](#configuration)
+7. [Command reference](#command-reference)
+8. [Using your own dataset](#using-your-own-dataset)
+9. [Demo and server deployment](#demo-and-server-deployment)
+10. [Troubleshooting](#troubleshooting)
+11. [How it works](#how-it-works)
+12. [API](#api)
+13. [Testing](#testing)
+14. [Project layout](#project-layout)
+15. [The catalogue (HUMMUS)](#the-catalogue-hummus)
+16. [Limitations](#limitations)
 
 ---
 
-## Quick start
+## Requirements
 
-Requires Python 3.11+.
+| | |
+|---|---|
+| Operating system | Linux or macOS. On Windows, use [WSL](https://learn.microsoft.com/windows/wsl/) (Ubuntu). |
+| Python | 3.11 or newer (`python3 --version`) |
+| Git | to clone the repository |
+| Disk / memory | about 1 GB disk; 2 GB RAM without a language model, 6 GB or more with a local one |
+| Optional | [Ollama](https://ollama.com) for the local language model and semantic search; Docker for Neo4j |
 
-> [!IMPORTANT]
-> **Set the administrator password before the first start.** FoodRec asks everyone to sign in. The
-> repository ships an administrator account (`admin`) without a password, and the app refuses to start
-> until you set one:
->
-> ```bash
-> foodrec admin password        # asks twice and stores only a hash in foodrec.config.json
-> ```
->
-> or write `"access": {"admin": {"username": "admin", "password": "your-password"}}` into
-> `foodrec.config.json`; the app replaces it with a hash when it starts. Sign in as `admin`: only the
-> administrator sees **Config** (account menu, top right). Participant accounts created there (Users &
-> study → Create the study population) sign in with their own usernames and passwords, get the role of
-> their account, and never see Config. See [docs/deployment.md](docs/deployment.md) for running it on a
-> server and for the public demo.
+No external service is needed to start: without a model the assistant uses rules and templates, and the
+knowledge graph and vector index run inside the app.
+
+---
+
+## Installation: step by step
+
+### 1. Get the code
 
 ```bash
-python -m venv .venv && source .venv/bin/activate        # or: uv venv && source .venv/bin/activate
-pip install -e ".[dev]"
-python -m pytest                                          # 128 tests, no services needed
-foodrec admin password                                    # once: the administrator's password
-foodrec                                                   # opens http://127.0.0.1:8000 (starts the app if needed)
-foodrec config open                                       # the Config page (model, dataset, criteria, roles, study)
-foodrec status / foodrec stop                             # is it running? stop it from any terminal
-foodrec scenario run scenarios/sara_goal_drift.json       # scripted run, report in out/scenarios
+git clone https://github.com/AmirMohammad-Nouri/agentic_recom_sys.git
+cd agentic_recom_sys
 ```
 
-That already works **without any external service**. The status pill in the top bar shows
-`rule-based · local graph`. To enable the full agentic stack:
+### 2. Create a virtual environment and install
 
 ```bash
-# 1. supervisor model + embeddings (https://ollama.com)
-ollama pull qwen3.5:2b-q4_K_M
-ollama pull nomic-embed-text
+python3 -m venv .venv
+source .venv/bin/activate          # every new terminal: run this again before using foodrec
+pip install -e ".[dev]"            # the app, its command line `foodrec`, and the test tools
+```
 
-# 2. Neo4j knowledge graph (optional; Docker)
-cp .env.example .env               # set NEO4J_URI=bolt://localhost:7687 and a password
-docker compose up -d neo4j
+Check it: `foodrec --help` lists the commands. Optionally run the tests: `python -m pytest`
+(129 tests, about 15 seconds, no services needed).
 
+### 3. Set the administrator password (required)
+
+> [!IMPORTANT]
+> FoodRec asks **everyone** to sign in. The repository ships one administrator account, `admin`,
+> **without a password**, and the app refuses to start until you set one:
+>
+> ```bash
+> foodrec admin password        # asks twice; stores only a hash in foodrec.config.json
+> ```
+>
+> Alternatively, write it once into `foodrec.config.json` and the app replaces it with a hash when it
+> starts:
+>
+> ```json
+> "access": { "admin": { "username": "admin", "password": "choose-a-good-password" } }
+> ```
+>
+> The administrator is the only account that sees **Config**. Run `foodrec admin password` again at any
+> time to change the password (this signs the administrator out everywhere).
+
+### 4. Start FoodRec
+
+```bash
 foodrec
 ```
 
-The repository ships the built catalogue (`data/hummus/catalogue.json.gz`). On start the app
-imports it into its SQLite database (once per catalogue version), so a fresh device only needs
-that file. To rebuild it with your local Qwen model, see [The catalogue](#the-catalogue-hummus).
+The first start imports the recipe catalogue into a local database (a few seconds), then opens
+`http://127.0.0.1:8000` in your browser. FoodRec keeps running in this terminal; stop it with `Ctrl+C`,
+or with `foodrec stop` from another terminal. Running `foodrec` again while it runs just opens the browser.
 
-On first open, a five-step onboarding asks for allergies and diets (strict rules), likes and
-dislikes, a **health goal** (eat healthier, lose weight, gain weight, build muscle,
-heart-friendly, less sugar) with an optional ingredient limit, a few dishes you like (searchable),
-and how much each of the three values should count.
+### 5. Sign in and set up your profile
+
+1. Sign in as `admin` with the password from step 3.
+2. A five-step **onboarding** asks for allergies and diets (strict rules), likes and dislikes, a health
+   goal, a few dishes you like, and how much each value should count.
+3. You land on **Discover** with your first recommendations.
+
+### 6. Open the Config page
+
+Click the account button (top right) → **Config**, or run `foodrec config open` in a terminal. Every
+setting has a **Guide** button explaining what it does and how it changes the results.
+
+That is a complete installation. The next sections are optional.
 
 ---
 
-## Choosing the supervisor model (4 GB GPU)
+## A tour of the app
 
-> **Hosted models.** Instead of a local model you can use any OpenAI-compatible API or the Claude API:
-> set `llm.provider`, `llm.model` (and `llm.base_url` for OpenAI-compatible servers) on the Config page or
-> in `foodrec.config.json`, and put the key in `.env` under the variable named by `llm.api_key_env`. See
-> the Language model guide on the Config page and [docs/configuration.md](docs/configuration.md#language-models).
+| Where | What you can do |
+|---|---|
+| **Discover** | Five recipes ranked for you. Move the value sliders and **Apply** to try them on this list, or **Save as goal** to keep them as a new goal version. Choose a meal, react to dishes (Like, Save, *I'll cook this*, *Not for me* with a reason), and open *How it's scored* on any card. |
+| **Assistant** (right side, every page) | Ask in plain language: "something easy with lentils", "why is #2 first?", "compare #1 and #3", "what if I cared more about sustainability?". Every step the agent takes is shown live above the answer. The *Supervisor* tab shows its questions and proposals. |
+| **Account menu** (top right) | **My dishes**: saved for later, liked and cooked dishes. **Config** (administrator only). Sign out. |
+| **Insights** | What your choices reveal compared with your saved goal, with the evidence behind every change; taste beliefs you can correct. |
+| **Knowledge** | The knowledge graph explorer, your document library and a search tester. |
+| **Activity** | The full event log and every supervisor decision. |
+| **Profile** | Rules and preferences, profile versions, and goal versions you can restore. |
 
-**Yes, a small Qwen3.5 model works as the supervisor on an RTX 3050 Ti (4 GB),** because the
-architecture asks very little of it. (There is no "Qwen 3.5M" model. The Qwen3.5 small series
-is 0.8B / 2B / 4B / 9B. Qwen is Alibaba's own model family, not a Llama derivative.)
+Saved dishes wait in My dishes instead of taking a place in Discover. Dishes you are shown but ignore,
+and cuisines that keep appearing, slowly give way so the lists stay fresh over days.
 
-| Model (Ollama) | Weights | Fits 4 GB with 8k context? | Use it for |
-| --- | --- | --- | --- |
-| `qwen3.5:0.8b` | ~1 GB | yes, easily | Only if speed matters most; weak at structured extraction |
-| **`qwen3.5:2b-q4_K_M`** (default) | ~1.9 GB | **yes**, ~1 GB left for KV cache | **Recommended.** Reliable JSON-schema intent parsing and phrasing |
-| `qwen3.5:2b` (default quant) | ~2.7 GB | yes, but tight | Slightly better quality, less headroom |
-| `qwen3.5:4b` | ~3.4 GB | only with partial CPU offload | Better reasoning, noticeably slower on 4 GB |
+---
 
-The design keeps the model inside the zone where small models are dependable:
+## Optional: language model and services
 
-* **Typed choices, not free tool loops.** The model picks an intent from 10 options and fills a
-  JSON schema that Ollama enforces (`format`). Every field is validated, and unknown values are
-  dropped and reported. A deterministic plan, not the model, decides which skill runs and with
-  which arguments.
-* **No arithmetic, no ranking, no database queries.** Scores come from the engine, and graph
-  access goes through parameterised templates.
-* **Validated phrasing.** The model rewrites recorded facts. Any number, recipe name or
-  medical claim not in the evidence makes the system fall back to the template.
-* **Embeddings on the CPU** (`FOODREC_EMBED_CPU=1`), so the GPU is left entirely to the supervisor.
-* **Thinking off by default** (`FOODREC_LLM_THINK=0`) for latency. Switch "Show model reasoning"
-  on in the assistant to stream Qwen's own reasoning into the timeline, labelled *unverified*.
+### A local language model (Ollama)
 
-Expect roughly 1–4 s per chat turn on that GPU (two short model calls). Recommendations from
-the Discover page never call the model.
+```bash
+# install Ollama from https://ollama.com, then:
+ollama pull qwen3.5:2b-q4_K_M      # the supervisor model (about 2 GB)
+ollama pull nomic-embed-text       # embeddings for semantic search
+```
+
+Restart FoodRec (`foodrec stop`, then `foodrec`). The status pill in the top bar shows the model once it
+is available. The default model fits a 4 GB GPU:
+
+| Model (Ollama) | Size | Fits 4 GB with 8k context | Use it for |
+|---|---|---|---|
+| `qwen3.5:0.8b` | ~1 GB | yes | fastest; weaker at structured extraction |
+| **`qwen3.5:2b-q4_K_M`** (default) | ~1.9 GB | yes | **recommended**: reliable intent parsing and phrasing |
+| `qwen3.5:4b` | ~3.4 GB | with partial CPU offload | better reasoning, slower on 4 GB |
+
+Expect 1 to 4 seconds per chat turn. Discover never calls the model.
+
+### A hosted model (OpenAI-compatible or Claude)
+
+On the Config page → Settings → Language model, choose the provider (`openai` for any OpenAI-compatible
+API such as OpenAI, Groq, OpenRouter, vLLM or LM Studio; `anthropic` for Claude), the model, and for
+OpenAI-compatible servers the base URL. Paste the API key into the field below it: it is written to `.env`
+(ignored by git), never to the config file. Claude needs `pip install -e ".[anthropic]"`.
+
+### Neo4j and Qdrant servers
+
+The built-in graph and vector index are enough. To use the servers instead:
+
+```bash
+cp .env.example .env               # set NEO4J_URI=bolt://localhost:7687 and NEO4J_PASSWORD
+docker compose up -d neo4j         # knowledge graph (browser at http://localhost:7474)
+docker compose --profile qdrant up -d   # optional Qdrant server; then set the vector store to its URL
+```
+
+| Missing component | What FoodRec does instead |
+|---|---|
+| Ollama or the model | rule-based message parsing and template answers (traces say `source: rules`) |
+| embedding model | lexical (hashing) embeddings |
+| Qdrant | an in-memory index |
+| Neo4j | an in-process graph with the same queries |
+
+Click the status pill for the live state of every component.
+
+---
+
+## Running a study
+
+1. **Decide the conditions** (Config → **Access roles**). A role switches features on or off: AI
+   explanations, score breakdowns, the assistant, the supervisor, food details, which criteria are shown,
+   and more. The server enforces them, not only the interface. Shipped roles: `full`, `no_explanations`,
+   `baseline` and `admin`.
+2. **Create the participants** (Config → **Users & study → Create the study population**). Enter the
+   number of users and the percentage per role (for example 40 users, 50 % `full`, 50 % `baseline`) and
+   click **Generate participants**. Each account gets a username (`p001` …) and a readable password;
+   both can be edited. **Save to file**, then **Download usernames and passwords (CSV)** to hand them out.
+   Command line: `foodrec study generate --size 40 --role full=50 --role baseline=50 --write`.
+3. **Participants sign in** with their account, complete the onboarding, and see the app as their role
+   allows. They never see Config and can only use their own account.
+4. **Export the data** (Config → **Export**, or `foodrec export --out study.zip`). Each user's record holds
+   their role and what they could see, preferences and their history, the scores of every list shown
+   (all and visible), every interaction, supervisor decisions, the conversation with the agent's steps,
+   interface events and a summary. The ZIP adds flat CSV tables. Passwords are never exported.
+5. **Test before you run it** with scripted scenarios (`scenarios/*.json`):
+   ```bash
+   foodrec scenario run scenarios/study_access_roles.json
+   foodrec scenario run scenarios/model_comparison.json --matrix llm.model=qwen3.5:2b-q4_K_M,qwen3:4b
+   ```
+   Each run starts from an empty database, writes a report and an export to `out/scenarios/`, and fails
+   if an expectation does not hold.
+
+> [!WARNING]
+> Participant passwords are stored readable in `foodrec.config.json`, because you hand them out. Do not
+> commit that file once it holds real accounts (`git status` shows it as modified; leave it out of
+> `git add`).
+
+---
+
+## Configuration
+
+Everything lives in **`foodrec.config.json`**, and the Config page edits the same file. Anything you can
+change on the page can be written in the file, and the other way round. The running app watches the file:
+settings marked *live* apply at once, the others restart the app automatically, and unchanged content
+does nothing.
+
+| Section | What it controls |
+|---|---|
+| `llm` | provider (Ollama, OpenAI-compatible, Claude), model, embeddings |
+| `dataset` | recipe catalogue, method notes, data folder |
+| `services` | Neo4j and the vector store |
+| `server` | mode (`local`, `demo`, `open`), host, port, automatic reload |
+| `ranking` | list size, missing-data policy, fresh lists, "New for you" places |
+| `supervisor` | how many tools one chat turn may use |
+| `criteria` | the values users weigh: switch built-ins off, add criteria from any numeric recipe field (energy, protein, price …) |
+| `interactions` | feedback reasons and how strongly each one counts |
+| `access` | roles and what they see; the administrator account |
+| `study` | name, population, participant accounts |
+
+Precedence: built-in default < environment / `.env` < config file. `null` in the file means "use the
+environment or the default". Secrets (API keys, `NEO4J_PASSWORD`, `FOODREC_ADMIN_TOKEN`) stay in the
+environment and are never written to the file. Full reference:
+[docs/configuration.md](docs/configuration.md).
+
+| Server mode | Who | Config page |
+|---|---|---|
+| `local` (default) | everyone signs in: the administrator account or participant accounts | administrator only |
+| `demo` | public showcase: no sign-in; visitors switch between a User and an Admin view | admin view, read-only |
+| `open` | no sign-in; for development and automated tests only | roles with *configure* |
+
+---
+
+## Command reference
+
+| Command | What it does |
+|---|---|
+| `foodrec` | open the app in the browser; start it if it is not running |
+| `foodrec config open` | open the Config page (signed in as administrator); start the app if needed |
+| `foodrec serve` | run only the server, without a browser |
+| `foodrec status` / `foodrec stop` | is it running? stop it, from any terminal |
+| `foodrec admin password` | set or change the administrator password |
+| `foodrec study generate --size N --role R=P … [--write]` | create participant accounts |
+| `foodrec study list` | participants with role and password |
+| `foodrec users` | users in the database and their roles |
+| `foodrec export --out study.zip [--users p001,p002]` | the standard export (JSON or ZIP) |
+| `foodrec scenario run FILE… [--set k=v] [--matrix k=v1,v2]` | run scripted scenarios |
+| `foodrec config show` / `check` / `init` | show where every setting comes from; validate; write a fresh file |
+| `foodrec --config other.json …` | use another config file |
+
+`open`, `serve`, `status`, `stop` and `config open` accept `--host` and `--port`. Only one FoodRec runs per port: if it already runs,
+`foodrec` and `foodrec config open` just open the browser.
+
+---
+
+## Using your own dataset
+
+1. Write your recipes in the simple JSON format (template: `data/examples/my_recipes.json`, or download it
+   from Config → Settings → Dataset). Required per recipe: a title, ingredients, and energy per 100 g.
+   Numbers in `"extra"` (price, preparation time …) can become criteria.
+2. Build the catalogue:
+   ```bash
+   python -m foodrec.ingest --recipes my_recipes.json --name my_study --out data/my_study/catalogue.json.gz
+   ```
+3. On the Config page (Settings → Dataset), set the catalogue file to that path and the data folder to a
+   new folder such as `data/my_study/runtime`, and save. The app restarts with your recipes.
+
+Food groups, CO₂e footprints, allergens, diets, cuisine and meal type are derived automatically. Step by
+step: the Dataset guide on the Config page, or [docs/configuration.md](docs/configuration.md#your-own-private-dataset).
+
+---
+
+## Demo and server deployment
+
+The same code runs a public showcase: `server.mode = "demo"` with `deploy/demo/demo.config.json`. Visitors
+need no account; the account menu switches between **User view** and **Admin view**, the Config page is
+read-only, visitors cannot see each other's data, and the data is reset every night.
+
+Try it on your computer next to your normal app:
+
+```bash
+foodrec --config deploy/demo/demo.config.json open --port 8001
+foodrec --config deploy/demo/demo.config.json stop --port 8001     # when done
+```
+
+[docs/deployment.md](docs/deployment.md) describes the server setup step by step (an Ubuntu VM, for
+example on CSC cPouta): systemd service, nightly reset, HTTPS with Caddy, and updates with release tags.
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `FoodRec needs an administrator password before it starts` | Run `foodrec admin password` (see step 3). |
+| Forgot the administrator password | Run `foodrec admin password` again. |
+| `Port 8000 … is used by another program` | Stop that program, or use another port: `foodrec open --port 8001`. |
+| The page loads but parts are empty after an update | An old server is still running: `foodrec stop`, then `foodrec`. |
+| `foodrec: command not found` | Activate the environment: `source .venv/bin/activate`. |
+| The status pill says `rule-based` | Ollama is not running or the model is not pulled (`ollama pull qwen3.5:2b-q4_K_M`). |
+| Start over with empty data | `foodrec stop`, then delete the data folder (default `data/runtime`). Users and history are lost; the config is kept. |
+| A setting has no effect | `foodrec config show` lists every value and whether it comes from the file, the environment or the default. |
 
 ---
 
 ## How it works
 
 ```
-User interaction ─▶ Event log (SQLite, append-only) ─▶ User model (taste + observed weights)
+User interaction ─▶ Event log (SQLite, append-only) ─▶ User model (taste + revealed weights)
                                    │                          │
                                    ├─▶ Knowledge graph        ▼
                                    │   (projection)     Supervisor policy ─▶ ask / propose / stay quiet
@@ -151,325 +344,144 @@ User interaction ─▶ Event log (SQLite, append-only) ─▶ User model (taste
 User message ─▶ Supervisor agent: perceive → understand → plan → act (skills) → compose → validate
                                    │                          │
                                    ▼                          ▼
-                     Recommendation engine          Hybrid retrieval (BM25 + Qdrant)
+                     Recommendation engine          Hybrid retrieval (BM25 + vectors)
            rules → candidates → scores → utility → diversity → evidence records
 ```
 
 | Layer | File(s) | Responsibility |
-| --- | --- | --- |
-| Engine | `engine.py`, `constraints.py`, `features.py`, `ranker.py`, `diversity.py`, `preference.py`, `explain.py`, `compare.py`, `router.py`, `telemetry.py` | Deterministic, auditable ranking and evidence |
-| User model | `learner.py` | Taste counts and stated-vs-observed weights with provenance, rebuilt by replaying events |
-| Ingest | `ingest/` | HUMMUS spreadsheet → portable catalogue file (parsing, local-model labels, footprints) |
-| Store | `store.py` | Events, versioned profile and goals, immutable request snapshots, decisions, messages, documents |
-| Service | `service.py` | The only writer: log → learner → graph for every change |
-| Agent | `agent/` | `supervisor.py` (turns), `policy.py` (monitoring), `skills.py` (tools), `intent.py` (parsing), `trace.py` |
-| Knowledge | `knowledge/` | Graph (Neo4j or in-process), documents, hybrid retrieval |
-| Model | `llm.py` | Ollama client: schema-constrained chat, streamed thinking, embeddings |
-| API + UI | `api.py`, `web/` | FastAPI, NDJSON trace streaming, no-build ES-module front end |
+|---|---|---|
+| Engine | `engine.py`, `constraints.py`, `features.py`, `ranker.py`, `diversity.py`, `preference.py`, `explain.py`, `compare.py` | deterministic, auditable ranking and evidence |
+| User model | `learner.py` | taste counts and stated-vs-revealed weights, rebuilt by replaying events |
+| Store | `store.py` | events, versioned profiles and goals, immutable list snapshots, decisions, messages |
+| Service | `service.py` | the only writer: event log → user model → knowledge graph |
+| Agent | `agent/` | turns, monitoring policy, skills, message parsing, trace |
+| Knowledge | `knowledge/` | graph (Neo4j or in-process), documents, hybrid retrieval |
+| Models | `llm.py`, `llm_openai.py`, `llm_anthropic.py` | Ollama, OpenAI-compatible and Claude clients |
+| Config and access | `appconfig.py`, `access.py`, `model_spec.py`, `study.py`, `reload.py` | config file, roles, criteria, accounts, reloading |
+| API and UI | `api.py`, `cli.py`, `web/` | FastAPI with streamed traces; a no-build ES-module front end |
 
-Details: [docs/architecture.md](docs/architecture.md).
-
----
-
-## The decision system
-
-Who decides what is fixed in code:
+### Who decides what
 
 | Decision | Made by | Can the model influence it? |
-| --- | --- | --- |
-| Is a recipe eligible? | Mandatory rules | No |
-| How is it scored and ranked? | Engine (weighted utility + MMR diversity) | No |
-| What does the user's message ask for? | Model (JSON schema), validated; rules as fallback | Yes, within 10 fixed intents |
-| Which skills run, with which arguments? | Deterministic plan from validated slots | No |
-| Is one more lookup needed? | Model picks from an allowed list (max 3 skills per turn) | Yes, bounded |
-| Is there a gap between goal and behaviour? | Policy: observed − stated, fixed thresholds | No |
-| Ask a question or propose a change? | Policy: gap size and number of events | No |
-| Change the saved goal or a rule? | **The user only** | No |
-| Which words the answer uses | Model, then validated against evidence | Yes, rejected if unsupported |
+|---|---|---|
+| Is a recipe eligible? | mandatory rules | no |
+| How is it scored and ranked? | engine (weighted utility, diversity, freshness) | no |
+| What does a message ask for? | model (JSON schema), validated; rules as fallback | yes, within fixed intents |
+| Which tools run, with which arguments? | a deterministic plan from validated fields | no |
+| Is one more lookup needed? | model, from an allowed list (limited per turn) | yes, bounded |
+| Do goal and behaviour drift apart? | policy: revealed − saved weight, fixed thresholds | no |
+| Change a saved goal or a rule? | **the user only** | no |
+| Which words the answer uses | model, validated against the evidence | yes, rejected if unsupported |
 
-### Monitoring loop
+### Scores and utility
 
-After every like, save, choice or rejection the supervisor runs:
-
-1. **Compare** the saved goal (stated weights) with the observed weights: gap = observed − stated.
-2. **Restraint**: one priority question at a time, and a topic you answered or dismissed is left
-   alone for 6 feedback events.
-3. **Search history** in the knowledge graph for interactions that name that criterion as the reason.
-4. **How big is the gap?**
-   * **≥ 0.15 after ≥ 6 events → proposal.** Move the weight halfway toward the observed value, run
-     a **counterfactual** ("these recipes would enter, these would leave"), then wait for *Accept*
-     or *Keep my goal*.
-   * **≥ 0.10 after ≥ 3 events → targeted question.** "When convenience and healthiness pull in
-     different directions, which usually wins for you?" Your answer is recorded as evidence and
-     does not edit the goal.
-   * **smaller → stay quiet** and keep recommending.
-5. **Taste conflicts**: a declared liking contradicted by several rejections gives "Do you still
-   want Italian as a preference?"
-
-The full specification, with all thresholds, is in [docs/supervisor.md](docs/supervisor.md).
-
----
-
-## Core concepts
-
-**Three values plus taste.** Every recipe has four scores between 0 and 1 (higher is better),
-each a fixed formula you can open on the recipe card (*How it's scored*):
+Every recipe has a score from 0 to 1 per criterion, each a fixed formula you can open on the card:
 
 | Criterion | How it is computed |
-| --- | --- |
-| **Healthiness** | Nine factors per 100 g (energy, fat, saturated fat, sugars, sodium, cholesterol, fibre, protein share of energy, FSA score), each linear between a good and a poor anchor (FSA traffic lights, WCRF, EU claims). Weighted mean; the **health goal** sets the weights (gain weight reverses energy). A–E grade is FoodRec's banding, not Nutri-Score. |
-| **Sustainability** | kg CO₂e per kg of dish = Σ grams × food-group factor / grams (water excluded). Log scale: 0.5 → 1, 30 → 0. |
-| **Convenience** | Number of ingredients (`ingredients_title`): 3 → 1, 15 → 0, linear. |
-| **Taste match** | Learned from likes and rejections (see below). Not a slider. |
+|---|---|
+| Healthiness | nine nutrient factors per 100 g (energy, fats, sugars, sodium, cholesterol, fibre, protein share, FSA score), weighted by the user's health goal |
+| Sustainability | kg CO₂e per kg of dish from ingredient amounts and food-group factors (Poore & Nemecek 2018), log scale |
+| Convenience | number of ingredients: 3 or fewer → 1, 15 or more → 0 |
+| Taste match | learned from likes and rejections; a fixed share of the utility, not a slider |
 
-**Weighted utility** `U = 0.25 · taste + 0.75 · (w_h·h + w_s·s + w_t·t)`, where the three values
-w sum to 1. Reference check: values 0.5/0.3/0.2 and scores 0.8/0.9/0.55/0.85 give **0.78875**.
-Taste keeps a fixed share so the three sliders mean exactly what they say, and a dish you would
-never eat cannot win on numbers alone.
+`utility = taste_share · taste + (1 − taste_share) · Σ weight_k · score_k` (taste share 0.25 by default).
+Allergies, diets and "never include" ingredients filter recipes before ranking; missing allergen data is
+never treated as safe, and rules are never relaxed automatically. Missing scores are handled openly
+(the other weights are scaled up for that recipe and the card says so). Diversity keeps a list varied;
+fatigue and variety across lists keep the lists fresh over days. Criteria can be replaced or added in
+the config.
 
-**Mandatory rules vs. preferences.** Allergies, diets, "never include" ingredients and a
-*strict* ingredient limit filter eligibility before ranking. Missing allergen data is never
-treated as safe. Rules are never relaxed automatically; an empty result explains which rule
-removes the most recipes.
+### The supervisor's monitoring loop
 
-**Request-only filters.** "Something high in protein with at most 8 ingredients" and the meal
-selector on Discover become visible filters for that request only. They are never saved.
+After every reaction, the supervisor compares the saved goal with the weights the user's choices reveal:
 
-**Missing values.** The default policy *renormalises* the remaining value weights for that
-recipe (taste keeps its fixed share) and discloses it. A recipe whose missing criteria carry
-more than half of the user's value weight, or with less than 60 % nutrient coverage for
-healthiness, is not ranked on what is left; the card and the response say what is missing.
-A missing value is never treated as average.
+* a gap of **0.10** after **3** events → a targeted question ("when convenience and healthiness pull in
+  different directions, which usually wins?"), recorded as evidence;
+* a gap of **0.15** after **6** events → a proposal to move the weight halfway, with a preview of which
+  recipes would change; *Update my goal*, *Only today*, or *Keep my goal*;
+* one question at a time, and a pause of 6 events on a topic the user just answered.
 
-**Diversity.** Greedy maximal marginal relevance. Each card shows when a recipe moved up for
-variety, which higher-utility recipe it displaced, and why.
+"Keep my goal" keeps the goal and what was learned; the supervisor only speaks again if the choices drift
+further. Full specification: [docs/supervisor.md](docs/supervisor.md), [docs/user-model.md](docs/user-model.md).
 
-**Computation modes.** *Lightweight* uses cached taste beliefs. *Extended* adds a pass over
-your like/save/choose/reject history for taste match. Neither calls a language model.
-
-**User model (simple and replayable).** *Taste*: for each cuisine, ingredient and food group,
-taste = (1 + likes) / (2 + likes + dislikes). *Values*: observed weights start at your stated
-weights; choosing a dish multiplies each weight by exp(how much better the chosen dish scores on
-it than the five shown), reasons and answers add a small push, and saving a goal moves them
-halfway to it. **Preference match** = 1 − ½ Σ |stated − observed|. Full walk-through:
-[docs/user-model.md](docs/user-model.md).
-
-**Versioning.** Profile and goal saves create new versions; nothing is overwritten. Every
-recommendation is stored as an immutable snapshot with its profile, goal, catalogue and scorer
-versions. Before/after comparisons are computed only from recorded snapshots.
-
-Definitions and parameters: [docs/features.md](docs/features.md).
-
----
-
-## Transparency model
+### Transparency
 
 | Question | Where it is answered |
-| --- | --- |
-| **WHY** this recipe? | Card → *How it's scored*: the nine health factors, the footprint by ingredient, the ingredient count, taste concepts |
-| **WHAT** drove the rank? | Per-criterion score × weight = contribution, utility rank vs. final rank, diversity effect |
-| **WHERE** does a belief come from? | Insights: every update lists the event and how many points it moved; assistant: "what do you know about me?" |
-| **UNCERTAINTY** | Confidence n/(n+5) for observed weights; estimated footprints and incomplete allergen data flagged per recipe |
-| **WHAT IF** | Live preview while dragging sliders; "what if I cared more about…?" counterfactuals |
-| **WHAT CHANGED** | Banner after each change: inputs changed, recipes entered/left/moved, main driver |
-| **CONTROL** | Correct any belief, undo/reset settings, restore any goal version, dismiss any proposal |
-| **HOW the agent worked** | Live thinking timeline in every answer; the assistant's Supervisor tab; Activity log |
+|---|---|
+| Why this recipe? | card → *How it's scored*: the factors, the footprint by ingredient, the ingredient count |
+| What drove the rank? | score × weight = contribution; utility rank vs. final rank; diversity and freshness effects |
+| Where does a belief come from? | Insights: every update with its event; assistant: "what do you know about me?" |
+| What would change? | live preview while moving sliders; "what if …?" in the assistant |
+| What changed? | banner after each change: recipes entered, left and moved, and the main driver |
+| How did the agent work? | the live trace in every answer; the Supervisor tab; Activity |
 
-Each step in the timeline has a kind with its own icon (context, reasoning, decision, tool,
-model thinking, check, answer), a source chip (policy, rules, model, ranking engine, knowledge
-graph, validator…), a duration, and an **evidence** table with the records behind it (raw JSON
-one click away). The header summarises the turn: "Thought for 2.2 s · 5 steps".
-
----
-
-## Knowledge graph
-
-A projection of the catalogue and the event log. It can be rebuilt at any time and runs in
-**Neo4j** (`NEO4J_URI`) or in-process with identical query templates.
-
-```
-(Recipe)-[:CONTAINS {grams}]->(Ingredient)-[:HAS_ALLERGEN]->(Allergen)
-(Recipe)-[:OF_CUISINE]->(Cuisine)   (Ingredient)-[:IN_CATEGORY]->(Category {co2e_kg_per_kg})
-(Recipe)-[:SUITS]->(Diet)           (Recipe)-[:SIMILAR_TO {score}]->(Recipe)
-(User)-[:PERFORMED]->(Interaction {type, reason, ts, meal, place})-[:ON]->(Recipe)
-(User)-[:DECLARED {kind, strict}]->(Allergen|Diet|Ingredient|Cuisine)
-(User)-[:SET_GOAL]->(Goal)   (User)-[:RECEIVED]->(Request)-[:RECOMMENDED {rank}]->(Recipe)
-(User)-[:SUBJECT_OF]->(Decision)-[:BASED_ON]->(Interaction)
-```
-
-The supervisor queries it by **time, person, place, meal, decision, food, ingredient and
-cuisine** through fixed templates (`timeline`, `ingredient_profile`, `recipe_context`,
-`alternatives`, `concept_evidence`, `decisions`, `recommended`, `neighborhood`). Example:
-"what did I reject last week?" → `timeline(user, since=now−7d, types=[reject])`. Explore it in
-**Knowledge → Graph**: search any node, click to inspect, double-click to expand.
-
----
-
-## Vector database and retrieval
-
-**Qdrant** (embedded on disk by default, or a server via `FOODREC_QDRANT=http://…`) stores
-embeddings of every recipe, food group, method note (`data/knowledge/*.md`) and user document.
-Search is **hybrid**: BM25 and dense cosine, fused with Reciprocal Rank Fusion. Every hit shows
-its BM25 rank, vector rank and fused score. Add vetted documents in **Knowledge → Library**;
-they are chunked and searchable immediately. Without an embedding model a hashing embedder is
-used and labelled *lexical, not semantic*.
-
----
-
-## The interface
-
-* **Assistant (on every page).** A docked panel on the right, opened from the top bar or the
-  *Ask* button, that stays open as you move between pages. *Chat* streams the thinking timeline
-  above each answer; *Supervisor* shows open questions and proposals and how each list and each
-  review was worked out. Recipe cards have an *Ask* button that sends the question to it.
-* **Discover.** Three value sliders (taste's fixed share is shown), a meal selector (breakfast,
-  lunch, dinner, snack, dessert, drink), diversity, computation mode, Apply / Save as goal / Undo
-  / Reset, and a live preview. The top five show the photo, health grade, ingredient count, kcal,
-  CO₂e, three score chips, Like / Save / *I'll cook this* (with reason) / *Not for me* (with
-  reason), and *How it's scored* with the full calculation.
-* **Insights.** Preference match as a ring, then for each value "You chose" vs. "You do" bars with
-  the gap, the evidence that moved them, and taste beliefs with one-click correction.
-* **Knowledge.** The graph explorer, plus the library with a retrieval tester.
-* **Activity.** The event log and every supervisor decision with its outcome.
-* **Profile.** Rules, health goal, ingredient limit, profile versions, and goal versions with *Restore*.
-
-Light and dark themes, keyboard-accessible controls, works down to phone width. Plain ES
-modules, no build step; the only external script is the pinned graph renderer (vis-network 9.1.9).
-
----
-
-## Configuration and degradation
-
-**Config file.** `foodrec.config.json` holds everything that shapes a run:
-
-* the **language model**: Ollama, any OpenAI-compatible API, or the Claude API (API keys stay in `.env`);
-* the **dataset**: HUMMUS or your own recipes (`python -m foodrec.ingest --recipes ...`);
-* **fresh lists**: dishes shown and ignored, and cuisines shown often, slowly give way; saved dishes wait on the
-  **My dishes** page in the account menu (with liked and cooked dishes) instead of taking a Discover place;
-* the **criteria** users weigh at onboarding (switch the built-ins off, or add criteria such as energy,
-  protein or price from any numeric recipe field) and the **feedback options** with their learning weights;
-* **access roles** (what each user sees: explanations, scores, food details, the assistant ...);
-* the **study**: who may register, how roles are assigned, and a generated study population with
-  usernames and passwords (optional sign-in).
-
-The **Config page** (account menu → Config for the administrator, or `foodrec config open`) edits the same
-file, with a guide for every section; API keys typed there are written to `.env`, never to the config file. The running app watches the file: live settings apply at once, the others restart the app
-automatically, and an unchanged file changes nothing. `foodrec export` writes the standard per-user study
-output, and `foodrec scenario run` replays scripted JSON scenarios. All of this is described in
-[docs/configuration.md](docs/configuration.md).
-
-Precedence: built-in default < environment / `.env` < config file. `null` in the file leaves a setting to the
-environment variables below. Secrets stay in the environment.
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `FOODREC_LLM_MODEL` | `qwen3.5:2b-q4_K_M` | Supervisor model in Ollama |
-| `FOODREC_LLM`, `OLLAMA_URL` | `1`, `http://127.0.0.1:11434` | Enable/locate Ollama |
-| `FOODREC_LLM_CTX`, `FOODREC_LLM_THINK` | `8192`, `0` | Context window; default thinking mode |
-| `FOODREC_EMBED_MODEL`, `FOODREC_EMBED_CPU` | `nomic-embed-text`, `1` | Embeddings, on CPU |
-| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | empty | Neo4j; empty uses the in-process graph |
-| `FOODREC_QDRANT` | `local` | `local`, `memory`, or a Qdrant URL |
-| `FOODREC_DATA_DIR` | `data/runtime` | SQLite (`foodrec_v2.db`), Qdrant files, index metadata |
-| `FOODREC_CATALOGUE` | `data/hummus/catalogue.json.gz` | Portable catalogue imported on start |
-| `FOODREC_MAX_STEPS` | `3` | Maximum skills per chat turn |
-| `FOODREC_MIN_NUTRIENT_COVERAGE` | `0.6` | Share of (goal-weighted) nutrient factors healthiness needs |
-| `FOODREC_MAX_MISSING_SHARE` | `0.5` | A recipe whose missing criteria carry more of the value weight is not ranked |
-
-| Missing service | Fallback |
-| --- | --- |
-| Ollama or the model | Rule-based intent parser, template answers (all traces say `source: rules`) |
-| Embedding model | Hashing embeddings |
-| Qdrant | numpy index |
-| Neo4j | In-process graph, same templates |
-
-Click the status pill for the live state of every component.
+The knowledge graph (`Recipe`, `Ingredient`, `Cuisine`, `User`, `Interaction`, `Goal`, `Decision` …) is a
+projection of the catalogue and the event log, queried through fixed templates (by time, place, meal,
+food, decision). Retrieval combines BM25 and vector search with reciprocal rank fusion; every hit shows
+both ranks. Details: [docs/architecture.md](docs/architecture.md), [docs/features.md](docs/features.md).
 
 ---
 
 ## API
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/api/system` | Component status, options, skills, thresholds |
-| GET | `/api/recipes?q=&limit=&ids=&meal=` | Search the catalogue |
-| GET | `/api/recipes/{rid}/breakdown?goal=` | How the three scores of one recipe are calculated |
-| POST | `/api/users/{id}/onboard` | Create profile v1 and goal v1 |
-| GET/PUT | `/api/users/{id}/state`, `/profile` | Current state; save a new profile version |
-| POST | `/api/users/{id}/goal`, `/goal/revert` | Save or restore a goal version |
-| POST | `/api/users/{id}/recommend` | Top five + evidence + comparison + pipeline trace (stored snapshot) |
-| POST | `/api/users/{id}/preview` | Counterfactual for unsaved settings (nothing stored) |
-| POST | `/api/users/{id}/goal-options` | `{increase, decrease?, max_drop?}`: several small goal changes with their lists, saved only when picked |
-| POST | `/api/users/{id}/feedback` | Record feedback (`scope`: `lasting` or `today`; repeated clicks are ignored); returns the supervisor's review trace |
-| GET/POST | `/api/users/{id}/decisions[/{did}]` | List; accept / dismiss / answer |
-| POST | `/api/users/{id}/review` | Run the monitoring loop now |
-| POST | `/api/users/{id}/chat` | Chat turn, streamed as NDJSON trace steps |
-| GET | `/api/users/{id}/insight`, `/events`, `/messages` | Beliefs with provenance; event log; conversation |
-| POST | `/api/users/{id}/beliefs` | Correct a taste belief |
-| GET | `/api/compare?before=&after=`, `/api/requests/{rid}` | Compare / read snapshots |
-| GET | `/api/graph/stats`, `/search`, `/neighborhood` | Knowledge graph |
-| GET/POST/DELETE | `/api/knowledge/search`, `/documents` | Retrieval and user documents |
+Interactive documentation at `http://127.0.0.1:8000/docs`. Main endpoints:
 
-Interactive docs at `/docs`.
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/system` | component status, options, criteria, mode |
+| POST | `/api/login` | sign in (username, password) → session token |
+| GET | `/api/recipes?q=&limit=&ids=&meal=` | search the catalogue |
+| POST | `/api/users/{id}/onboard` | create profile v1 and goal v1 |
+| GET / PUT | `/api/users/{id}/state`, `/profile` | current state; save a profile version |
+| POST | `/api/users/{id}/goal`, `/goal/revert` | save or restore a goal version |
+| POST | `/api/users/{id}/recommend` | a ranked list with evidence (stored snapshot) |
+| POST | `/api/users/{id}/feedback` | record a reaction; returns the supervisor's review |
+| GET / POST | `/api/users/{id}/dishes`, `/dishes/remove` | My dishes |
+| GET / POST | `/api/users/{id}/decisions[/{did}]` | supervisor questions and proposals; answer them |
+| POST | `/api/users/{id}/chat` | a chat turn, streamed as trace steps (NDJSON) |
+| GET | `/api/users/{id}/insight`, `/events`, `/messages`, `/export` | beliefs, event log, conversation, own export |
+| GET / PUT | `/api/config` | the configuration (administrator) |
+| GET | `/api/export?users=&format=json\|zip` | the study export (administrator) |
 
 ---
 
 ## Testing
 
 ```bash
-python -m pytest
+python -m pytest          # 129 tests, no services needed
 ```
 
-* `tests/test_reference.py`: 33 deterministic reference cases (utility 0.78875, normalisation,
-  missing values, the anchors of each criterion, health goals, breakdown = score, fail-closed
-  allergens, strict vs. soft limits, empty-result diagnosis, meal filters, diversity,
-  comparisons, mode parity, narrative validation, and the user model: replay, like ratio,
-  observed weights, inconsistent reasons, preference match, trade-off answers, goal saves).
-* `tests/test_agent.py`: intent parsing, model-output validation, offline and model chat
-  turns (with a scripted fake model), streaming, unsupported-number rejection, confirmation of
-  profile changes, one-question-at-a-time, cool-down, proposals with counterfactuals, taste
-  conflicts, replay after restart, graph templates, hybrid retrieval, and the HTTP API.
-* `tests/test_config_access.py`: config precedence and validation, role redaction and API enforcement,
-  study registration and round-robin assignment, the config API and admin token, the export, and
-  scenario runs.
-* `tests/test_study_reload.py`: configurable criteria (an energy criterion end to end, in a subprocess)
-  and interactions, the OpenAI-compatible client against a stub server, live provider switching, study
-  population generation, sign-in enforcement, signed sessions, and the config-file reload decisions.
-* `tests/test_fixes.py`: regression tests for zero weights, the candidate pool (diversity 0 =
-  full-catalogue top five), missing nutrition and coverage, repeated clicks, proposal and
-  option normalisation, full event replay, "only today" / "keep my goal", "had it recently"
-  as recency, and hard constraints after reranking and goal changes.
-  They run on a 148-recipe sample of the catalogue (`data/fixture/catalogue.json.gz`).
-
-The Neo4j backend implements the same templates in Cypher but needs a running Neo4j, so it
-is not covered by the automatic tests. Check it with `docker compose up -d neo4j` and the app.
+The tests run on a 148-recipe sample (`data/fixture/catalogue.json.gz`) and cover the reference
+calculations, the agent (with a scripted model), learning and policy regressions, configuration and
+access roles, criteria and providers, sign-in and modes, fresh lists and My dishes. The Neo4j backend
+needs a running Neo4j and is not part of the automatic tests.
 
 ---
 
 ## Project layout
 
 ```
-foodrec/
-  api.py  service.py  store.py  config.py  llm.py          application, persistence, model client
-  appconfig.py access.py model_spec.py                     config file, access roles, criteria and interactions
-  llm.py llm_openai.py llm_anthropic.py                    supervisor model clients (Ollama, OpenAI-compatible, Claude)
-  study.py reload.py                                       study population and sign-in, config-file reloading
-  cli.py  export.py  scenario.py                           command line, study export, scenario runner
-  engine.py constraints.py features.py ranker.py diversity.py preference.py
-  explain.py compare.py router.py telemetry.py learner.py catalogue.py   recommendation core
-  ingest/     build.py parse.py classify.py foodgroups.py simple.py     HUMMUS or your own recipes → catalogue file
-  agent/      supervisor.py policy.py skills.py intent.py trace.py
-  knowledge/  graph.py neo4j_graph.py retrieval.py documents.py
-  web/        index.html config.html app.css app.js config-main.js lib.js dock.js trace.js components.js
-              markdown.js views/*.js guides/*.md (the Config page guides and dataset templates)
-foodrec.config.json                                        the config file (Config page)
-deploy/demo/  demo.config.json, systemd units, Caddyfile: the public demo (docs/deployment.md)
-scenarios/    scripted scenario files (foodrec scenario run)
+foodrec/                    the application
+  api.py cli.py             web API and command line
+  service.py store.py       state changes and persistence (SQLite)
+  engine.py features.py ranker.py diversity.py constraints.py explain.py   recommendation engine
+  learner.py                user model
+  agent/                    supervisor, policy, skills, message parsing, trace
+  knowledge/                knowledge graph and retrieval
+  llm*.py                   language-model clients
+  appconfig.py access.py model_spec.py study.py reload.py   configuration, roles, accounts, reloading
+  export.py scenario.py     study export and scenario runner
+  ingest/                   build a catalogue from HUMMUS or your own recipes
+  web/                      the web interface; web/guides/ holds the Config page guides
+foodrec.config.json         the configuration (Config page)
+scenarios/                  scripted scenarios
+deploy/demo/                public demo: config, systemd units, Caddyfile
 data/
-  examples/   my_recipes.json: the simple format for your own dataset
-  hummus/     hummus_recipes.xlsx, catalogue.json.gz, labels_*.json (label caches)
-  fixture/    148-recipe sample used by the tests
-  knowledge/  method notes indexed for retrieval
-docs/         user-model.md architecture.md supervisor.md features.md background/
+  hummus/                   the shipped catalogue (catalogue.json.gz) and label cache
+  fixture/                  the test sample
+  knowledge/                method notes the assistant cites
+  examples/                 template for your own recipes
+docs/                       configuration, deployment, architecture, supervisor, user model, features
 tests/
 ```
 
@@ -477,50 +489,34 @@ tests/
 
 ## The catalogue (HUMMUS)
 
-`python -m foodrec.ingest` turns `data/hummus/hummus_recipes.xlsx` into one portable file,
-`data/hummus/catalogue.json.gz` (≈6 MB): `{meta, groups, recipes}`. Building needs
-`pip install -e ".[ingest]"` (pandas, openpyxl); running the app does not.
+The repository ships the built catalogue, `data/hummus/catalogue.json.gz`. On the first start the app
+imports it into its database (once per catalogue version), so nothing else is needed. To rebuild it from
+the HUMMUS spreadsheet (`data/hummus/hummus_recipes.xlsx`, not in the repository) install
+`pip install -e ".[ingest]"` and run:
 
 ```bash
-python -m foodrec.ingest                       # label with your local Qwen via Ollama (FOODREC_LLM_MODEL)
-python -m foodrec.ingest --model qwen3.5:4b    # another local model
-python -m foodrec.ingest --no-llm              # keyword rules only, no model needed (~30 s)
-python -m foodrec.ingest --fixture 150         # small sample for the tests
-python -m foodrec.ingest --recipes data/examples/my_recipes.json --name my_study \
-       --out data/my_study/catalogue.json.gz  # your own dataset (docs/configuration.md)
+python -m foodrec.ingest                      # labels with your local model via Ollama
+python -m foodrec.ingest --no-llm             # keyword rules only (about 30 s)
 ```
 
-What the build does, per recipe:
+The build parses ingredient amounts into grams, labels food groups, cuisine and meal type (model answers
+are validated; invalid ones fall back to rules), computes footprints, allergens and diets (failing closed),
+and finds similar recipes for the graph. Labels are cached in `data/hummus/labels.json`, so a run can be
+resumed and copied to another computer.
 
-1. **Parse** each ingredient line (amount, unit, pack size such as "(8 ounce) can") into grams,
-   drop notes and duplicates, and count ingredients from `ingredients_title`.
-2. **Label** with the local model, in batches with a JSON schema that only allows fixed options:
-   each unique ingredient name → one of ~45 food groups (beef, poultry, cheese, pulses, …), and
-   each recipe → cuisine and meal type (or *non_food*, which drops household and pet "recipes").
-   Every answer is validated; anything invalid falls back to the keyword rules. The build reports
-   how often the model and the rules agree.
-3. **Compute** the footprint (grams × food-group factor, with a per-ingredient breakdown),
-   allergens and diet flags (fail closed: unknown stays unknown), and the three nearest
-   neighbours for the knowledge graph.
+**Data sources.** Nutrients and the FSA score come from HUMMUS. Footprints are estimates from ingredient
+amounts and food-group factors. Allergens and diets are detected from ingredient names: verify them
+before relying on them.
 
-Labels are cached in `data/hummus/labels.json` after every batch, so a run can be stopped and
-resumed, and **copying the cache (or just the finished `.json.gz`) to another device skips the
-model there**. `labels_rules.json` is the cache of the rules-only build.
-
-**On start** the app reads `FOODREC_CATALOGUE` and imports it into the `recipes` and
-`catalogue_meta` tables of its SQLite database; if that version is already stored the import is
-skipped. The app then always loads recipes from the database, so a device with the database but
-without the file still runs. The new database file is `foodrec_v2.db`; an older `foodrec.db`
-is left untouched.
+---
 
 ## Limitations
 
-* Footprints are estimates from food-group averages and parsed amounts, not a life-cycle
-  assessment. Allergens and diets are detected from ingredient names and can be wrong.
+* Footprints are estimates from food-group averages, not a life-cycle assessment. Allergens and diets are
+  detected from ingredient names and can be wrong.
 * Healthiness is an operational nutrient measure for ranking, not medical or dietetic advice.
-* Taste match and observed weights are model estimates, not observed ratings. The learning rate
-  and policy thresholds are design choices that still need calibration with users.
-* The supervisor's model phrasing is validated for numbers, recipe names and medical claims, not
-  for every possible misleading statement. The template answer is always available as ground truth.
-* Single-process server and SQLite: suitable for a demo and user studies, not for multi-user production.
-* Energy telemetry exists only where the machine exposes a RAPL counter.
+* Taste match and revealed weights are model estimates; learning rates and policy thresholds are design
+  choices that still need calibration with users.
+* The model's wording is checked for numbers, recipe names and medical claims, not for every possible
+  misleading statement; the template answer is always available.
+* One server process with SQLite: suited to research studies and demos, not to large production use.
