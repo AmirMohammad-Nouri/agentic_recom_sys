@@ -52,8 +52,8 @@ accounts, and exports one standard record per user.
 
 ## Detailed explanation of the model
 
-**[FoodRec: how it works, how it learns, and the math](https://amirmohammad-nouri.github.io/agentic_recom_sys/guide/)**
-explains the system in depth, with diagrams and a live simulator:
+**[FoodRec: how it works, how it learns, and the math](docs/guide/index.html)** explains the system in depth,
+with diagrams and a live simulator:
 
 1. **How FoodRec works**: the components, from HUMMUS to the database, how five recipes are chosen, what one
    click and one chat turn set off, and why nothing is lost.
@@ -62,9 +62,17 @@ explains the system in depth, with diagrams and a live simulator:
 3. **Every equation, explained**: notation, criterion scores, ranking, the taste and value models, the
    supervisor policy, which equation each event runs, and every parameter with the reason for its value.
 
-Read it online (link above), in the app (account menu → **How FoodRec works**, or
-`http://127.0.0.1:8000/guide`), or open [`docs/guide/index.html`](docs/guide/index.html) in a browser.
-This README covers installation and use; the guide covers the concepts and the mathematics.
+**How to open it**
+
+* **In the app** (easiest): account menu → **How FoodRec works**, or `http://127.0.0.1:8000/guide` while
+  FoodRec runs.
+* **From your copy of the repository**: open `docs/guide/index.html` in a web browser (double-click it in
+  your file manager). GitHub itself shows `.html` files as source code, not as a page.
+* **Online**: [the guide on GitHub Pages](https://amirmohammad-nouri.github.io/agentic_recom_sys/guide/)
+  (available once GitHub Pages is enabled for this repository).
+
+The page loads its formulas and fonts from the internet. This README covers installation and use; the
+guide covers the concepts and the mathematics.
 
 ---
 
