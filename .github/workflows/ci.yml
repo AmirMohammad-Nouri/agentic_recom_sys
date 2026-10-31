@@ -3,11 +3,14 @@
 # in-memory vector store. Add a scenario: put a JSON file in scenarios/ and it runs here too.
 name: CI
 
+# Not on every push: only when main changes (a merge), when a version tag is pushed, or by hand.
+# Pushes that only change documentation are skipped. Add "[skip ci]" to a commit message to skip a run.
 on:
   push:
-    branches: [main, config-access-scenarios]
-  pull_request:
-  workflow_dispatch:          # "Run workflow" button on the Actions tab
+    branches: [main]
+    tags: ["v*"]
+    paths-ignore: ["**.md", "docs/**", "Scenarios.txt"]
+  workflow_dispatch:          # "Run workflow" button on the Actions tab (choose any branch)
 
 jobs:
   tests:
