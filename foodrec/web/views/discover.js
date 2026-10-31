@@ -41,17 +41,35 @@ export function discoverView() {
   }, m === "lightweight" ? "Lightweight" : "Extended")));
   const modeDesc = h("div.hint");
   const preview = h("div.hint", { style: { minHeight: "18px" } });
+  // "Apply" tries the values on this list only; "Save as goal" keeps them as a new goal version.
+  const goalTag = h("span.small.muted");
+  const saveBtn = h("button.btn", { onclick: () => saveGoal(), title: "Keep these values as a new goal version" }, "Save as goal");
+  const unsaved = h("div.change.hidden", { style: { borderRadius: "8px", border: "1px solid var(--border)", fontSize: "12.5px" } });
+  const differsFromGoal = () => {
+    const g = state.user_state.goal, n = norm();
+    if (!g || !n) return false;
+    return VALUES.some((k) => Math.abs((n[k] ?? 0) - (g.weights[k] ?? 0)) >= 0.005) ||
+      Math.abs(diversity - g.diversity) >= 0.005 || mode !== g.mode;
+  };
 
   function refresh() {
     const n = norm();
     for (const s of sliders) clear(s.val, h("b", pct(n ? n[s.k] : 0)), ` · ${raw[s.k]}`);
-    const eff = n || goal.weights;
+    const eff = n || state.user_state.goal.weights;
     clear(bar, weightBar({ p: taste, ...Object.fromEntries(VALUES.map((k) => [k, (1 - taste) * eff[k]])) }));
     zeroNote.classList.toggle("hidden", !!n);
     clear(divVal, h("b", f2(diversity)));
     [...modeSeg.children].forEach((b, i) => b.classList.toggle("on", ["lightweight", "extended"][i] === mode));
     [...mealSeg.children].forEach((b, i) => b.classList.toggle("on", ["any", ...MEALS][i] === state.context.meal));
     modeDesc.textContent = state.system?.modes?.[mode]?.description || "";
+    const g = state.user_state.goal;
+    goalTag.textContent = `saved goal v${g.version}`;
+    const diff = differsFromGoal();
+    unsaved.classList.toggle("hidden", !diff);
+    clear(unsaved, h("b", "Not saved. "), `Apply uses these values for the list only; your saved goal stays v${g.version}. `,
+      "Save as goal to keep them as ", h("b", `goal v${g.version + 1}`), ".");
+    saveBtn.classList.toggle("primary", diff);
+    saveBtn.disabled = !diff;
   }
 
   let pTimer = null;
@@ -81,7 +99,7 @@ export function discoverView() {
     ["home", "work", "out"].map((m) => h("option", { value: m, selected: state.context.place === m }, "at " + m)));
 
   const controls = h("aside.card.sticky",
-    h("div.card-head", h("h2", "Your values"), h("span.small.muted", `goal v${goal.version}`)),
+    h("div.card-head", h("h2", "Your values"), goalTag),
     h("div.card-body.stack",
       h("div.stack", sliders.map((s) => s.row)),
       h("div.stack.tight", h("div.field-label", "Weights applied"), bar, zeroNote,
@@ -91,9 +109,10 @@ export function discoverView() {
       h("div.stack.tight", h("div.field-label", "Computation"), modeSeg, modeDesc),
       h("div.stack.tight", h("div.field-label", "Place (recorded with feedback)"), placeSel),
       h("div.divider"),
+      unsaved,
       h("div.btn-row",
-        h("button.btn.primary.grow", { onclick: () => run() }, "Apply"),
-        h("button.btn", { onclick: saveGoal, title: "Save these settings as a new goal version" }, "Save as goal")),
+        h("button.btn.grow", { onclick: () => run(), title: "Rank with these values for this list only (nothing is saved)" }, "Apply"),
+        saveBtn),
       h("div.btn-row",
         h("button.btn.ghost.sm", { onclick: undo, title: "Back to the previously applied settings" }, icon("undo"), "Undo"),
         h("button.btn.ghost.sm", { onclick: resetToGoal, title: "Back to your saved goal" }, icon("reset"), "Reset to saved")),
@@ -151,6 +170,8 @@ export function discoverView() {
       const out = await api(userPath("/goal"), { method: "POST", body: { name: "My priorities", weights: n, diversity, mode } });
       state.user_state = await api(userPath("/state"));
       toast(`Saved as goal v${out.goal_version}`);
+      refresh();
+      run({ weights: state.user_state.goal.weights, diversity: state.user_state.goal.diversity, mode: state.user_state.goal.mode });
       emit("feed", { title: `Goal v${out.goal_version} saved`, ts: Date.now() / 1000,
         steps: [{ id: "g" + out.goal_version, kind: "perceive", source: "learner", status: "done", title: "New goal recorded",
           detail: "Your observed weights moved halfway toward the new goal, and the event count for the supervisor restarts.",
@@ -177,8 +198,14 @@ export function discoverView() {
     run({ weights: g.weights, diversity: g.diversity, mode: g.mode });
   }
 
-  const off = on((what) => {
+  const off = on(async (what, data) => {
     if (what === "results_changed" && !state.lastResult) run({ weights: state.user_state.goal.weights, diversity, mode });
+    // accepting a supervisor proposal or a goal option creates a new goal version: show it
+    if (what === "decision" && data?.decision?.status === "accepted") {
+      const before = state.user_state.goal.version;
+      state.user_state = await api(userPath("/state"));
+      if (state.user_state.goal.version !== before) { setControls(state.user_state.goal); run(state.user_state.goal); }
+    }
   });
 
   refresh();
