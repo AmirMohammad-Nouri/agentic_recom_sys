@@ -6,8 +6,8 @@ import { scoreChips, sendFeedback, thumb } from "../components.js";
 
 const TABS = [
   ["saved", "Saved for later", "bookmark", "Dishes you saved. They wait here instead of taking a place in Discover; remove one to let Discover show it again."],
-  ["liked", "Liked", "heart", "Dishes you liked."],
-  ["cooked", "Cooked", "check", "Dishes you chose to cook, most recent first."],
+  ["liked", "Liked", "heart", ""],
+  ["cooked", "Cooked", "check", ""],
 ];
 const reasonLabel = (id) => [...(state.system?.interactions?.choose_reasons || []), ...(state.system?.interactions?.reject_reasons || [])]
   .find((r) => r.id === id)?.label || human(id);
@@ -72,10 +72,10 @@ export function dishesView() {
     clear(tabsEl, TABS.map(([k, label, ic]) => h("button" + (k === tab ? ".on" : ""), {
       onclick: () => { tab = k; safeSet("foodrec.dishes_tab", k); render(); },
     }, icon(ic), ` ${label}`, h("span.count", { style: { marginLeft: "6px" } }, data?.[k]?.length ?? 0))));
-    const [, label, , hint] = TABS.find(([k]) => k === tab);
+    const [, , , hint] = TABS.find(([k]) => k === tab);
     const rows = data?.[tab] || [];
     clear(body,
-      h("div.card-head", h("div", h("h2", label), h("div.small.muted", hint))),
+      hint ? h("div.card-head", h("div.small.muted", hint)) : null,
       rows.length ? rows.map((r) => row(r, tab))
         : h("div.card-body", h("div.empty", h("h3", "Nothing here yet"),
           h("p", tab === "saved" ? "Use Save on a recipe in Discover to keep it for later." :

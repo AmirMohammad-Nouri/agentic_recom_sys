@@ -105,8 +105,6 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
           `moved up from utility rank ${rk.utility_rank} for variety`) : null,
         dv.demoted ? h("span.tag", `utility rank ${rk.utility_rank}`) : null) : null,
       explain && personalFits(r).length ? h("ul.reason-list.fit", personalFits(r).slice(0, 2).map((x) => h("li", x))) : null,
-      explain && ruleCount(r) ? h("div.small.muted", { style: { marginTop: "4px" }, title: r.evidence.fit.filter((f) => f.type === "constraint").map((f) => f.text).join("\n") },
-        `Passes your ${ruleCount(r)} mandatory rule${ruleCount(r) === 1 ? "" : "s"}`) : null,
       explain && r.reasons?.compromises?.length ? h("ul.reason-list.comp", r.reasons.compromises.slice(0, 1).map((x) => h("li", x))) : null,
       (r.missing_info?.length || (explain && r.repetition) || r.freshness?.new_cuisine || (explain && r.freshness?.exposure_penalty)) ? h("div.row.wrap", { style: { marginTop: "4px", gap: "4px" } },
         r.freshness?.new_cuisine ? h("span.tag.accent", { title: `No ${r.cuisine} dish was in your recent lists` }, `New for you: ${r.cuisine}`) : null,
@@ -127,7 +125,7 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
         status,
         can("assistant") && explain ? h("button.btn.sm.ghost", { onclick: () => ask(`Why is #${r.final_rank} ${r.title} recommended?`), title: "Ask the assistant about this recipe" },
           icon("spark"), "Ask") : null,
-        hasDetails(r) ? h("button.btn.sm.ghost", {
+        hasDetails(r) ? h("button.btn.sm.ghost.details-btn", {
           onclick: (e) => {
             detailBox.classList.toggle("hidden");
             if (!detailBox.firstChild) detailBox.append(recipeDetails(r, compareWith));

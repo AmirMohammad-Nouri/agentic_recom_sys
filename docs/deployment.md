@@ -99,7 +99,9 @@ sudo systemctl reload caddy
 ```
 
 Open `https://<your-dns-name>`. A banner says it is a demo; the account menu (top right) switches between
-**User view** and **Admin view**, and the admin view shows **Config** (read-only).
+**User view** and **Admin view**, and the admin view shows **Config** (read-only). After the onboarding, a
+**guided tour** with short, skippable hints walks visitors through each part (once per browser; again from
+the account menu → Show the tour). Edit the hints in `foodrec/web/tour.json`.
 
 ### Update the demo
 

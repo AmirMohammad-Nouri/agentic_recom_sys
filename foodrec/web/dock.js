@@ -167,7 +167,7 @@ export function mountDock() {
     h("div.dock-section", h("div.section-label", "Supervisor activity"), feedBox));
   const badge = h("span.count.hidden");
   const setBadge = (n) => { badge.textContent = n; badge.classList.toggle("hidden", !n); fabBadge.textContent = n; fabBadge.classList.toggle("hidden", !n); };
-  const tabs = [h("button.on", { onclick: () => tab(0) }, "Chat"), h("button", { onclick: () => tab(1) }, "Supervisor", badge)];
+  const tabs = [h("button.on", { onclick: () => tab(0) }, "Chat"), h("button.sup-tab", { onclick: () => tab(1) }, "Supervisor", badge)];
   if (!can("supervisor")) tabs[1].classList.add("hidden");
   function tab(i) {
     tabs.forEach((t, j) => t.classList.toggle("on", i === j));
@@ -203,6 +203,7 @@ export function mountDock() {
 
   on((what, data) => {
     if (what === "ask") { toggle(true); tab(0); send(data); }
+    if (what === "open_dock") toggle(true, false);  // the guided tour points at the assistant
     if (what === "feed") pushFeed(data);
     if (what === "review") {
       pushFeed({ title: `After you ${data.type === "choose" ? "chose" : data.type + "d"} ${data.recipe}: ${human(data.status)}`, steps: data.trace, ts: data.ts });

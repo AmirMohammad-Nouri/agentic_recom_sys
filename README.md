@@ -166,6 +166,9 @@ That is a complete installation. The next sections are optional.
 | **Activity** | The full event log and every supervisor decision. |
 | **Profile** | Rules and preferences, profile versions, and goal versions you can restore. |
 
+**Guided tour.** Account menu → **Show the tour** walks through these parts with short, skippable hints
+(on the public demo it starts by itself). The hints are in `foodrec/web/tour.json` and can be edited.
+
 Saved dishes wait in My dishes instead of taking a place in Discover. Dishes you are shown but ignore,
 and cuisines that keep appearing, slowly give way so the lists stay fresh over days.
 

@@ -82,7 +82,7 @@ export function profileForm(declared = {}) {
       h("div.field", h("span.field-label", "Ingredients you like"), likes.el),
       h("div.field", h("span.field-label", "Cuisines you enjoy"), cuisines.el)),
     limits: h("div.stack",
-      h("div.hint", "A preference is shown as a fit reason; a strict limit removes recipes. Convenience is also one of your three values, so you rarely need a strict limit."),
+      h("div.hint", "A strict limit removes recipes; a preference only counts in the ranking."),
       maxIng.el),
     goal: h("div.stack", goalPick,
       h("div.hint", "Your health goal decides how much each of the nine nutrient factors counts in the healthiness score. It does not filter recipes and it is not medical advice.")),
@@ -155,20 +155,20 @@ export function activityView() {
   const events = h("ul.timeline");
   const decisions = h("div.stack");
   (async () => {
-    const [evs, decs] = await Promise.all([api(userPath("/events")), api(userPath("/decisions"))]);
+    let [evs, decs] = await Promise.all([api(userPath("/events")), api(userPath("/decisions"))]);
+    evs = evs.filter((e) => e.type !== "ui");  // page views etc. are for the study export, not the user's history
     const ids = [...new Set(evs.map((e) => e.payload.recipe_id).filter(Boolean))].slice(0, 200);
     const recipes = ids.length ? await api("/api/recipes?limit=200&ids=" + encodeURIComponent(ids.join(","))) : [];
     const titles = Object.fromEntries(recipes.map((r) => [r.recipe_id, r.title]));
-    clear(events, evs.length ? evs.map((e) => h("li",
+    clear(events, evs.length ? evs.map((e) => h("li", { title: e.event_id },
       h("span.muted.small", when(e.ts)), h("span", h("span.tag", human(e.type))),
       h("span", (EVENT_TEXT[e.type] || (() => human(e.type)))({ ...e.payload, recipe_title: titles[e.payload.recipe_id] }),
-        e.context?.meal ? h("span.small.muted", `  · ${e.context.meal}${e.context.place ? " at " + e.context.place : ""}`) : null,
-        h("span.mono.muted", "  " + e.event_id))))
+        e.context?.meal ? h("span.small.muted", `  · ${e.context.meal}${e.context.place ? " at " + e.context.place : ""}`) : null)))
       : h("li", h("span.muted", "No events yet.")));
     clear(decisions, decs.length ? decs.map((d) => decisionCard(d)) : h("div.small.muted", "The supervisor has not raised anything yet."));
   })();
   return h("div",
-    h("div.page-head", h("div", h("h1", "Activity"), h("p", "The append-only event log and every supervisor decision. This is the source of truth everything else is rebuilt from."))),
+    h("div.page-head", h("div", h("h1", "Activity"), h("p", "Everything you did and every supervisor decision, newest first."))),
     h("div.sidebar-layout",
       h("section.card", h("div.card-head", h("h2", "Event log")), events),
       h("aside.stack", h("section.card", h("div.card-head", h("h2", "Supervisor decisions")), h("div.card-body", decisions)))));

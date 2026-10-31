@@ -54,7 +54,7 @@ export function discoverView() {
 
   function refresh() {
     const n = norm();
-    for (const s of sliders) clear(s.val, h("b", pct(n ? n[s.k] : 0)), ` · ${raw[s.k]}`);
+    for (const s of sliders) clear(s.val, h("b", pct(n ? n[s.k] : 0)));
     const eff = n || state.user_state.goal.weights;
     clear(bar, weightBar({ p: taste, ...Object.fromEntries(VALUES.map((k) => [k, (1 - taste) * eff[k]])) }));
     zeroNote.classList.toggle("hidden", !!n);
@@ -142,10 +142,11 @@ export function discoverView() {
     const titles = {};
     for (const r of res.results) titles[r.recipe_id] = r.title;
     clear(resultsHead,
+      // goal version, mode and diversity are on the controls panel; only what is new here is shown
       h("div", h("h2", res.results.length === 5 ? "Your top five" : `Your top ${res.results.length}`),
-        can("explanations") ? h("div.small.muted", `${res.weights_source} · ${res.config.mode} · diversity ${f2(res.config.diversity)} · ` +
-          `${res.eligibility.eligible_count} eligible of ${res.eligibility.eligible_count + res.eligibility.excluded_count}`) : null),
-      can("explanations") ? h("span.small.muted.mono", { title: "Immutable request snapshot id" }, res.request_id) : null);
+        can("explanations") ? h("div.small.muted", `${res.eligibility.eligible_count.toLocaleString()} of ` +
+          `${(res.eligibility.eligible_count + res.eligibility.excluded_count).toLocaleString()} recipes pass your rules` +
+          (res.weights_source.startsWith("saved goal") && !res.weights_source.includes(",") ? "" : ` · weights ${res.weights_source.replace(/^saved goal v\d+, /, "")}`)) : null));
     if (res.empty && !res.results.length) {
       clear(resultsBody, h("div.card-body.stack",
         h("div.empty", h("h3", "Nothing passes your mandatory rules"), h("p", res.empty.message)),
@@ -159,8 +160,7 @@ export function discoverView() {
       res.comparison && can("explanations") ? changeSummary(res.comparison, titles) : null,
       res.config.weights_message && res.config.weights_message.startsWith("All") ? h("div.change", res.config.weights_message) : null,
       res.results.map((r) => recipeCard(r, { requestId: res.request_id, compareWith })),
-      can("utility") && visibleCriteria().length ? h("div.card-body", { style: { borderTop: "1px solid var(--border)" } }, legend(visibleCriteria()),
-        h("div.hint", { style: { marginTop: "4px" } }, "Bars show each criterion's share of the utility. Taste match is a model estimate; CO₂e is estimated from ingredient amounts and food-group averages.")) : null);
+      can("utility") && visibleCriteria().length ? h("div.card-body", { style: { borderTop: "1px solid var(--border)" } }, legend(visibleCriteria())) : null);
   }
 
   async function saveGoal() {
@@ -215,8 +215,7 @@ export function discoverView() {
   // Without priority controls (an access-role setting) the saved goal is used and the list fills the page.
   const el = h("div",
     h("div.page-head", h("div", h("h1", "Discover"),
-      h("p", can("explanations") ? "Five recipes ranked by healthiness, sustainability, convenience and your taste. Every reason comes from a recorded evidence record."
-        : "Recipes picked for you.")),
+      h("p", can("explanations") ? "Recipes ranked by your values and your taste. Open any card to see why." : "Recipes picked for you.")),
       h("div.stack.tight", { style: { alignItems: "flex-end" } }, h("span.field-label", "Meal"), mealSeg)),
     can("weight_controls") ? h("div.discover", controls, results) : results);
   el.cleanup = off;

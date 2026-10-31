@@ -1,6 +1,7 @@
 // App shell: top bar, router, system status, onboarding gate.
 import { api, can, clear, demoView, h, icon, on, safeGet, safeSet, setCriteria, setDemoView, startDemo, state, toast, track, userPath } from "./lib.js";
 import { mountDock } from "./dock.js";
+import { startTour } from "./tour.js";
 import { discoverView } from "./views/discover.js";
 import { dishesView } from "./views/dishes.js";
 import { insightsView } from "./views/insights.js";
@@ -83,6 +84,7 @@ function userMenu(anchor) {
       { onclick: () => { close(); location.hash = "#/dishes"; } }) : null,
     can("configure") ? item("tool", "Config", mode === "demo" ? "Every setting, read-only in the demo" : "Model, dataset, criteria, roles, study",
       { href: "/config" }) : null,
+    item("spark", "Show the tour", "A short walk through the app", { onclick: () => { close(); startTour(); } }),
     item("info", "How FoodRec works", "The complete guide: concepts and every equation", { href: "/guide", target: "_blank", rel: "noopener" }),
   ].filter(Boolean);
   let account = null;
@@ -231,10 +233,12 @@ async function boot() {
       track("session_start", { role: state.user_state.access?.role });
       startDock();
       route();
+      if (state.system.mode === "demo") setTimeout(() => startTour({ auto: true }), 900);
     });
   } else {
     track("session_start", { role: state.user_state.access?.role });
     route();
+    if (state.system.mode === "demo") setTimeout(() => startTour({ auto: true }), 900);
   }
 }
 
