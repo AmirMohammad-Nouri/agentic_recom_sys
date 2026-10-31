@@ -1,5 +1,5 @@
 // The supervisor's visible work: a live timeline of what it looked at, decided and checked.
-import { h, icon, clear, human } from "./lib.js";
+import { h, icon, clear, human, CRIT_META } from "./lib.js";
 
 const KIND = {
   perceive: { icon: "eye", label: "Context" },
@@ -12,7 +12,7 @@ const KIND = {
 };
 const SRC = { policy: "Policy", rules: "Rules", model: "Model", skill: "Skill", engine: "Ranking engine", graph: "Knowledge graph",
   learner: "User model", store: "Event log", validator: "Validator", template: "Template", retriever: "Retrieval" };
-const CRIT_NAME = { p: "Taste", h: "Healthiness", s: "Sustainability", t: "Convenience" };
+const CRIT_NAME = new Proxy({}, { get: (_, k) => CRIT_META[k]?.long });
 
 const fmtMs = (ms) => (ms < 1000 ? `${Math.max(1, Math.round(ms))} ms` : `${(ms / 1000).toFixed(1)} s`);
 const isScalar = (v) => v === null || ["string", "number", "boolean"].includes(typeof v);

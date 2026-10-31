@@ -8,7 +8,7 @@ Two parsers produce the same structure:
 """
 import re
 
-from .. import CRITERIA
+from .. import CRITERIA, CRITERION_LABELS, CRITERION_SPECS, VALUE_CRITERIA
 
 INTENTS = {
     "recommend": "suggest recipes now (optionally with request filters such as few ingredients, high protein, a cuisine)",
@@ -29,11 +29,10 @@ FILTER_KEYS = {"protein_min": ("protein_g", "min", 0, 150), "sugars_max": ("suga
                "kcal_max": ("kcal", "max", 50, 3000), "max_ingredients": ("n_ingredients", "max", 2, 40),
                "co2e_max": ("co2e_kg", "max", 0.1, 60)}
 MEALS = ("breakfast", "main", "side", "salad", "soup", "dessert", "snack", "drink", "sauce")
+# words that name each criterion in chat (the configured "keywords" of each criterion)
 CRITERION_WORDS = {
     "p": ("taste", "tasty", "flavour", "flavor", "preference match", "like more"),
-    "h": ("health", "healthy", "healthier", "nutritious", "nutrition", "nutri"),
-    "s": ("sustainab", "climate", "co2", "carbon", "green", "environment", "planet", "footprint"),
-    "t": ("convenien", "easy", "easier", "simple", "simpler", "fewer ingredients", "effort", "quick"),
+    **{k: tuple(c["keywords"]) for k, c in CRITERION_SPECS.items()},
 }
 SCHEMA = {
     "type": "object",
@@ -42,7 +41,7 @@ SCHEMA = {
         "recipe_refs": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
         "criterion": {"type": ["string", "null"], "enum": list(CRITERIA) + [None]},
         "direction": {"type": ["string", "null"], "enum": ["more", "less", None]},
-        "secondary_criterion": {"type": ["string", "null"], "enum": ["h", "s", "t", None]},
+        "secondary_criterion": {"type": ["string", "null"], "enum": list(VALUE_CRITERIA) + [None]},
         "filters": {"type": "object", "properties": {
             **{k: {"type": ["number", "null"]} for k in FILTER_KEYS},
             "cuisine": {"type": ["string", "null"]},
@@ -211,7 +210,7 @@ def parse_rules(text, catalogue, vocab):
     to = _tradeoff(t)
     if pc:
         it["intent"], it["profile_change"] = "update_profile", pc
-    elif to or (it["criterion"] in ("h", "s", "t") and
+    elif to or (it["criterion"] in VALUE_CRITERIA and
                 _has(t, "change my goal", "update my goal", "adjust my goal", "my priorities", "save more",
                      "permanently", "from now on")):
         it["intent"] = "adjust_goal"
@@ -249,14 +248,18 @@ def parse_rules(text, catalogue, vocab):
 
 
 # ---- model -------------------------------------------------------------------------------
+_HINT = {"h": "healthiness", "s": "sustainability (CO2 footprint)", "t": "convenience (few ingredients)"}
+CRITERIA_CODES = ", ".join(["p=taste match"] + [f"{k}={_HINT.get(k) or CRITERION_LABELS[k].lower()}"
+                                                for k in VALUE_CRITERIA])
+
+
 def model_prompt(text, context, vocab):
     intents = "\n".join(f"- {k}: {v}" for k, v in INTENTS.items())
     return [
         {"role": "system", "content": (
             "You classify one message sent to a food recommendation assistant and extract fields. "
             "Return JSON only, matching the schema. Use null when a field is not mentioned. Never invent "
-            "values. Criteria codes: p=taste match, h=healthiness, s=sustainability (CO2 footprint), "
-            "t=convenience (few ingredients).\nIntents:\n" + intents + "\n"
+            "values. Criteria codes: " + CRITERIA_CODES + ".\nIntents:\n" + intents + "\n"
             "recipe_refs: recipe titles exactly as written by the user, or '#n' for 'number n' in the "
             "current list. filters only for this request (protein_min grams per serving, max_ingredients, "
             "kcal_max per serving, co2e_max kg CO2e per kg, cuisine, meal, include_ingredient, exclude_ingredient). "
@@ -287,7 +290,7 @@ def validate_model(data, text, catalogue, vocab):
     it["criterion"] = data.get("criterion") if data.get("criterion") in CRITERIA else None
     it["direction"] = data.get("direction") if data.get("direction") in ("more", "less") else None
     sc = data.get("secondary_criterion")
-    it["secondary_criterion"] = sc if sc in ("h", "s", "t") and sc != it["criterion"] else None
+    it["secondary_criterion"] = sc if sc in VALUE_CRITERIA and sc != it["criterion"] else None
     f = {}
     for k, v in (data.get("filters") or {}).items():
         if v is None:

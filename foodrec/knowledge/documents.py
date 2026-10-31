@@ -9,6 +9,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .. import CRITERION_SPECS
 from ..constraints import per_serving
 
 
@@ -102,8 +103,24 @@ def methodology_chunks(knowledge_dir):
     return out
 
 
+def criterion_chunks():
+    """A method note for every configured field criterion, so "how is X scored?" finds it."""
+    out = []
+    for k, c in CRITERION_SPECS.items():
+        if c["kind"] != "field":
+            continue
+        better = "Lower" if c["direction"] == "lower" else "Higher"
+        text = (f"# How {c['label'].lower()} is scored\n\n{c['description']}\n\n"
+                f"{c['label']} ({k}) is scored from the recipe field {c['field']}"
+                + (f" in {c['unit']}" if c.get("unit") else "") + f". {better} values are better: "
+                f"{c['best']} or better scores 1, {c['worst']} or worse scores 0, {c['scale']} in between. "
+                "Recipes without this value are handled by the missing-value policy.")
+        out.extend(text_chunks(f"method:criterion_{k}", f"How {c['label'].lower()} is scored", text, "method"))
+    return out
+
+
 def build_corpus(catalogue, knowledge_dir, user_docs):
-    chunks = recipe_chunks(catalogue) + group_chunks(catalogue) + methodology_chunks(knowledge_dir)
+    chunks = recipe_chunks(catalogue) + group_chunks(catalogue) + methodology_chunks(knowledge_dir) + criterion_chunks()
     for d in user_docs:
         chunks.extend(text_chunks(d["doc_id"], d["title"], d["text"], "user"))
     return chunks

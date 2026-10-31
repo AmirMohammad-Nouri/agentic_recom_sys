@@ -7,6 +7,7 @@ text is ever produced by the language model.
 import json
 from collections import defaultdict
 
+from .. import VALUE_CRITERIA
 from .graph import LABEL_OF_PREFIX, GraphProjection, rid_uid
 
 LABELS = sorted(set(LABEL_OF_PREFIX.values()))
@@ -162,7 +163,7 @@ class Neo4jGraph(GraphProjection):
         return out
 
     def alternatives(self, recipe_id, criterion, k=3):
-        if criterion not in ("h", "s", "t"):
+        if criterion not in VALUE_CRITERIA:
             return []
         prop = f"score_{criterion}"
         rows = self._run(f"""

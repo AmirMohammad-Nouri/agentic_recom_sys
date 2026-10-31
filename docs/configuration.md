@@ -1,14 +1,40 @@
 # Configuration, access roles, export and scenarios
 
 Everything that controls how FoodRec runs lives in one JSON file, **`foodrec.config.json`** in the
-repository root. The **Config** page in the app (visible to roles with the `configure` feature) edits the
-same file. Use another file with `foodrec --config path/to/study.json serve` or `FOODREC_CONFIG=...`.
+repository root: the language model, the dataset, the criteria users weigh, the feedback options,
+access roles and the study population. The **Config page** (`/config`, a separate page from the app)
+edits the same file, and every setting on the page is a key in the file. Use another file with
+`foodrec --config path/to/study.json serve` or `FOODREC_CONFIG=...`.
 
 ```bash
+foodrec config open       # open the Config page (starts the app if it is not running)
 foodrec config show       # every setting, its value and where it came from (config / env / default)
 foodrec config check      # validate the file
 foodrec config init       # write a fresh file with all defaults (--force to overwrite)
 ```
+
+Every section of the Config page has a **Guide** button with a full explanation (the guides are the
+markdown files in `foodrec/web/guides/`, readable in the repository as well).
+
+## The Config page and reloading
+
+`foodrec config open` checks whether the app is running on the configured host and port. If it is, it
+opens the browser at `/config`; if not, it starts the app and opens the page when it is ready
+(`--no-browser` prints the link only). The link carries this installation's admin token
+(`data/runtime/.admin_session`, readable only by you), so the page opens as administrator without
+choosing a user. The app itself has no link to the Config page. **Open the app** (top right of the Config
+page) replaces the Config page with the app in the same tab. After a restart caused by a config change,
+the app comes back as a plain server and no extra tab is opened.
+
+The running app **watches the config file** (`server.auto_reload`, on by default). Whether a change comes
+from the page or from editing the file by hand:
+
+| Change | What happens |
+|---|---|
+| nothing (saved again, formatting only) | nothing |
+| invalid JSON or invalid settings | the app keeps its last valid config; the Config page shows the problem |
+| live settings, roles, study, participant accounts | applied in place, no interruption |
+| a restart setting, `criteria` or `interactions` | the app restarts itself with the same command line (a few seconds); the Config page waits and reloads |
 
 ## Precedence
 
@@ -22,8 +48,10 @@ the file: `NEO4J_PASSWORD` and `FOODREC_ADMIN_TOKEN` are read from the environme
 
 | Section | Key | Applies | Notes |
 |---|---|---|---|
-| `llm` | `enabled`, `url`, `model`, `ctx`, `think`, `timeout_s`, `seed` | at once | Switch the supervisor model here to test another LLM |
-| `llm` | `embed_model`, `embed_on_cpu` | after restart | |
+| `llm` | `enabled`, `provider`, `model`, `url`, `base_url`, `api_key_env`, `effort`, `max_tokens`, `fallbacks`, `ctx`, `think`, `timeout_s`, `seed` | at once | See *Language models* below |
+| `llm` | `embed_provider`, `embed_model`, `embed_on_cpu` | after restart | |
+| `server` | `host`, `port` | after restart | `null` = `FOODREC_HOST` / `FOODREC_PORT` |
+| `server` | `auto_reload` | at once | Watch the config file |
 | `dataset` | `catalogue_path`, `knowledge_dir`, `data_dir` | after restart | Your own dataset: see below |
 | `services` | `neo4j_uri`, `neo4j_user`, `neo4j_database`, `qdrant` | after restart | `null` = environment |
 | `ranking` | `top_k`, `default_diversity`, `default_mode`, `max_missing_share` | at once | |
@@ -33,11 +61,71 @@ the file: `NEO4J_PASSWORD` and `FOODREC_ADMIN_TOKEN` are read from the environme
 The Config page marks each setting **live** or **restart**. After saving, it lists the changes that are still
 waiting for a restart.
 
+## Language models
+
+| `llm.provider` | Models | Key |
+|---|---|---|
+| `ollama` (default) | any pulled model, e.g. `qwen3.5:2b-q4_K_M`, `qwen3:4b` | none |
+| `openai` | any OpenAI-compatible API at `llm.base_url`: OpenAI, Groq, Together, OpenRouter, vLLM, LM Studio, Ollama's `/v1` | `llm.api_key_env`, default `OPENAI_API_KEY` |
+| `anthropic` | the Claude API, e.g. `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5` (`pip install -e ".[anthropic]"`) | `llm.api_key_env`, default `ANTHROPIC_API_KEY` (or an `ant auth login` profile) |
+
+`llm.api_key_env` is the **name** of the environment variable that holds the key. Paste the key itself
+into the field under it on the Config page: the server writes it to `.env` (added or updated, other lines
+kept, file readable only by you, ignored by git) and uses it at once. The config file never contains the
+key. Editing `.env` by hand works too (then restart). Structured output uses each provider's JSON-schema feature (the OpenAI-compatible client falls back
+to JSON mode or an instruction when a server does not support schemas). For Anthropic, `llm.effort`
+(default `low`) sets how much the model thinks, and `llm.fallbacks` (default on) enables the server-side
+refusal fallback on the models that support it. A failed or declined call falls back to rules and templates
+for that turn. Embeddings come from `llm.embed_provider` (`ollama`, `openai` or `none`), independent of the
+chat provider.
+
+The model never ranks recipes, so the lists are the same with every model. Compare models on the same
+conversation with `foodrec scenario run scenarios/model_comparison.json --matrix llm.model=a,b`.
+
+## Criteria and interactions
+
+`criteria` defines what users weigh at onboarding; `interactions` the feedback options and how much they
+count. Both are read when the app starts, so changing them restarts it.
+
+```json
+"criteria": {"taste_share": 0.25, "items": [
+  {"id": "h", "kind": "healthiness", "label": "Healthiness", "enabled": true, "default_weight": 0.4},
+  {"id": "s", "kind": "sustainability", "label": "Sustainability", "enabled": true, "default_weight": 0.3},
+  {"id": "t", "kind": "convenience", "label": "Convenience", "enabled": true, "default_weight": 0.3},
+  {"id": "e", "kind": "field", "label": "Low energy", "field": "nutrition_per_100g.kcal",
+   "direction": "lower", "best": 80, "worst": 400, "scale": "linear", "unit": "kcal/100 g",
+   "default_weight": 0.2, "keywords": ["energy", "calorie"]}]}
+```
+
+The built-in kinds keep their formulas and ids (`h`, `s`, `t`) and can be switched off or relabelled. A
+`field` criterion scores any numeric recipe field between a best and a worst anchor, including the
+`extra.<name>` values of your own dataset (price, preparation time ...). The Config page lists the numeric
+fields of the loaded catalogue and can set the anchors from the data.
+
+```json
+"interactions": {
+  "feedback_strength": {"like": 1.0, "save": 0.6, "choose": 0.8},
+  "choose_reasons": [{"id": "health", "label": "It is healthy", "criterion": "h", "weight": 1.0}, ...],
+  "reject_reasons": [{"id": "not_my_taste", "label": "Not my taste", "criterion": null, "taste_strength": 1.0},
+                     {"id": "had_recently", "label": "Had it recently", "criterion": null, "effect": "recency"}, ...],
+  "learning": {"eta": 1.0, "nudge": 0.2, "anchor": 0.05, "floor": 0.02, "today_nudge": 0.10, "conf_k": 5}}
+```
+
+How each value changes the results is explained in the Criteria and Interactions guides
+(`foodrec/web/guides/criteria.md`, `interactions.md`). In short: users keep their saved weights when
+criteria change (a removed criterion is dropped, a new one starts at 0, the rest is rescaled); every
+enabled criterion gets a choose and a reject reason (added automatically when missing); reasons with a
+criterion move the revealed weights, reasons without one are about taste. Scenario files can use other
+criteria in their `config`: they then run in a separate process automatically.
+
 ## Your own (private) dataset
 
 1. Put your recipes in the simple JSON format (example: `data/examples/my_recipes.json`; the format is described in
    `foodrec/ingest/simple.py`). Only `title`, `ingredients` and `nutrition_per_100g.kcal` are required. A
    spreadsheet in the HUMMUS column layout (`.xlsx` or `.csv`) works with `--xlsx` instead.
+   Numbers in a recipe's `"extra": {...}` (price, preparation time, a rating ...) are kept as
+   `extra.<name>` and can be used as field criteria. The Config page (Settings → Dataset) downloads the
+   template; its guide lists every field.
 2. Build the catalogue. Food groups, CO₂e, allergens, diets, cuisine and meal type are derived as for HUMMUS:
    ```bash
    python -m foodrec.ingest --recipes my_recipes.json --name my_study --out data/my_study/catalogue.json.gz
@@ -81,9 +169,10 @@ export can report both.
 
 **Admin protection.** Without `FOODREC_ADMIN_TOKEN`, the server trusts the `X-User` header that the browser
 sends, so anyone who can reach the server can choose an admin id. That is fine on `127.0.0.1`. For any
-shared deployment, set `FOODREC_ADMIN_TOKEN`; the Config page then asks for it.
+shared deployment, set `FOODREC_ADMIN_TOKEN` and turn on `study.login_required`; then only signed-in
+administrators, the token, or the `foodrec config open` link can change the configuration.
 
-## Study settings
+## Study settings and the study population
 
 ```json
 "study": {"name": "Pilot study", "description": "",
@@ -93,7 +182,25 @@ shared deployment, set `FOODREC_ADMIN_TOKEN`; the Config page then asks for it.
           "assign_roles": ["full", "baseline"], "seed": 7}
 ```
 
-A role is assigned **once, at onboarding**, and stored in the database. A fixed role in `access.users` always
+**Study population.** Instead of adding participants one by one, set `study.population` (number of users,
+percent per role, username prefix) and generate the accounts on the Config page (**Users & study → Create
+the study population**) or with `foodrec study generate --size 40 --role full=50 --role baseline=50
+--write`. Each account gets a readable password (`maple-river-42`); usernames, passwords and roles can be
+edited before saving, and regenerating keeps existing passwords. With `study.login_required` on,
+participants sign in with these accounts and can only use their own account:
+
+```json
+"study": {"login_required": true,
+          "population": {"size": 40, "prefix": "p", "digits": 3, "roles": {"full": 50, "baseline": 50},
+                         "shuffle": true, "seed": 7, "password_words": 2},
+          "participants": [{"username": "p001", "password": "maple-river-42", "role": "baseline"}, ...]}
+```
+
+Passwords are stored as written because the study team hands them out: keep the file private while it
+holds real credentials. `foodrec study list` prints them; the page downloads them as CSV.
+
+Role precedence: a fixed role in `access.users` > the participant account's role > an assignment > the
+default role. A role is assigned **once, at onboarding**, and stored in the database. A fixed role in `access.users` always
 wins over an assignment. The **Users & study** tab lists every user with their effective role, and bulk-adds
 participant ids.
 
@@ -178,5 +285,5 @@ with the highest or lowest score on a criterion, for simulating consistent behav
 `open_decisions.length`. Any step can set `"times": n`, `"user": "..."`, `"label": "..."`, and
 `"allow_error": true` (for steps that should be refused).
 
-Example scenarios are in `scenarios/`: `sara_goal_drift`, `reza_safety_rules`, `study_access_roles` and
-`model_comparison`.
+Example scenarios are in `scenarios/`: `sara_goal_drift`, `reza_safety_rules`, `study_access_roles`,
+`model_comparison` and `energy_criterion` (other criteria and reasons, run in its own process).

@@ -19,13 +19,17 @@ assertion), export.json (the standard export of the users in the run) and summar
 The exit code is 1 when a step failed or an assertion did not hold.
 """
 import json
+import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
 
 from .appconfig import AppConfig, merge, set_path, validate
+from .model_spec import fingerprint, normalize
 from .export import export, to_json
 
 ACTIONS = ("onboard", "recommend", "feedback", "chat", "review", "resolve", "update_profile", "save_goal",
@@ -126,12 +130,7 @@ class Runner:
         from .config import load_settings
         from .agent import Supervisor
         from .service import App
-        # "base_config": "defaults" ignores foodrec.config.json, so a scenario is self-contained
-        base = AppConfig({}) if scenario.get("base_config") == "defaults" else AppConfig.load()
-        data = merge(base.raw, scenario.get("config") or {})
-        for k, v in (overrides or {}).items():
-            set_path(data, k, v)
-        self.cfg = AppConfig(data, base.path)
+        self.cfg = scenario_config(scenario, overrides)
         if self.cfg.errors:
             raise ScenarioError("config: " + "; ".join(self.cfg.errors))
         self.tmp = None
@@ -170,7 +169,7 @@ class Runner:
         scores highest / lowest on a criterion), a recipe id, or a title (exact, then substring)."""
         ref = str(ref).strip()
         cat = self.app.catalogue
-        m = re.fullmatch(r"(best|worst):([phst])", ref)
+        m = re.fullmatch(r"(best|worst):([a-z][a-z0-9_]*)", ref)
         if m:
             last = self._last_list(uid)
             rows = [r for r in (last or {}).get("results") or [] if r["scores"].get(m.group(2)) is not None]
@@ -417,6 +416,57 @@ class Runner:
         return {"passed": ok, "actual": None if v is _MISSING else v}, ("passed" if ok else f"FAILED: actual {v!r}")
 
 
+def scenario_config(scenario, overrides=None):
+    """The config a scenario runs with: the config file (or the defaults when the scenario says
+    "base_config": "defaults"), its own "config" merged over it, then --set overrides."""
+    base = AppConfig({}) if scenario.get("base_config") == "defaults" else AppConfig.load()
+    data = merge(base.raw, scenario.get("config") or {})
+    for k, v in (overrides or {}).items():
+        set_path(data, k, v)
+    return AppConfig(data, base.path)
+
+
+def _needs_own_process(cfg):
+    """Criteria and interactions are fixed when the package is imported. A scenario that
+    changes them runs in a child process started with FOODREC_MODEL_SPEC. Returns the spec
+    JSON for the child, or None when this process already has it."""
+    import foodrec
+    spec, errors = normalize(cfg.raw.get("criteria"), cfg.raw.get("interactions"))
+    if errors:
+        raise ScenarioError("criteria/interactions: " + "; ".join(errors))
+    if fingerprint(spec) == fingerprint(foodrec.MODEL_SPEC):
+        return None
+    return json.dumps({"criteria": cfg.raw.get("criteria"), "interactions": cfg.raw.get("interactions")})
+
+
+def _run_child(path, ov, spec_json, out_dir, data_dir, keep_services, log):
+    """Run one variant in a child process with other criteria; return its report."""
+    log("  (criteria or interactions differ from this process: running in a child process)")
+    tmp_out = tempfile.mkdtemp(prefix="foodrec-scenario-out-")
+    cmd = [sys.executable, "-m", "foodrec", "scenario", "run", str(path), "--out", tmp_out]
+    for k, v in ov.items():
+        cmd += ["--set", f"{k}={v if isinstance(v, str) else json.dumps(v)}"]
+    if data_dir:
+        cmd += ["--data-dir", str(data_dir)]
+    if keep_services:
+        cmd.append("--keep-services")
+    env = {**os.environ, "FOODREC_MODEL_SPEC": spec_json, "FOODREC_SCENARIO_CHILD": "1"}
+    proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    for line in proc.stdout.splitlines():
+        if line.strip() and not line.startswith(("PASS", "FAIL", "▶")):
+            log(line)
+    reports = sorted(Path(tmp_out).glob("*/report.json"))
+    if not reports:
+        shutil.rmtree(tmp_out, ignore_errors=True)
+        raise ScenarioError(f"child process failed: {(proc.stderr or proc.stdout).strip()[-800:]}")
+    d = reports[0].parent
+    rep = json.loads(reports[0].read_text())
+    if out_dir:
+        return rep, d, tmp_out
+    shutil.rmtree(tmp_out, ignore_errors=True)
+    return rep, None, None
+
+
 # ---- running files ---------------------------------------------------------------------------------
 def _slug(s):
     return re.sub(r"[^a-zA-Z0-9_.-]+", "_", s).strip("_")[:80] or "run"
@@ -439,6 +489,20 @@ def run_file(path, out_dir, overrides=None, matrix=None, data_dir=None, keep_ser
         name = _slug(sc["name"] + ("__" + "__".join(f"{k}={v}" for k, v in var.items()) if var else ""))
         if var:
             log(f"\n=== variant {', '.join(f'{k}={v}' for k, v in var.items())}")
+        spec_json = _needs_own_process(scenario_config(sc, ov))
+        if spec_json and not os.environ.get("FOODREC_SCENARIO_CHILD"):
+            rep, child_dir, tmp_out = _run_child(path, ov, spec_json, out_dir, data_dir, keep_services, log)
+            rep["variant"] = var
+            if child_dir is not None:
+                d = Path(out_dir) / name
+                if d.exists():
+                    shutil.rmtree(d)
+                shutil.move(str(child_dir), str(d))
+                shutil.rmtree(tmp_out, ignore_errors=True)
+                rep["output_dir"] = str(d)
+            reports.append(rep)
+            _log_result(log, sc, rep)
+            continue
         runner = Runner(sc, ov, data_dir, keep_services, llm, log)
         try:
             rep = runner.run()
@@ -456,10 +520,14 @@ def run_file(path, out_dir, overrides=None, matrix=None, data_dir=None, keep_ser
             (d / "summary.md").write_text(summary_md(rep))
             rep["output_dir"] = str(d)
         reports.append(rep)
-        log(f"{'PASS' if rep['passed'] else 'FAIL'}  {sc['name']}  {rep['assertions_passed']}/{rep['assertions_total']} "
-            f"assertions, {sum(s['status'] == 'error' for s in rep['steps'])} step error(s), {rep['elapsed_s']} s"
-            + (f"  -> {rep['output_dir']}" if rep.get("output_dir") else ""))
+        _log_result(log, sc, rep)
     return reports
+
+
+def _log_result(log, sc, rep):
+    log(f"{'PASS' if rep['passed'] else 'FAIL'}  {sc['name']}  {rep['assertions_passed']}/{rep['assertions_total']} "
+        f"assertions, {sum(s['status'] == 'error' for s in rep['steps'])} step error(s), {rep['elapsed_s']} s"
+        + (f"  -> {rep['output_dir']}" if rep.get("output_dir") else ""))
 
 
 def summary_md(rep):

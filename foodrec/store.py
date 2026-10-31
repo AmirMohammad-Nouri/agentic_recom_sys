@@ -241,8 +241,9 @@ class Store:
 
     @staticmethod
     def _goal_row(r):
+        from .ranker import conform_weights  # goals may predate the configured criteria
         return {"version": r["version"], "name": r["name"], "created_at": r["created_at"],
-                "weights": json.loads(r["weights_json"]), "diversity": r["diversity"],
+                "weights": conform_weights(json.loads(r["weights_json"])), "diversity": r["diversity"],
                 "mode": r["mode"], "source": r["source"], "note": r["note"]}
 
     def goal(self, user_id):

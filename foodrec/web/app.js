@@ -1,7 +1,6 @@
 // App shell: top bar, router, system status, onboarding gate.
-import { api, can, clear, h, icon, on, safeGet, safeSet, state, toast, track, userPath } from "./lib.js";
+import { api, can, clear, h, icon, on, safeGet, safeSet, setCriteria, state, toast, track, userPath } from "./lib.js";
 import { mountDock } from "./dock.js";
-import { configView } from "./views/config.js";
 import { discoverView } from "./views/discover.js";
 import { insightsView } from "./views/insights.js";
 import { knowledgeView } from "./views/knowledge.js";
@@ -14,8 +13,8 @@ const ROUTES = {
   knowledge: { label: "Knowledge", view: knowledgeView, icon: "graph", feature: "page_knowledge" },
   activity: { label: "Activity", view: activityView, icon: "clock", feature: "page_activity" },
   profile: { label: "Profile", view: profileView, icon: "user", feature: "page_profile" },
-  config: { label: "Config", view: configView, icon: "tool", feature: "configure" },
 };
+// The Config page is a separate page (/config), opened with `foodrec config open`; the app has no link to it.
 const allowed = (k) => ROUTES[k] && (!ROUTES[k].feature || can(ROUTES[k].feature));
 
 const main = document.querySelector("main");
@@ -64,12 +63,13 @@ function systemPanel() {
         h("div.change", { style: { borderRadius: "8px", border: "1px solid var(--border)" } }, s.catalogue.note),
         h("div", h("div.section-label", "Supervisor skills"),
           h("table.t", h("tbody", s.skills.map((k) => h("tr", h("td.mono", k.name), h("td", k.description), h("td", h("span.tag" + (k.side_effect === "none" ? "" : ".warn"), k.side_effect)))))))),
-      h("div.modal-foot", h("span.small.muted", can("configure") ? h("a", { href: "#/config", onclick: () => overlay.remove() }, "Open the Config page") : "Configured by the study administrator."),
+      h("div.modal-foot", h("span.small.muted", can("configure") ? "Change these settings with: foodrec config open" : "Configured by the study administrator."),
         h("button.btn", { onclick: () => overlay.remove() }, "Close"))));
   document.body.append(overlay);
 }
 
 function userMenu(anchor) {
+  if (state.system?.login_required) return accountMenu(anchor);
   const input = h("input", { type: "text", value: state.user, style: { width: "100%" }, "aria-label": "User id" });
   const pop = h("div.menu", { style: { padding: "10px", width: "240px" } },
     h("div.menu-label", { style: { padding: "0 0 6px" } }, "Pseudonymous user id"), input,
@@ -86,6 +86,42 @@ function userMenu(anchor) {
   setTimeout(() => document.addEventListener("click", function off(e) {
     if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("click", off); }
   }), 0);
+}
+
+// With login required: who is signed in, and a sign-out button instead of "switch user".
+function accountMenu(anchor) {
+  const pop = h("div.menu", { style: { padding: "10px", width: "220px" } },
+    h("div.menu-label", { style: { padding: "0 0 6px" } }, `Signed in as ${state.user}`),
+    h("button.btn.sm", { onclick: () => { safeSet("foodrec.session", ""); location.reload(); } }, "Sign out"));
+  document.querySelectorAll(".menu").forEach((m) => m.remove());
+  document.body.append(pop);
+  const r = anchor.getBoundingClientRect();
+  pop.style.top = `${window.scrollY + r.bottom + 4}px`;
+  pop.style.left = `${Math.max(8, r.right - 220)}px`;
+  setTimeout(() => document.addEventListener("click", function off(e) {
+    if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("click", off); }
+  }), 0);
+}
+
+function loginScreen(system) {
+  const user = h("input", { type: "text", autocomplete: "username", placeholder: "Username", style: { width: "100%" } });
+  const pw = h("input", { type: "password", autocomplete: "current-password", placeholder: "Password", style: { width: "100%" } });
+  const msg = h("div.small", { style: { color: "var(--danger)", minHeight: "18px" } });
+  async function go(e) {
+    e?.preventDefault();
+    try {
+      const out = await api("/api/login", { method: "POST", body: { username: user.value.trim(), password: pw.value } });
+      safeSet("foodrec.session", out.token);
+      safeSet("foodrec.user", out.user_id);
+      location.reload();
+    } catch (err) { msg.textContent = err.message; }
+  }
+  clear(main, h("div", { style: { maxWidth: "360px", margin: "80px auto" } },
+    h("section.card", h("div.card-body.stack",
+      h("h2", system.study?.name || "Sign in"),
+      system.study?.description ? h("p.muted", system.study.description) : h("p.muted", "Use the username and password you were given."),
+      h("form.stack", { onsubmit: go }, user, pw, msg, h("button.btn.primary", { type: "submit" }, "Sign in"))))));
+  user.focus();
 }
 
 async function route() {
@@ -116,12 +152,20 @@ async function boot() {
   });
   document.querySelector(".user-btn").addEventListener("click", (e) => {
     e.stopPropagation();
-    if (can("switch_user")) userMenu(e.currentTarget);
+    if (state.system?.login_required || can("switch_user")) userMenu(e.currentTarget);
   });
   document.querySelector(".user-btn .uid").textContent = state.user;
   statusPill.addEventListener("click", systemPanel);
   try {
-    [state.system, state.user_state] = await Promise.all([api("/api/system"), api(userPath("/state"))]);
+    state.system = await api("/api/system");
+    setCriteria(state.system.criteria_specs);
+    if (state.system.login_required) {
+      const sess = await api("/api/session");
+      if (!sess.user_id) { document.querySelector(".user-btn .uid").textContent = "sign in"; return loginScreen(state.system); }
+      state.user = sess.user_id;
+      document.querySelector(".user-btn .uid").textContent = state.user;
+    }
+    state.user_state = await api(userPath("/state"));
   } catch (e) {
     clear(main, h("div.empty", h("h3", "The server is not reachable"), h("p", e.message)));
     return;

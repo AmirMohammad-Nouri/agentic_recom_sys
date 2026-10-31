@@ -4,13 +4,19 @@ Run:  python -m foodrec            (or: uvicorn foodrec.api:app)
 The chat endpoint streams newline-delimited JSON: one object per trace step while the
 supervisor works, then a final {"type": "done"} object with the stored message.
 """
+import hmac
 import json
 import logging
 import os
 import queue
+import re
 import threading
 import time
+import uuid
 from pathlib import Path
+from urllib.parse import unquote
+
+import foodrec
 
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
@@ -25,11 +31,28 @@ from .appconfig import (ASSIGNMENT, FIELDS, REGISTRATION, ROOT, SECTIONS, AppCon
                         feature_catalog)
 from .config import load_settings
 from .export import export, to_json, to_zip
+from .model_spec import KINDS
+from .study import admin_link_token, check_password, generate, validate_study
+
+BOOT_ID = uuid.uuid4().hex[:12]  # changes on every (re)start; the Config page waits for a new one
 from .features import breakdown, health_grade
 from .service import MEAL_CONTEXTS, App
 
 WEB = Path(__file__).parent / "web"
 log = logging.getLogger("foodrec.api")
+
+
+class _RevalidatedStatic(StaticFiles):
+    """Static files the browser must revalidate (ETag, 304) on every load.
+
+    The ES modules import each other by unversioned URLs, so a heuristically cached old
+    module next to a new one breaks the whole import graph and the UI never starts.
+    """
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
 
 
 def pipeline_trace(res):
@@ -73,7 +96,7 @@ def create_app(settings=None, llm=None):
     settings = settings or load_settings()
     core = App(settings, llm=llm)
     sup = Supervisor(core)
-    api = FastAPI(title="FoodRec", version="0.3.0")
+    api = FastAPI(title="FoodRec", version=foodrec.__version__)
     api.state.core, api.state.supervisor = core, sup
 
     @api.exception_handler(ValueError)
@@ -93,39 +116,101 @@ def create_app(settings=None, llm=None):
             raise HTTPException(403, f"not available for the role '{acc['role']}' ({', '.join(missing)})")
         return acc
 
+    def login_required():
+        return bool(core.cfg.study.get("login_required"))
+
+    def session_user(request):
+        auth = request.headers.get("authorization") or ""
+        return core.sessions.user(auth[7:]) if auth.lower().startswith("bearer ") else None
+
+    def who(request):
+        """The user making the request: the signed-in user, or (without required login) the
+        X-User header the browser sends."""
+        return session_user(request) or (None if login_required() else request.headers.get("x-user"))
+
+    def admin_token_ok(request):
+        tok = request.headers.get("x-admin-token")
+        if not tok:
+            return False
+        env = os.environ.get("FOODREC_ADMIN_TOKEN")
+        link = admin_link_token(core.s.data_dir)
+        return bool(env and hmac.compare_digest(tok, env)) or hmac.compare_digest(tok, link)
+
     def viewer(request, *features):
-        """For endpoints that are not user-scoped: check the role of the X-User header, if sent."""
-        uid = request.headers.get("x-user")
+        """For endpoints that are not user-scoped: check the role of the requesting user."""
+        uid = who(request)
         return need(uid, *features) if uid else None
 
     def admin(request):
-        token = os.environ.get("FOODREC_ADMIN_TOKEN")
-        if token:
-            if request.headers.get("x-admin-token") != token:
-                raise HTTPException(401, "admin token required (FOODREC_ADMIN_TOKEN)")
+        """The Config page and study administration: the admin token (FOODREC_ADMIN_TOKEN, or the
+        link printed by `foodrec config open`), or a signed-in user / X-User with 'configure'.
+        With FOODREC_ADMIN_TOKEN set, X-User alone is not trusted."""
+        if admin_token_ok(request):
             return
-        uid = request.headers.get("x-user")
-        if not uid or not core.access(uid)["features"]["configure"]:
+        uid = session_user(request) or (None if (login_required() or os.environ.get("FOODREC_ADMIN_TOKEN"))
+                                        else request.headers.get("x-user"))
+        if not uid:
+            raise HTTPException(401, "sign in as an administrator, or open the link from `foodrec config open`")
+        if not core.access(uid)["features"]["configure"]:
             raise HTTPException(403, "only a role with the 'configure' feature can do this")
 
+    # With login required, every user-scoped call must come from that user (or an admin), and
+    # the other data endpoints need a signed-in user.
+    OPEN_API = ("/api/system", "/api/login", "/api/session", "/api/logout")
+
+    @api.middleware("http")
+    async def _require_login(request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/api/") and not path.startswith(OPEN_API) and not path.startswith("/api/config") \
+                and not path.startswith(("/api/admin", "/api/export")) and login_required() and not admin_token_ok(request):
+            uid = session_user(request)
+            if not uid:
+                return JSONResponse({"error": "please sign in", "login_required": True}, status_code=401)
+            m = re.match(r"^/api/users/([^/]+)/", path)
+            if m and unquote(m.group(1)) != uid and not core.access(uid)["features"]["configure"]:
+                return JSONResponse({"error": "you can only use your own account"}, status_code=403)
+        return await call_next(request)
+
+    # ---- sign-in ------------------------------------------------------------------------------
+    @api.post("/api/login")
+    def login(body: dict = Body(...)):
+        user, pw = (body.get("username") or "").strip(), body.get("password") or ""
+        if not check_password(core.cfg, user, pw):
+            raise HTTPException(401, "unknown username or wrong password")
+        core.store.ensure_user(user)
+        return {"token": core.sessions.issue(user), "user_id": user, "access": core.access(user)}
+
+    @api.get("/api/session")
+    def session(request: Request):
+        uid = session_user(request)
+        return {"user_id": uid, "login_required": login_required(),
+                "participants": len(core.cfg.study.get("participants") or [])}
+
     # ---- web ----------------------------------------------------------------------------
-    api.mount("/static", StaticFiles(directory=WEB), name="static")
+    api.mount("/static", _RevalidatedStatic(directory=WEB), name="static")
 
     @api.get("/", include_in_schema=False)
     def index():
-        return FileResponse(WEB / "index.html")
+        return FileResponse(WEB / "index.html", headers={"Cache-Control": "no-cache"})
+
+    @api.get("/config", include_in_schema=False)
+    def config_page():
+        """The Config page, separate from the app (open it with `foodrec config open`)."""
+        return FileResponse(WEB / "config.html", headers={"Cache-Control": "no-cache"})
 
     # ---- system -------------------------------------------------------------------------
     @api.get("/api/system")
     def system():
-        return {**core.system(), "skills": sup.skills.catalog(), "thresholds": policy.THRESHOLDS}
+        return {**core.system(), "skills": sup.skills.catalog(), "thresholds": policy.THRESHOLDS,
+                "boot_id": BOOT_ID, "login_required": login_required(),
+                "restarting": getattr(core, "restarting", False)}
 
     def _brief(r):
         sc = core.scaler.scores(r)
         return {"recipe_id": r["id"], "title": r["title"], "cuisine": r["cuisine"], "meal": r.get("meal"),
                 "image_url": r.get("image_url"), "n_ingredients": r.get("n_ingredients"),
                 "kcal": r.get("kcal_per_serving"), "co2e_kg_per_kg": (r.get("footprint") or {}).get("kg_co2e_per_kg"),
-                "health_grade": health_grade(sc["h"]), "scores": sc,
+                "health_grade": health_grade(sc.get("h")), "scores": sc,
                 "diet": r["diet"], "allergens": r["allergens"],
                 "ingredients": [i["name"] for i in r["ingredients"]]}
 
@@ -404,6 +489,15 @@ def create_app(settings=None, llm=None):
             "registration_options": REGISTRATION, "assignment_options": ASSIGNMENT,
             "restart_pending": core.restart_pending, "admin_token": bool(os.environ.get("FOODREC_ADMIN_TOKEN")),
             "installed_models": st.get("installed") or [], "llm_status": st,
+            "auto_reload": bool(core.s.auto_reload and getattr(core, "watcher", None)),
+            "config_problem": getattr(core, "config_problem", None),
+            "model_spec": {"running": foodrec.MODEL_SPEC, "errors": foodrec.MODEL_SPEC_ERRORS,
+                           "source": foodrec.MODEL_SPEC_SOURCE},
+            "field_kinds": list(KINDS), "boot_id": BOOT_ID, "numeric_fields": core.numeric_fields(),
+            # which key variables are set (never their values)
+            "api_keys": {**{n: True for n in os.environ if n.endswith(("_API_KEY", "_TOKEN"))},
+                         **{n: bool(os.environ.get(n)) for n in
+                            {core.s.llm_api_key_env or "", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"} if n}},
         }
 
     @api.get("/api/config")
@@ -423,7 +517,51 @@ def create_app(settings=None, llm=None):
         new = core.cfg.save(body.get("config") or {})
         pending = core.apply_config(new)
         log.info("config saved to %s (%d setting(s) need a restart)", new.path, len(pending))
-        return config_view()
+        w = getattr(core, "watcher", None)
+        restarting = bool(pending and core.s.auto_reload and w)
+        if restarting:
+            w.check()  # the watcher would see the new file within a second anyway
+        return {**config_view(), "restarting": restarting}
+
+    @api.post("/api/config/secret")
+    def set_secret(request: Request, body: dict = Body(...)):
+        """Store an API key in .env (never in the config file) and use it at once.
+        {"name": "OPENAI_API_KEY", "value": "sk-..."}; value null removes it."""
+        admin(request)
+        from . import config as cfgmod
+        out = cfgmod.set_dotenv(body.get("name"), body.get("value"), cfgmod.DOTENV)
+        if hasattr(core.llm, "_status"):
+            core.llm._status = None
+        if hasattr(core.llm, "_client"):
+            core.llm._client = None  # the Claude client caches its key
+        log.info("%s %s in %s", out["name"], "updated" if out["set"] else "removed", out["file"])
+        return {**out, "llm_status": core.llm.status(refresh=True) if hasattr(core.llm, "status") else {}}
+
+    @api.get("/api/config/field-stats")
+    def field_stats(request: Request, field: str):
+        admin(request)
+        return core.field_stats(field)
+
+    @api.post("/api/config/population")
+    def generate_population(request: Request, body: dict = Body(...)):
+        """Participants for a population spec (nothing is saved; the page saves the result)."""
+        admin(request)
+        pop = body.get("population") or {}
+        errs = validate_study({"population": pop}, core.cfg.roles)
+        if errs:
+            raise HTTPException(400, "; ".join(errs))
+        parts, counts = generate(pop, body.get("participants"))
+        return {"participants": parts, "counts": counts}
+
+    @api.post("/api/config/restart")
+    def restart_now(request: Request):
+        admin(request)
+        w = getattr(core, "watcher", None)
+        if not w:
+            raise HTTPException(409, "the app was not started with `foodrec serve`, so it cannot restart itself")
+        core.restarting = True
+        threading.Timer(0.5, w.restart).start()
+        return {"restarting": True}
 
     @api.get("/api/admin/users")
     def admin_users(request: Request):
@@ -457,12 +595,37 @@ def create_app(settings=None, llm=None):
     return api
 
 
-def main():
+def main(host=None, port=None, open_page=None):
+    """Run the web app. Watches the config file (server.auto_reload) and reloads on changes.
+    `open_page`: a path to open in the browser once the server is up (foodrec config open)."""
     import uvicorn
+
+    from .reload import ConfigWatcher
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per Ollama call is noise
-    uvicorn.run(create_app(), host=os.environ.get("FOODREC_HOST", "127.0.0.1"),
-                port=int(os.environ.get("FOODREC_PORT", 8000)))
+    settings = load_settings()
+    app = create_app(settings)
+    core = app.state.core
+    if settings.config.path:
+        core.watcher = ConfigWatcher(core, settings.config.path)
+        core.watcher.start()
+        log.info("watching %s for changes (auto reload %s)", settings.config.path,
+                 "on" if settings.auto_reload else "off")
+    host, port = host or settings.host, int(port or settings.port)
+    if open_page:
+        threading.Timer(1.5, _open_browser, (f"http://{_browser_host(host)}:{port}{open_page}",)).start()
+    log.info("Config page: http://%s:%d/config", _browser_host(host), port)
+    uvicorn.run(app, host=host, port=port)
+
+
+def _browser_host(host):
+    return "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
+
+
+def _open_browser(url):
+    import webbrowser
+    print(f"Opening {url}", flush=True)
+    webbrowser.open(url)
 
 
 if __name__ == "__main__":

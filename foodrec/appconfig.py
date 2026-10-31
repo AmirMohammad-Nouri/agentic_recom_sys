@@ -33,10 +33,34 @@ FIELDS = [
     # language model
     {"section": "llm", "key": "enabled", "attr": "llm_enabled", "env": "FOODREC_LLM", "type": "bool", "apply": "live",
      "label": "Use the language model", "help": "Off: rule-based intent parsing and template answers."},
-    {"section": "llm", "key": "url", "attr": "ollama_url", "env": "OLLAMA_URL", "type": "str", "apply": "live",
-     "label": "Ollama URL", "machine": True},
+    {"section": "llm", "key": "provider", "attr": "llm_provider", "env": "FOODREC_LLM_PROVIDER", "type": "choice",
+     "options": ["ollama", "openai", "anthropic"], "apply": "live", "label": "Provider",
+     "help": "ollama: a local Ollama server. openai: any OpenAI-compatible API (OpenAI, Groq, Together, OpenRouter, "
+             "vLLM, LM Studio ...) at the base URL below. anthropic: the Claude API."},
     {"section": "llm", "key": "model", "attr": "llm_model", "env": "FOODREC_LLM_MODEL", "type": "str", "apply": "live",
-     "label": "Supervisor model", "help": "Any model pulled in Ollama, e.g. qwen3.5:2b-q4_K_M, qwen3:4b, llama3.2:3b."},
+     "label": "Supervisor model", "help": "Ollama: a pulled model (qwen3.5:2b-q4_K_M, qwen3:4b ...). OpenAI-compatible: "
+                                         "the provider's model id. Anthropic: e.g. claude-opus-5-5, claude-sonnet-5-5, "
+                                         "claude-haiku-5-5."},
+    {"section": "llm", "key": "url", "attr": "ollama_url", "env": "OLLAMA_URL", "type": "str", "apply": "live",
+     "label": "Ollama URL", "machine": True, "help": "Also used for embeddings when the embedding provider is ollama."},
+    {"section": "llm", "key": "base_url", "attr": "llm_base_url", "env": "FOODREC_LLM_BASE_URL", "type": "str",
+     "apply": "live", "label": "API base URL", "machine": True,
+     "help": "OpenAI-compatible provider: e.g. https://api.openai.com/v1, https://api.groq.com/openai/v1, "
+             "http://localhost:1234/v1. Anthropic: leave empty for the default."},
+    {"section": "llm", "key": "api_key_env", "attr": "llm_api_key_env", "env": None, "type": "str", "apply": "live",
+     "label": "API key variable", "help": "NAME of the environment variable (or .env entry) that holds the key, e.g. "
+                                          "OPENAI_API_KEY or ANTHROPIC_API_KEY. The key itself is never stored in this "
+                                          "file. Empty: the provider's usual variable."},
+    {"section": "llm", "key": "effort", "attr": "llm_effort", "env": None, "type": "choice",
+     "options": ["low", "medium", "high", "xhigh", "max"], "apply": "live", "label": "Effort (Anthropic)",
+     "help": "How much the Claude model thinks. The supervisor only classifies and rewrites short answers: low "
+             "is usually enough and cheapest."},
+    {"section": "llm", "key": "max_tokens", "attr": "llm_max_tokens", "env": None, "type": "int", "min": 256,
+     "max": 128000, "apply": "live", "label": "Output token budget (hosted APIs)",
+     "help": "Minimum max_tokens per call for hosted providers; reasoning models need room to think."},
+    {"section": "llm", "key": "fallbacks", "attr": "llm_fallbacks", "env": None, "type": "bool", "apply": "live",
+     "label": "Refusal fallbacks (Anthropic)",
+     "help": "On a safety refusal, the API retries on a fallback model in the same call (server-side fallback)."},
     {"section": "llm", "key": "ctx", "attr": "llm_ctx", "env": "FOODREC_LLM_CTX", "type": "int", "min": 512, "apply": "live",
      "label": "Context window (tokens)"},
     {"section": "llm", "key": "think", "attr": "llm_think", "env": "FOODREC_LLM_THINK", "type": "bool", "apply": "live",
@@ -45,8 +69,12 @@ FIELDS = [
      "apply": "live", "label": "Timeout (s)"},
     {"section": "llm", "key": "seed", "attr": "llm_seed", "env": "FOODREC_LLM_SEED", "type": "int", "apply": "live",
      "label": "Sampling seed"},
+    {"section": "llm", "key": "embed_provider", "attr": "embed_provider", "env": "FOODREC_EMBED_PROVIDER",
+     "type": "choice", "options": ["ollama", "openai", "none"], "apply": "restart", "label": "Embedding provider",
+     "help": "Embeddings for semantic search. none: lexical (hashing) embeddings only. Anthropic has no embedding "
+             "endpoint, so use ollama or none with it."},
     {"section": "llm", "key": "embed_model", "attr": "embed_model", "env": "FOODREC_EMBED_MODEL", "type": "str",
-     "apply": "restart", "label": "Embedding model"},
+     "apply": "restart", "label": "Embedding model", "help": "e.g. nomic-embed-text (Ollama), text-embedding-3-small (OpenAI)."},
     {"section": "llm", "key": "embed_on_cpu", "attr": "embed_on_cpu", "env": "FOODREC_EMBED_CPU", "type": "bool",
      "apply": "restart", "label": "Embeddings on CPU"},
     # dataset and storage
@@ -80,11 +108,21 @@ FIELDS = [
     {"section": "ranking", "key": "min_nutrient_coverage", "attr": "min_nutrient_coverage",
      "env": "FOODREC_MIN_NUTRIENT_COVERAGE", "type": "float", "min": 0, "max": 1, "apply": "restart",
      "label": "Min. nutrient coverage", "help": "Below this share of nutrient factors, healthiness counts as missing."},
+    # web server
+    {"section": "server", "key": "host", "attr": "host", "env": "FOODREC_HOST", "type": "str", "apply": "restart",
+     "label": "Host", "machine": True, "help": "127.0.0.1: this computer only. 0.0.0.0: reachable on the network "
+                                              "(set FOODREC_ADMIN_TOKEN and require login then)."},
+    {"section": "server", "key": "port", "attr": "port", "env": "FOODREC_PORT", "type": "int", "min": 1, "max": 65535,
+     "apply": "restart", "label": "Port", "machine": True},
+    {"section": "server", "key": "auto_reload", "attr": "auto_reload", "env": "FOODREC_AUTO_RELOAD", "type": "bool",
+     "apply": "live", "label": "Reload when the config file changes",
+     "help": "Watch this file: live settings apply at once, the others restart the app. Unchanged content does nothing."},
     # supervisor
     {"section": "supervisor", "key": "max_agent_steps", "attr": "max_agent_steps", "env": "FOODREC_MAX_STEPS",
      "type": "int", "min": 1, "max": 8, "apply": "live", "label": "Max. skill calls per chat turn"},
 ]
 SECTIONS = {"llm": "Language model", "dataset": "Dataset and storage", "services": "Knowledge services",
+            "server": "Web server",
             "ranking": "Ranking", "supervisor": "Supervisor"}
 
 # ---- access control ---------------------------------------------------------------------------
@@ -128,13 +166,13 @@ def _all(**off):
 
 DEFAULT_ROLES = {
     "admin": {"label": "Administrator", "description": "Everything, including this Config page.",
-              "features": {k: True for k in FEATURES}, "visible_criteria": list(CRITERIA), "blocked_skills": []},
+              "features": {k: True for k in FEATURES}, "visible_criteria": "all", "blocked_skills": []},
     "full": {"label": "Full transparency", "description": "All explanations, scores and the assistant.",
-             "features": _all(), "visible_criteria": list(CRITERIA), "blocked_skills": []},
+             "features": _all(), "visible_criteria": "all", "blocked_skills": []},
     "no_explanations": {"label": "No explanations",
                         "description": "Scores and the assistant, but no why-reasons, traces or score breakdowns.",
                         "features": _all(explanations=False, agent_trace=False, score_breakdown=False),
-                        "visible_criteria": list(CRITERIA), "blocked_skills": []},
+                        "visible_criteria": "all", "blocked_skills": []},
     "baseline": {"label": "Baseline list", "description": "A plain list of recipes with food details and feedback "
                  "buttons. No assistant, scores, explanations or supervisor.",
                  "features": _all(assistant=False, agent_trace=False, explanations=False, score_breakdown=False,
@@ -153,7 +191,14 @@ def defaults():
     out["access"] = {"default_role": "full", "roles": copy.deepcopy(DEFAULT_ROLES),
                      "users": {"admin": "admin", "demo": "admin"}}
     out["study"] = {"name": "", "description": "", "registration": "open", "max_users": None,
-                    "assignment": "default", "assign_roles": ["full", "baseline"], "seed": 7}
+                    "assignment": "default", "assign_roles": ["full", "baseline"], "seed": 7,
+                    "login_required": False,
+                    "population": {"size": 20, "prefix": "p", "digits": 3, "roles": {"full": 50, "baseline": 50},
+                                   "shuffle": True, "seed": 7, "password_words": 2},
+                    "participants": []}
+    from .model_spec import DEFAULT_CRITERIA, DEFAULT_INTERACTIONS
+    out["criteria"] = copy.deepcopy(DEFAULT_CRITERIA)
+    out["interactions"] = copy.deepcopy(DEFAULT_INTERACTIONS)
     return out
 
 
@@ -163,7 +208,10 @@ _BUILTIN = {"llm_enabled": True, "ollama_url": "http://127.0.0.1:11434", "llm_mo
             "catalogue_path": "data/hummus/catalogue.json.gz", "knowledge_dir": "data/knowledge",
             "data_dir": "data/runtime", "neo4j_uri": "", "neo4j_user": "neo4j", "neo4j_database": "neo4j",
             "qdrant": "local", "top_k": 5, "default_diversity": 0.3, "default_mode": "lightweight",
-            "max_missing_share": 0.5, "min_nutrient_coverage": 0.6, "max_agent_steps": 3}
+            "max_missing_share": 0.5, "min_nutrient_coverage": 0.6, "max_agent_steps": 3,
+            "llm_provider": "ollama", "llm_base_url": "", "llm_api_key_env": "", "llm_effort": "low",
+            "llm_max_tokens": 4096, "llm_fallbacks": True, "embed_provider": "ollama",
+            "host": "127.0.0.1", "port": 8000, "auto_reload": True}
 
 
 def _builtin_default(f):
@@ -230,7 +278,8 @@ def validate(cfg):
             coerce(f, sec.get(f["key"]))
         except ValueError as e:
             errs.append(str(e))
-    known = {f["section"] for f in FIELDS} | {"access", "study", "config_version", "$comment"}
+    known = {f["section"] for f in FIELDS} | {"access", "study", "criteria", "interactions", "config_version",
+                                               "$comment"}
     errs += [f"unknown section '{k}'" for k in cfg if k not in known]
     for sec in SECTIONS:
         keys = {f["key"] for f in FIELDS if f["section"] == sec}
@@ -245,8 +294,10 @@ def validate(cfg):
             continue
         errs += [f"access.roles.{name}.features: unknown feature '{k}'" for k in (r.get("features") or {})
                  if k not in FEATURES]
-        errs += [f"access.roles.{name}.visible_criteria: unknown criterion '{c}' (use {', '.join(CRITERIA)})"
-                 for c in r.get("visible_criteria", CRITERIA) if c not in CRITERIA]
+        vc = r.get("visible_criteria", "all")
+        if vc != "all" and not (isinstance(vc, list) and all(isinstance(c, str) for c in vc)):
+            errs.append(f"access.roles.{name}.visible_criteria: \"all\" or a list of criterion ids")
+        # ids of criteria that are not configured (e.g. switched off) are ignored, not errors
     if acc.get("default_role") and acc["default_role"] not in roles:
         errs.append(f"access.default_role: '{acc['default_role']}' is not a defined role")
     for uid, rn in (acc.get("users") or {}).items():
@@ -265,6 +316,11 @@ def validate(cfg):
     mu = st.get("max_users")
     if mu is not None and (not isinstance(mu, int) or mu < 1):
         errs.append("study.max_users: a positive whole number or null")
+    from .study import validate_study
+    errs += validate_study(st, roles)
+    if "criteria" in cfg or "interactions" in cfg:
+        from .model_spec import normalize
+        errs += normalize(cfg.get("criteria"), cfg.get("interactions"))[1]
     return errs
 
 
@@ -356,12 +412,18 @@ class AppConfig:
     def study(self):
         return self.data["study"]
 
+    def participant(self, username):
+        return next((p for p in self.study.get("participants") or [] if p.get("username") == username), None)
+
     def role_name(self, user_id, assigned=None):
-        """Explicit entry in access.users > stored assignment > default role."""
+        """Entry in access.users > study participant > stored assignment > default role."""
         acc = self.data["access"]
         explicit = (acc.get("users") or {}).get(user_id)
         if explicit in self.roles:
             return explicit, "config"
+        part = self.participant(user_id)
+        if part and part.get("role") in self.roles:
+            return part["role"], "participant"
         if assigned and assigned in self.roles:
             return assigned, "assigned"
         dr = acc.get("default_role")
@@ -375,7 +437,8 @@ class AppConfig:
         for feat, skills in SKILLS_BY_FEATURE.items():
             if not feats[feat]:
                 blocked.update(skills)
-        crit = [c for c in CRITERIA if c in (role.get("visible_criteria", CRITERIA) or [])]
+        vc = role.get("visible_criteria", "all")
+        crit = list(CRITERIA) if vc == "all" else [c for c in CRITERIA if c in (vc or [])]
         return {"role": name, "label": role.get("label", name), "description": role.get("description", ""),
                 "source": source, "features": feats, "visible_criteria": crit,
                 "blocked_skills": sorted(blocked)}

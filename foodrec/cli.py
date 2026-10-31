@@ -5,7 +5,10 @@
     foodrec scenario run scenarios/*.json     run scripted scenarios, write reports
     foodrec scenario check scenarios/*.json   validate scenario files without running them
     foodrec export --out study.zip            export every user (JSON or a ZIP of CSV tables)
+    foodrec config open                       open the Config page (starts the app if needed)
     foodrec config show | check | init | path
+    foodrec study generate [--write]          create the study population from study.population
+    foodrec study list                        participants with their role and password
     foodrec users                             list users with their role
 """
 import argparse
@@ -16,13 +19,77 @@ import sys
 from pathlib import Path
 
 
-def _serve(a):
+def _serve(a, open_page=None):
     from .api import main
-    if a.host:
-        os.environ["FOODREC_HOST"] = a.host
-    if a.port:
-        os.environ["FOODREC_PORT"] = str(a.port)
-    main()
+    main(host=getattr(a, "host", None), port=getattr(a, "port", None), open_page=open_page)
+
+
+def _open(a):
+    """Open the Config page. If the app is already running, only open the browser; otherwise
+    start it here (and keep it running). The link carries this installation's admin token, so
+    the page opens as administrator without choosing a user."""
+    import httpx
+
+    from .appconfig import AppConfig
+    from .config import load_settings
+    from .study import admin_link_token
+    s = load_settings(config=AppConfig.load())
+    host = a.host or s.host
+    port = a.port or s.port
+    bhost = "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
+    page = f"/config#token={admin_link_token(s.data_dir)}"
+    try:
+        running = httpx.get(f"http://{bhost}:{port}/api/system", timeout=2.0).status_code == 200
+    except httpx.HTTPError:
+        running = False
+    url = f"http://{bhost}:{port}{page}"
+    if running:
+        print(f"FoodRec is running. Config page: {url}")
+        if not a.no_browser:
+            import webbrowser
+            webbrowser.open(url)
+        return 0
+    print(f"Starting FoodRec on {bhost}:{port}; the Config page opens when it is ready.\n  {url}")
+    a.host, a.port = host, port
+    # a restart after a config change must not open the browser again: restart as a plain server
+    from . import reload
+    reload.LAUNCH_ARGV = ["serve", "--host", str(host), "--port", str(port)]
+    return _serve(a, open_page=None if a.no_browser else page)
+
+
+def _study(a):
+    from .appconfig import AppConfig
+    from .study import generate
+    cfg = AppConfig.load()
+    st = cfg.study
+    if a.cmd == "list":
+        parts = st.get("participants") or []
+        print(f"{len(parts)} participant(s); login required: {bool(st.get('login_required'))}")
+        for p in parts:
+            print(f"  {p['username']:<16} {p['role']:<18} {p['password']}")
+        return 0
+    pop = dict(st.get("population") or {})
+    if a.size is not None:
+        pop["size"] = a.size
+    if a.role:
+        pop["roles"] = {r: float(v) for r, v in (x.split("=", 1) for x in a.role)}
+    if a.prefix:
+        pop["prefix"] = a.prefix
+    parts, counts = generate(pop, None if a.new_passwords else st.get("participants"))
+    print(f"{len(parts)} participant(s): " + ", ".join(f"{r} {n}" for r, n in counts.items()))
+    for p in parts[:10]:
+        print(f"  {p['username']:<16} {p['role']:<18} {p['password']}")
+    if len(parts) > 10:
+        print(f"  ... and {len(parts) - 10} more")
+    if not a.write:
+        print("Not saved. Add --write to store them in the config file.")
+        return 0
+    data = json.loads(json.dumps(cfg.raw))
+    data.setdefault("study", {})["population"] = pop
+    data["study"]["participants"] = parts
+    cfg.save(data)
+    print(f"Saved to {cfg.path}" + (" (a running app reloads it automatically)" if cfg.path else ""))
+    return 0
 
 
 def _core():
@@ -149,22 +216,41 @@ def main(argv=None):
     ex.add_argument("--users", help="comma-separated user ids (default: all)")
     ex.add_argument("--no-raw", action="store_true", help="leave out the raw event log")
 
-    cf = sub.add_parser("config", help="show, check or create the config file")
-    cf.add_argument("cmd", choices=["show", "check", "init", "path"])
+    cf = sub.add_parser("config", help="open the Config page; show, check or create the config file")
+    cf.add_argument("cmd", choices=["open", "show", "check", "init", "path"])
     cf.add_argument("file", nargs="?")
     cf.add_argument("--force", action="store_true")
+    cf.add_argument("--host")
+    cf.add_argument("--port", type=int)
+    cf.add_argument("--no-browser", action="store_true", help="print the link only")
+
+    st = sub.add_parser("study", help="study population: generate or list participants")
+    st.add_argument("cmd", choices=["generate", "list"])
+    st.add_argument("--size", type=int, help="number of participants (default: study.population.size)")
+    st.add_argument("--role", action="append", metavar="ROLE=PERCENT", help="e.g. --role full=50 --role baseline=50")
+    st.add_argument("--prefix", help="username prefix (default: study.population.prefix)")
+    st.add_argument("--new-passwords", action="store_true", help="new passwords for existing usernames too")
+    st.add_argument("--write", action="store_true", help="save to the config file")
 
     sub.add_parser("users", help="list users and their roles")
 
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
     a = ap.parse_args(argv)
-    if a.config:
+    if a.config and os.environ.get("FOODREC_CONFIG") != a.config:
+        # criteria and interactions are read when the package is imported, i.e. before these
+        # arguments were parsed: start again with the config file in the environment
         os.environ["FOODREC_CONFIG"] = a.config
+        os.execv(sys.executable, [sys.executable, "-m", "foodrec", *raw_argv])
+    from . import reload
+    reload.LAUNCH_ARGV = raw_argv
     cmd = a.command or "serve"
     if cmd == "serve":
         if not a.command:
             a.host = a.port = None
         return _serve(a)
-    return {"scenario": _scenario, "export": _export, "config": _config, "users": _users}[cmd](a)
+    if cmd == "config" and a.cmd == "open":
+        return _open(a)
+    return {"scenario": _scenario, "export": _export, "config": _config, "users": _users, "study": _study}[cmd](a)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,43 @@
+{
+  "name": "energy_criterion",
+  "description": "Replaces healthiness with a configured 'Low energy' criterion (kcal per 100 g) and checks that onboarding, ranking, reasons, learning and chat use it. The criteria differ from the config file, so the runner starts a separate process for this scenario automatically.",
+  "user": "ena",
+  "config": {
+    "llm": {"enabled": false},
+    "criteria": {"taste_share": 0.25, "items": [
+      {"kind": "healthiness", "enabled": false},
+      {"kind": "sustainability", "default_weight": 0.35},
+      {"kind": "convenience", "default_weight": 0.25},
+      {"id": "e", "kind": "field", "label": "Low energy", "field": "nutrition_per_100g.kcal",
+       "direction": "lower", "best": 80, "worst": 400, "unit": "kcal/100 g", "default_weight": 0.40,
+       "description": "Energy density: lighter dishes score higher.", "keywords": ["energy", "calorie", "lighter"]}]},
+    "interactions": {
+      "choose_reasons": [
+        {"id": "taste", "label": "It sounds tasty", "criterion": null, "taste_bonus": 0.2},
+        {"id": "light", "label": "It is light", "criterion": "e", "weight": 1.5},
+        {"id": "climate", "label": "It is climate-friendly", "criterion": "s"},
+        {"id": "easy", "label": "It is easy to make", "criterion": "t"}],
+      "reject_reasons": [
+        {"id": "not_my_taste", "label": "Not my taste", "criterion": null, "taste_strength": 1.0},
+        {"id": "too_heavy", "label": "Too heavy", "criterion": "e", "weight": 1.5},
+        {"id": "not_sustainable", "label": "Not sustainable enough", "criterion": "s"},
+        {"id": "too_complicated", "label": "Too many ingredients", "criterion": "t"},
+        {"id": "had_recently", "label": "Had it recently", "criterion": null, "effect": "recency"}]}
+  },
+  "steps": [
+    {"action": "onboard", "declared": {"diets": ["vegetarian"]}, "weights": {"e": 0.2, "s": 0.5, "t": 0.3}},
+    {"action": "recommend"},
+    {"action": "expect", "that": "result.results[0].scores.e", "exists": true, "label": "recipes are scored on energy"},
+    {"action": "expect", "that": "result.results[0].scores.h", "exists": false, "label": "healthiness is not scored"},
+    {"action": "repeat", "times": 6, "steps": [
+      {"action": "recommend"},
+      {"action": "feedback", "recipe": "best:e", "type": "choose", "reason": "light"},
+      {"action": "feedback", "recipe": "worst:e", "type": "reject", "reason": "too_heavy"}]},
+    {"action": "insight"},
+    {"action": "expect", "that": "insight.observed.e", "gt": 0.2, "label": "choosing light dishes raises the revealed energy weight"},
+    {"action": "chat", "text": "What if I cared more about energy?"},
+    {"action": "expect", "that": "chat.skills", "contains": "what_if"},
+    {"action": "chat", "text": "Why is #1 recommended?"},
+    {"action": "expect", "that": "chat.text", "matches": "Low energy"}
+  ]
+}

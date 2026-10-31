@@ -9,6 +9,7 @@ The active backend of each component is reported by GET /api/system and in every
 """
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -16,7 +17,12 @@ ROOT = Path(__file__).resolve().parent.parent
 log = logging.getLogger("foodrec.config")
 
 
-def _load_dotenv(path=ROOT / ".env"):
+DOTENV = ROOT / ".env"
+ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]{0,63}$")
+
+
+def _load_dotenv(path=None):
+    path = path or DOTENV
     """Minimal .env reader: KEY=VALUE lines; real environment variables take precedence."""
     if not path.exists():
         return
@@ -28,6 +34,36 @@ def _load_dotenv(path=ROOT / ".env"):
 
 
 _load_dotenv()
+
+
+def set_dotenv(name, value, path=None):
+    """Add, update (value) or remove (value None) one KEY=VALUE line in .env, keeping every other
+    line and comment, and apply it to this process at once. .env is git-ignored and made
+    readable by its owner only. Used for API keys entered on the Config page."""
+    if not ENV_NAME_RE.match(name or ""):
+        raise ValueError("the variable name must be capital letters, digits and _ (e.g. OPENAI_API_KEY)")
+    if value is not None and ("\n" in value or "\r" in value or not value.strip()):
+        raise ValueError("the value must be one non-empty line")
+    path = Path(path or DOTENV)
+    lines = path.read_text().splitlines() if path.exists() else []
+    out, done = [], False
+    for line in lines:
+        key = line.split("=", 1)[0].strip() if "=" in line and not line.lstrip().startswith("#") else None
+        if key == name:
+            if value is not None and not done:
+                out.append(f"{name}={value.strip()}")
+            done = True
+            continue
+        out.append(line)
+    if value is not None and not done:
+        out.append(f"{name}={value.strip()}")
+    path.write_text("\n".join(out) + "\n")
+    path.chmod(0o600)
+    if value is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = value.strip()
+    return {"name": name, "set": value is not None, "file": str(path)}
 
 
 def _env(name, default):
@@ -48,6 +84,14 @@ class Settings:
 
     # Supervisor language model (Ollama). Default sized for a 4 GB GPU, see README.
     llm_enabled: bool = field(default_factory=lambda: _flag("FOODREC_LLM", True))
+    # ollama | openai (any OpenAI-compatible API) | anthropic
+    llm_provider: str = field(default_factory=lambda: _env("FOODREC_LLM_PROVIDER", "ollama"))
+    llm_base_url: str = field(default_factory=lambda: _env("FOODREC_LLM_BASE_URL", ""))
+    llm_api_key_env: str = ""          # NAME of the variable holding the key; never the key itself
+    llm_effort: str = "low"            # Anthropic effort
+    llm_max_tokens: int = 4096         # minimum output budget for hosted providers
+    llm_fallbacks: bool = True         # Anthropic server-side refusal fallbacks
+    embed_provider: str = field(default_factory=lambda: _env("FOODREC_EMBED_PROVIDER", "ollama"))
     ollama_url: str = field(default_factory=lambda: _env("OLLAMA_URL", "http://127.0.0.1:11434"))
     llm_model: str = field(default_factory=lambda: _env("FOODREC_LLM_MODEL", "qwen3.5:2b-q4_K_M"))
     llm_ctx: int = field(default_factory=lambda: int(_env("FOODREC_LLM_CTX", 8192)))
@@ -81,6 +125,11 @@ class Settings:
     top_k: int = field(default_factory=lambda: int(_env("FOODREC_TOP_K", 5)))
     default_diversity: float = 0.3
     default_mode: str = "lightweight"
+
+    # Web server and config-file watching.
+    host: str = field(default_factory=lambda: _env("FOODREC_HOST", "127.0.0.1"))
+    port: int = field(default_factory=lambda: int(_env("FOODREC_PORT", 8000)))
+    auto_reload: bool = field(default_factory=lambda: _flag("FOODREC_AUTO_RELOAD", True))
 
     # Where each setting came from: "default", "env", "config" or "override".
     sources: dict = field(default_factory=dict)
@@ -128,6 +177,8 @@ def load_settings(config=None, **overrides):
     s.config = config if config is not None else AppConfig.load()
     apply_config(s, s.config)
     for k, v in overrides.items():
+        if k in ("data_dir", "catalogue_path", "knowledge_dir") and isinstance(v, str):
+            v = Path(v)
         setattr(s, k, v)
         s.sources[k] = "override"
     s.data_dir.mkdir(parents=True, exist_ok=True)

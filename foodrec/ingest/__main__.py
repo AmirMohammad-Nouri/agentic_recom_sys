@@ -30,11 +30,11 @@ def main():
     logging.basicConfig(level=logging.WARNING)
     llm = None
     if not a.no_llm:
-        from ..llm import OllamaLLM
+        from ..llm import make_llm
         s = load_settings()
         if a.model:
             s.llm_model = a.model
-        llm = OllamaLLM(s)
+        llm = make_llm(s)
         st = llm.status(refresh=True)
         if not st.get("available"):
             print(f"Ollama model not available ({st.get('reason')}); continuing with keyword rules.")

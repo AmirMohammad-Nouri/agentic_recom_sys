@@ -114,6 +114,7 @@ def _recipe(row, labels_ing, labels_rec, id_prefix="h"):
         "footprint": footprint, "allergens": allergens, "allergens_complete": complete,
         "unknown_allergen_ingredients": unknown, "diet": diet,
         "quality": {"impossible": bad},
+        **({"extra": row["extra"]} if isinstance(row.get("extra"), dict) and row["extra"] else {}),
     }
 
 

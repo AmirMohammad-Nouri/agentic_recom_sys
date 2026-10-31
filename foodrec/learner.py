@@ -47,8 +47,11 @@ All constants are design choices, documented in docs/user-model.md.
 import math
 import time
 
-from . import VALUE_CRITERIA
+from . import INTERACTIONS, VALUE_CRITERIA
+from .ranker import conform_weights
 
+# Learning parameters and interaction options come from the "interactions" section of
+# foodrec.config.json (model_spec.py); the defaults are the values below.
 PARAMS = {
     "eta": 1.0,          # learning rate of the value model
     "nudge": 0.2,        # size of an explicit signal (reason chip, answered question)
@@ -57,10 +60,17 @@ PARAMS = {
     "today_nudge": 0.10, # weight added to a criterion for the rest of the day by a "today" signal
     "conf_k": 5,         # confidence = n / (n + conf_k)
     "declared_count": 2.0,
+    **INTERACTIONS["learning"],
 }
-CHOOSE_REASONS = {"health": "h", "climate": "s", "easy": "t"}
-REJECT_REASONS = {"not_healthy_enough": "h", "not_sustainable": "s", "too_complicated": "t"}
-STRENGTH = {"like": 1.0, "save": 0.6, "choose": 0.8, "onboarding_like": 1.0}
+PARAMS["conf_k"] = int(PARAMS["conf_k"])
+# reason id -> criterion it is about (reasons without a criterion are about taste)
+CHOOSE_REASONS = {r["id"]: r["criterion"] for r in INTERACTIONS["choose_reasons"] if r["criterion"]}
+REJECT_REASONS = {r["id"]: r["criterion"] for r in INTERACTIONS["reject_reasons"] if r["criterion"]}
+REASON_WEIGHT = {(k, r["id"]): r["weight"] for k in ("choose", "reject") for r in INTERACTIONS[f"{k}_reasons"]}
+TASTE_BONUS = {r["id"]: r["taste_bonus"] for r in INTERACTIONS["choose_reasons"]}
+TASTE_STRENGTH = {r["id"]: r["taste_strength"] for r in INTERACTIONS["reject_reasons"]}
+RECENCY_REASONS = {r["id"] for r in INTERACTIONS["reject_reasons"] if r.get("effect") == "recency"}
+STRENGTH = {**INTERACTIONS["feedback_strength"], "onboarding_like": 1.0}
 SCOPES = ("lasting", "today")
 
 
@@ -149,7 +159,7 @@ class TasteModel:
 class ValueModel:
     def __init__(self, stated, params=None):
         self.p = params or PARAMS
-        self.stated = {k: float(stated[k]) for k in VALUE_CRITERIA}
+        self.stated = conform_weights(stated)
         self.observed = dict(self.stated)
         self.n = 0                  # informative events since the last goal save
         self.counts = {"choices": 0, "reasons": 0, "rejections": 0, "answers": 0, "goal_saves": 0}
@@ -201,7 +211,7 @@ class ValueModel:
         k, flag = CHOOSE_REASONS.get(reason), None
         if k is not None and d.get(k, 0.0) > 0:
             self.counts["reasons"] += 1
-            d = {**d, k: d[k] + self.p["nudge"]}
+            d = {**d, k: d[k] + self.p["nudge"] * REASON_WEIGHT.get(("choose", reason), 1.0)}
         elif k is not None:
             flag = extra["flag"] = "reason_inconsistent_with_choice"
         self._apply(d, "choice", event_id, extra)
@@ -216,7 +226,8 @@ class ValueModel:
             self._log("rejection", event_id, dict(self.observed), {"reason": reason, "flag": "reason_inconsistent"})
             return False
         self.counts["rejections"] += 1
-        self._apply({k: d}, "rejection", event_id, {"reason": reason, "criterion": k})
+        self._apply({k: d * REASON_WEIGHT.get(("reject", reason), 1.0)}, "rejection", event_id,
+                    {"reason": reason, "criterion": k})
         return True
 
     def observe_answer(self, winner, loser, event_id):
@@ -226,7 +237,7 @@ class ValueModel:
 
     def observe_goal(self, weights, event_id):
         before = dict(self.observed)
-        self.stated = {k: float(weights[k]) for k in VALUE_CRITERIA}
+        self.stated = conform_weights(weights)
         self.observed = {k: (self.observed[k] + self.stated[k]) / 2 for k in VALUE_CRITERIA}
         self.n = 0
         self.day_start = {}
@@ -415,9 +426,9 @@ class Learner:
             return "repeated click on " + recipe["title"] + " (ignored)"
         if key is not None:
             self._seen.add(key)
-        if typ == "choose" or (typ == "reject" and reason == "had_recently"):
+        if typ == "choose" or (typ == "reject" and reason in RECENCY_REASONS):
             self.recent[rid] = self._ts
-        if typ == "reject" and reason == "had_recently":
+        if typ == "reject" and reason in RECENCY_REASONS:
             return f"you had {recipe['title']} recently (temporary repetition penalty, no dislike)"
         if pl.get("scope") == "today" and typ in ("choose", "reject"):
             return self._today_feedback(typ, rid, reason, recipe, eid)
@@ -427,7 +438,7 @@ class Learner:
         idx = ids.index(rid) if rid in ids else None
         scores = [s["scores"] for s in shown]
         if typ in ("like", "save", "choose"):
-            s = STRENGTH[typ] + (0.2 if typ == "choose" and reason == "taste" else 0.0)
+            s = STRENGTH[typ] + (TASTE_BONUS.get(reason, 0.0) if typ == "choose" else 0.0)
             self.taste.observe(conc, True, s, eid, typ)
             self.history.append((rid, 1.0, s))
             if typ == "choose" and idx is not None and len(shown) > 1 and self.values:
@@ -438,7 +449,7 @@ class Learner:
                 if idx is not None and self.values:
                     self.values.observe_rejection(scores, idx, reason, eid)
                 return f"you rejected {recipe['title']} ({reason.replace('_', ' ')})"
-            strength = 1.0 if reason == "not_my_taste" else 0.5
+            strength = TASTE_STRENGTH.get(reason, 0.5)
             self.taste.observe(conc, False, strength, eid, "reject")
             self.history.append((rid, 0.0, strength))
             return "you rejected " + recipe["title"]

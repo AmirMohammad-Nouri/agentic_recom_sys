@@ -1,6 +1,8 @@
 // Shared helpers: DOM builder, API client, icons, formatting, tiny app state.
 
-// p = taste (a fixed, learned share); h, s, t = the three values the user sets.
+// p = taste (a fixed, learned share); the others are the values the user weighs. They are
+// configurable (foodrec.config.json "criteria"): setCriteria() replaces these in place from
+// /api/system, so every module that imported them sees the configured set.
 export const CRIT = ["p", "h", "s", "t"];
 export const VALUES = ["h", "s", "t"];
 export const CRIT_META = {
@@ -13,6 +15,21 @@ export const CRIT_META = {
   t: { label: "Convenience", long: "Convenience", lo: "Not important", hi: "Very important", color: "var(--c-t)", icon: "list",
     what: "Fewer ingredients score higher" },
 };
+
+const ICON_FOR = { healthiness: "pulse", sustainability: "leaf", convenience: "list", field: "target" };
+export function setCriteria(specs) {
+  if (!specs?.length) return;
+  VALUES.splice(0, VALUES.length, ...specs.map((c) => c.id));
+  CRIT.splice(0, CRIT.length, "p", ...VALUES);
+  for (const k of Object.keys(CRIT_META)) if (k !== "p" && !VALUES.includes(k)) delete CRIT_META[k];
+  for (const c of specs) {
+    CRIT_META[c.id] = {
+      ...(CRIT_META[c.id] || {}), label: c.label, long: c.label, lo: "Not important", hi: "Very important",
+      color: c.color || CRIT_META[c.id]?.color || `var(--c-${c.id})`, icon: ICON_FOR[c.kind] || "target",
+      what: c.description || CRIT_META[c.id]?.what || "", kind: c.kind, spec: c,
+    };
+  }
+}
 
 // h("div.card.pad", {onclick}, child, "text", [children])
 export function h(sel, attrs, ...kids) {
@@ -104,6 +121,8 @@ export function icon(name, cls = "") {
 // entered on the Config page, the admin token.
 export function headers(json = false) {
   const hd = { "X-User": state.user };
+  const session = safeGet("foodrec.session");
+  if (session) hd.Authorization = `Bearer ${session}`;
   const tok = sessionGet("foodrec.admin_token");
   if (tok) hd["X-Admin-Token"] = tok;
   if (json) hd["Content-Type"] = "application/json";

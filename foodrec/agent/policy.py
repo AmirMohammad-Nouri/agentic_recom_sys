@@ -16,7 +16,7 @@ say how far the answer should reach:
     "only today"             today's lists are adjusted; the day's drift is rolled back
     "keep my goal"           the drift since the goal was saved is forgotten
 """
-from .. import VALUE_CRITERIA, CRITERION_LABELS
+from .. import INTERACTIONS, VALUE_CRITERIA, CRITERION_LABELS
 
 THRESHOLDS = {
     "ask_gap": 0.10,             # |observed - stated| that is worth a question ...
@@ -27,8 +27,10 @@ THRESHOLDS = {
     "taste_min_evidence": 2.0,   # ... with at least this much observed evidence
     "cooldown_events": 6,        # after a dismissal, do not re-raise the same topic for N events
 }
-REASON_FOR = {"t": ("easy", "too_complicated"), "h": ("health", "not_healthy_enough"),
-              "s": ("climate", "not_sustainable")}
+# criterion -> all choose / reject reason ids about it (from the configured interactions)
+REASON_FOR = {k: (tuple(r["id"] for r in INTERACTIONS["choose_reasons"] if r["criterion"] == k),
+                  tuple(r["id"] for r in INTERACTIONS["reject_reasons"] if r["criterion"] == k))
+              for k in VALUE_CRITERIA}
 
 
 def _pct(x):
@@ -112,11 +114,11 @@ def review(app, user_id, trace, trigger="feedback"):
 
 
 def _history_evidence(app, user_id, trace, k):
-    choose_reason, reject_reason = REASON_FOR[k]
+    choose_reasons, reject_reasons = REASON_FOR[k]
     s = trace.start("tool", "Searching interaction history in the knowledge graph",
                     "graph.timeline(user, types=[choose, reject, like], limit=40)", source="graph")
     rows = app.graph.timeline(user_id, types=["choose", "reject", "like", "save"], limit=40)
-    support = [r for r in rows if r.get("reason") in (choose_reason, reject_reason)]
+    support = [r for r in rows if r.get("reason") in choose_reasons + reject_reasons]
     trace.finish(s, f"{len(rows)} recent interactions; {len(support)} name {CRITERION_LABELS[k].lower()} "
                     f"explicitly as the reason.",
                  evidence=[{"event_id": r["event_id"], "type": r["type"], "reason": r.get("reason"),

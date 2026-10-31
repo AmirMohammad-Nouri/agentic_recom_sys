@@ -17,3 +17,4 @@ data/hummus/labels_rules.json
 out/
 data/*/runtime/
 *.config.json.tmp
+Scenarios.txt

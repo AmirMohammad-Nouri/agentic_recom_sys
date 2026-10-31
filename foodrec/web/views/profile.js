@@ -135,7 +135,7 @@ export function profileView() {
       h("div.stack",
         h("section.card", h("div.card-head", h("h2", "Safety rules")), h("div.card-body", form.sections.safety)),
         h("section.card", h("div.card-head", h("h2", "Taste")), h("div.card-body", form.sections.taste)),
-        h("section.card", h("div.card-head", h("h2", "Health goal")), h("div.card-body", form.sections.goal)),
+        VALUES.includes("h") ? h("section.card", h("div.card-head", h("h2", "Health goal")), h("div.card-body", form.sections.goal)) : null,
         h("section.card", h("div.card-head", h("h2", "Ingredient limit")), h("div.card-body", form.sections.limits))),
       h("div.stack",
         h("section.card", h("div.card-head", h("h2", "Goal versions")), h("div.card-body", goals)),
@@ -177,15 +177,19 @@ export function onboarding(onDone) {
   const form = profileForm({});
   const picked = new Map();
   let step = 0;
-  const raw = { h: 40, s: 30, t: 30 };
+  // starting slider values: the configured default weights of the enabled criteria
+  const dw = state.system.default_weights || {};
+  const raw = Object.fromEntries(VALUES.map((k) => [k, Math.round(100 * (dw[k] ?? 1 / VALUES.length))]));
+  const hasHealth = VALUES.includes("h");
   const body = h("div.modal-body");
   const ind = h("div.steps-ind");
   const back = h("button.btn.ghost", { onclick: () => go(step - 1) }, "Back");
   const next = h("button.btn.primary", { onclick: () => (step === 4 ? finish() : go(step + 1)) }, "Continue");
-  const titles = ["Safety first", "What you like", "Your health goal", "A few dishes you like", "Your three values"];
+  const titles = ["Safety first", "What you like", hasHealth ? "Your health goal" : "Limits", "A few dishes you like",
+    VALUES.length === 3 ? "Your three values" : "Your values"];
   const subs = ["These are strict rules. They filter recipes before anything is ranked.",
     "Preferences shape the taste match; only 'never include' items become rules.",
-    "This decides how the nutrient factors are weighted inside the healthiness score.",
+    hasHealth ? "This decides how the nutrient factors are weighted inside the healthiness score." : "An optional limit on the number of ingredients.",
     "Search and pick up to five. This gives the taste model a starting point.",
     "How much should each count? You can change these at any time; every change is versioned."];
   const head = h("div.modal-head");
@@ -234,7 +238,8 @@ export function onboarding(onDone) {
   paint();
   const prio = h("div.stack", sliders.map((s) => s.el), h("div.stack.tight", h("div.field-label", "Share of each value"), total),
     h("div.hint", `Taste is not a slider: it keeps a fixed ${Math.round((state.system.taste_share ?? 0.25) * 100)}% share and is learned from what you like and reject.`));
-  const pages = [form.sections.safety, form.sections.taste, h("div.stack", form.sections.goal, h("div.divider"), form.sections.limits), dishes, prio];
+  const pages = [form.sections.safety, form.sections.taste,
+    hasHealth ? h("div.stack", form.sections.goal, h("div.divider"), form.sections.limits) : form.sections.limits, dishes, prio];
   function go(i) {
     step = Math.max(0, Math.min(4, i));
     clear(head, h("div.small.muted", `Step ${step + 1} of 5`), h("h2", { style: { fontSize: "18px", marginTop: "4px" } }, titles[step]),

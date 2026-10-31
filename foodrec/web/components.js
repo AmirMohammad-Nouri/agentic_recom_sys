@@ -1,13 +1,12 @@
 // Reusable UI pieces: recipe card, decision card, change summary, comparison table.
 import { api, ask, can, co2, CRIT, CRIT_META, clear, emit, f2, grade, h, human, icon, menu, pct, state, toast, track, userPath, VALUES, visibleCriteria, weightBar, ago } from "./lib.js";
 
-const REJECT = [["not_my_taste", "Not my taste"], ["not_healthy_enough", "Not healthy enough"],
-  ["not_sustainable", "Not sustainable enough"], ["too_complicated", "Too many ingredients"], ["had_recently", "Had it recently"]];
-const CHOOSE = [["taste", "It sounds tasty"], ["health", "It is healthy"], ["climate", "It is climate-friendly"],
-  ["easy", "It is easy to make"], [null, "No particular reason"]];
-
+// Feedback reasons come from the configured interactions (foodrec.config.json "interactions").
+const reasons = (kind) => (state.system?.interactions?.[`${kind}_reasons`] || []).filter((r) => r.show !== false);
+const REJECT = () => reasons("reject").map((r) => [r.id, r.label]);
+const CHOOSE = () => [...reasons("choose").map((r) => [r.id, r.label]), [null, "No particular reason"]];
 // Reasons that may be a one-off: the user says whether they should change what is learned.
-const SCOPED = new Set(["not_my_taste", "not_healthy_enough", "not_sustainable", "too_complicated", "health", "climate", "easy", "taste"]);
+const scoped = (reason) => [...reasons("choose"), ...reasons("reject")].some((r) => r.id === reason && r.ask_scope);
 
 export async function sendFeedback(r, requestId, type, reason, scope = "lasting") {
   try {
@@ -76,8 +75,8 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
     } catch { /* toast already shown */ }
   };
   // Second step for reasons that may be temporary: only today, or update what is learned.
-  const scoped = (anchor, type, reason) => {
-    if (!SCOPED.has(reason)) return act(type, reason);
+  const askScope = (anchor, type, reason) => {
+    if (!scoped(reason)) return act(type, reason);
     setTimeout(() => menu(anchor, [{ label: "Is this lasting?" },
       { text: "Update my preference", run: () => act(type, reason, "lasting") },
       { text: "Only today", run: () => act(type, reason, "today") }]), 0);
@@ -117,9 +116,9 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
           h("button.btn.sm", { onclick: () => act("like") }, icon("heart"), "Like"),
           h("button.btn.sm", { onclick: () => act("save") }, icon("bookmark"), "Save"),
           h("button.btn.sm", { onclick: (e) => { const b = e.currentTarget; menu(b, [{ label: "Why this one?" },
-            ...CHOOSE.map(([k, t]) => ({ text: t, run: () => scoped(b, "choose", k) }))]); } }, icon("check"), "I'll cook this"),
+            ...CHOOSE().map(([k, t]) => ({ text: t, run: () => askScope(b, "choose", k) }))]); } }, icon("check"), "I'll cook this"),
           h("button.btn.sm.ghost", { onclick: (e) => { const b = e.currentTarget; menu(b, [{ label: "What is wrong with it?" },
-            ...REJECT.map(([k, t]) => ({ text: t, run: () => scoped(b, "reject", k) }))]); } }, icon("x"), "Not for me")] : null,
+            ...REJECT().map(([k, t]) => ({ text: t, run: () => askScope(b, "reject", k) }))]); } }, icon("x"), "Not for me")] : null,
         h("span.grow"),
         status,
         can("assistant") && explain ? h("button.btn.sm.ghost", { onclick: () => ask(`Why is #${r.final_rank} ${r.title} recommended?`), title: "Ask the assistant about this recipe" },
@@ -138,6 +137,17 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
 
 // ---- score breakdown: how each of the three scores was calculated ------------------------
 export function scoreBreakdown(bd) {
+  // one section per enabled criterion; built-ins have their own layout, field criteria a generic one
+  const on = (k) => VALUES.includes(k) && bd[k];
+  const fieldSection = (k) => {
+    const c = bd[k];
+    const better = c.direction === "lower" ? "lower is better" : "higher is better";
+    return h("section",
+      h("div.bd-head", h("span.swatch", { style: { background: CRIT_META[k].color } }), h("b", CRIT_META[k].long),
+        h("span.bd-score", f2(c.score)), h("span.small.muted", c.value == null ? "value unknown" : `${c.value} ${c.unit || ""}`)),
+      CRIT_META[k].what ? h("div.small.muted", CRIT_META[k].what) : null,
+      h("div.formula", `From ${c.field} (${better}): ${c.anchors.best} → 1, ${c.anchors.worst} → 0, ${c.scale}. Score = ${c.formula}.`));
+  };
   const hh = bd.h, ss = bd.s, tt = bd.t;
   const fac = hh.factors.map((f) => h("tr" + (f.score == null ? ".muted" : ""),
     h("td", f.label, f.flipped ? h("span.tag.info", { title: "Reversed for the goal: more is better" }, "reversed") : null),
@@ -148,25 +158,26 @@ export function scoreBreakdown(bd) {
       h("div.row", h("div.minibar.grow", h("span", { style: { width: pct(f.score), background: "var(--c-h)" } })), h("span.small", f2(f.score))))));
   const fp = (ss.breakdown || []).filter((b) => b.share >= 0.01).slice(0, 6);
   return h("div.breakdown",
-    h("section",
-      h("div.bd-head", h("span.swatch", { style: { background: "var(--c-h)" } }), h("b", "Healthiness"), grade(hh.grade),
+    on("h") ? h("section",
+      h("div.bd-head", h("span.swatch", { style: { background: CRIT_META.h.color } }), h("b", CRIT_META.h.long), grade(hh.grade),
         h("span.bd-score", f2(hh.score)), h("span.small.muted", `goal: ${hh.goal_label}`)),
       h("table.t", h("thead", h("tr", h("th", "Factor (per 100 g)"), h("th.num", "Value"), h("th.num", "Good → poor"), h("th.num", "Weight"), h("th", "Score"))),
         h("tbody", fac)),
-      h("div.formula", "Healthiness = Σ weight × factor score / Σ weight", hh.missing.length ? ` · missing: ${hh.missing.join(", ")}` : "")),
-    h("section",
-      h("div.bd-head", h("span.swatch", { style: { background: "var(--c-s)" } }), h("b", "Sustainability"),
+      h("div.formula", "Healthiness = Σ weight × factor score / Σ weight", hh.missing.length ? ` · missing: ${hh.missing.join(", ")}` : "")) : null,
+    on("s") ? h("section",
+      h("div.bd-head", h("span.swatch", { style: { background: CRIT_META.s.color } }), h("b", CRIT_META.s.long),
         h("span.bd-score", f2(ss.score)), h("span.small.muted", co2(ss.kg_co2e_per_kg) + (ss.kg_co2e_per_serving != null ? ` · ${f2(ss.kg_co2e_per_serving)} kg per serving` : ""))),
       fp.length ? h("div.fp-bars", fp.map((b) => h("div.fp-row",
         h("span.fp-name", b.name, h("span.small.muted", ` · ${human(b.category)}`)),
         h("div.minibar", h("span", { style: { width: pct(b.share), background: "var(--c-s)" } })),
         h("span.small", `${pct(b.share)}`), h("span.small.muted", `${Math.round(b.grams)} g × ${b.factor}`)))) : null,
-      h("div.formula", `Footprint = Σ grams × food-group factor / total grams (Poore & Nemecek 2018). Score: log scale, ${ss.anchors.best} → 1, ${ss.anchors.worst} → 0.`)),
-    h("section",
-      h("div.bd-head", h("span.swatch", { style: { background: "var(--c-t)" } }), h("b", "Convenience"),
+      h("div.formula", `Footprint = Σ grams × food-group factor / total grams (Poore & Nemecek 2018). Score: log scale, ${ss.anchors.best} → 1, ${ss.anchors.worst} → 0.`)) : null,
+    on("t") ? h("section",
+      h("div.bd-head", h("span.swatch", { style: { background: CRIT_META.t.color } }), h("b", CRIT_META.t.long),
         h("span.bd-score", f2(tt.score)), h("span.small.muted", `${tt.n_ingredients} ingredients`)),
       h("div.chips", tt.ingredients.map((n) => h("span.tag", n))),
-      h("div.formula", `Score = (${tt.anchors.worst} − n) / (${tt.anchors.worst} − ${tt.anchors.best}), clipped to 0–1.`)));
+      h("div.formula", `Score = (${tt.anchors.worst} − n) / (${tt.anchors.worst} − ${tt.anchors.best}), clipped to 0–1.`)) : null,
+    VALUES.filter((k) => bd[k]?.kind === "field").map(fieldSection));
 }
 
 // The details panel: "How it's scored" when scores are visible, otherwise just the food details.

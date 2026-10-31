@@ -175,16 +175,23 @@ class Skills:
             data = {"recipe": {"recipe_id": recipe_id, "title": r["title"], "scores": sc, "violations": viol}}
         bd = breakdown(r, (prof["declared"].get("health_goal") or DEFAULT_GOAL))
         fp = r.get("footprint") or {}
-        facts.append(f"Health grade {bd['h']['grade'] or 'unknown'} for the goal '{bd['h']['goal_label']}'; "
+        facts.append((f"Health grade {bd['h']['grade'] or 'unknown'} for the goal '{bd['h']['goal_label']}'; "
+                      if "h" in VALUE_CRITERIA else "") +
                      f"{r['n_ingredients']} ingredients; about {fp.get('kg_co2e_per_kg')} kg CO2e per kg; "
                      f"{r.get('kcal_per_serving')} kcal per serving.")
+        for k in VALUE_CRITERIA:
+            if bd.get(k, {}).get("kind") == "field" and bd[k]["value"] is not None:
+                facts.append(f"{CRITERION_LABELS[k]}: {bd[k]['value']} {bd[k]['unit']} "
+                             f"(best {bd[k]['anchors']['best']}, worst {bd[k]['anchors']['worst']}).")
+                nums += [bd[k]["value"], bd[k]["anchors"]["best"], bd[k]["anchors"]["worst"]]
         nums += [r["n_ingredients"], fp.get("kg_co2e_per_kg"), r.get("kcal_per_serving")]
         top = [b for b in fp.get("breakdown", [])[:2] if b["share"] >= 0.2]
         if top:
             facts.append("Most of its footprint comes from " + " and ".join(
                 f"{b['name']} ({round(100 * b['share'])}%)" for b in top) + ".")
             nums += [round(100 * b["share"]) for b in top]
-        weak = sorted((f for f in bd["h"]["factors"] if f["score"] is not None), key=lambda f: f["score"])[:2]
+        weak = sorted((f for f in bd["h"]["factors"] if f["score"] is not None),
+                      key=lambda f: f["score"])[:2] if "h" in VALUE_CRITERIA else []
         if weak and weak[0]["score"] < 0.5:
             facts.append("Weakest health factors: " + ", ".join(f"{f['label'].lower()} {f['value']} {f['unit']}"
                                                                  for f in weak if f["score"] < 0.5) + ".")
@@ -246,7 +253,8 @@ class Skills:
         if criterion not in VALUE_CRITERIA:
             return SkillResult("Taste has a fixed share", {}, [f"Taste is a fixed {round(TASTE_SHARE * 100)}% share "
                                "learned from your likes and rejections, so there is no taste weight to change. "
-                               "Try healthiness, sustainability or convenience."], [round(TASTE_SHARE * 100)])
+                               "Try " + ", ".join(CRITERION_LABELS[k].lower() for k in VALUE_CRITERIA) + "."],
+                               [round(TASTE_SHARE * 100)])
         w = dict(goal["weights"])
         w[criterion] = max(0.0, w[criterion] + (amount if direction != "less" else -amount))
         tot = sum(w.values())

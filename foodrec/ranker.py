@@ -19,11 +19,22 @@ Missing-value policies (decided BEFORE ranking, disclosed per recipe):
 * "zero"         an unscored criterion contributes 0 (a pessimistic penalty).
 * "exclude"      a recipe missing any positively weighted criterion is not ranked.
 """
-from . import CRITERIA, TASTE_SHARE, VALUE_CRITERIA
+from . import CRITERIA, CRITERION_SPECS, TASTE_SHARE, VALUE_CRITERIA
 
-DEFAULT_WEIGHTS = {"h": 0.40, "s": 0.30, "t": 0.30}
+# the configured starting weights of the enabled criteria (foodrec.config.json "criteria")
+_dw = {k: c["default_weight"] for k, c in CRITERION_SPECS.items()}
+DEFAULT_WEIGHTS = {k: v / sum(_dw.values()) for k, v in _dw.items()}
 MISSING_POLICIES = ("renormalize", "zero", "exclude")
 MAX_MISSING_SHARE = 0.5
+
+
+def conform_weights(weights):
+    """Weights saved under another criteria configuration, mapped onto the current criteria:
+    a removed criterion is dropped, a new one starts at 0, the rest is renormalised. If
+    nothing is left, the configured default weights are used."""
+    w = {k: max(0.0, float((weights or {}).get(k) or 0.0)) for k in VALUE_CRITERIA}
+    tot = sum(w.values())
+    return {k: v / tot for k, v in w.items()} if tot > 0 else dict(DEFAULT_WEIGHTS)
 
 
 def resolve_weights(weights=None, last_valid=None):

@@ -1,14 +1,21 @@
 {
-  "$comment": "FoodRec configuration. Edit here or on the Config page (admin role). Precedence: built-in default < environment/.env < this file; null means 'use the environment or the default'. Secrets (NEO4J_PASSWORD, FOODREC_ADMIN_TOKEN) stay in the environment. See docs/configuration.md.",
   "config_version": 1,
+  "$comment": "FoodRec configuration. Edit here or on the Config page (admin role). Precedence: built-in default < environment/.env < this file; null means 'use the environment or the default'. Secrets (NEO4J_PASSWORD, FOODREC_ADMIN_TOKEN) stay in the environment. See docs/configuration.md.",
   "llm": {
     "enabled": true,
-    "url": null,
+    "provider": "ollama",
     "model": "qwen3.5:2b-q4_K_M",
+    "url": null,
+    "base_url": null,
+    "api_key_env": null,
+    "effort": "low",
+    "max_tokens": 4096,
+    "fallbacks": true,
     "ctx": 8192,
     "think": false,
-    "timeout_s": 60.0,
+    "timeout_s": 60,
     "seed": 7,
+    "embed_provider": "ollama",
     "embed_model": "nomic-embed-text",
     "embed_on_cpu": true
   },
@@ -29,6 +36,11 @@
     "default_mode": "lightweight",
     "max_missing_share": 0.5,
     "min_nutrient_coverage": 0.6
+  },
+  "server": {
+    "host": null,
+    "port": null,
+    "auto_reload": true
   },
   "supervisor": {
     "max_agent_steps": 3
@@ -58,12 +70,7 @@
           "switch_user": true,
           "configure": true
         },
-        "visible_criteria": [
-          "p",
-          "h",
-          "s",
-          "t"
-        ],
+        "visible_criteria": "all",
         "blocked_skills": []
       },
       "full": {
@@ -85,15 +92,10 @@
           "page_activity": true,
           "page_profile": true,
           "export_own": true,
-          "switch_user": true,
+          "switch_user": false,
           "configure": false
         },
-        "visible_criteria": [
-          "p",
-          "h",
-          "s",
-          "t"
-        ],
+        "visible_criteria": "all",
         "blocked_skills": []
       },
       "no_explanations": {
@@ -115,15 +117,10 @@
           "page_activity": true,
           "page_profile": true,
           "export_own": true,
-          "switch_user": true,
+          "switch_user": false,
           "configure": false
         },
-        "visible_criteria": [
-          "p",
-          "h",
-          "s",
-          "t"
-        ],
+        "visible_criteria": "all",
         "blocked_skills": []
       },
       "baseline": {
@@ -154,7 +151,8 @@
     },
     "users": {
       "admin": "admin",
-      "demo": "admin"
+      "demo": "admin",
+      "p1": "full"
     }
   },
   "study": {
@@ -167,6 +165,160 @@
       "full",
       "baseline"
     ],
-    "seed": 7
+    "seed": 7,
+    "login_required": false,
+    "population": {
+      "size": 20,
+      "prefix": "p",
+      "digits": 3,
+      "roles": {
+        "full": 50,
+        "baseline": 50
+      },
+      "shuffle": true,
+      "seed": 7,
+      "password_words": 2
+    },
+    "participants": []
+  },
+  "criteria": {
+    "taste_share": 0.25,
+    "items": [
+      {
+        "id": "h",
+        "kind": "healthiness",
+        "label": "Healthiness",
+        "enabled": true,
+        "default_weight": 0.4,
+        "description": "Nine nutrient factors per 100 g (energy, fats, sugars, sodium, cholesterol, fibre, protein, FSA score), weighted by the user's health goal.",
+        "keywords": [
+          "health",
+          "healthy",
+          "healthier",
+          "nutritious",
+          "nutrition",
+          "nutri"
+        ],
+        "color": null
+      },
+      {
+        "id": "s",
+        "kind": "sustainability",
+        "label": "Sustainability",
+        "enabled": true,
+        "default_weight": 0.3,
+        "description": "Estimated kg CO2e per kg of dish from ingredient amounts and food-group factors (log scale).",
+        "keywords": [
+          "sustainab",
+          "climate",
+          "co2",
+          "carbon",
+          "green",
+          "environment",
+          "planet",
+          "footprint"
+        ],
+        "color": null
+      },
+      {
+        "id": "t",
+        "kind": "convenience",
+        "label": "Convenience",
+        "enabled": true,
+        "default_weight": 0.3,
+        "description": "Fewer ingredients score higher (3 or fewer = 1, 15 or more = 0).",
+        "keywords": [
+          "convenien",
+          "easy",
+          "easier",
+          "simple",
+          "simpler",
+          "fewer ingredients",
+          "effort",
+          "quick"
+        ],
+        "color": null
+      }
+    ]
+  },
+  "interactions": {
+    "feedback_strength": {
+      "like": 1,
+      "save": 0.6,
+      "choose": 0.8
+    },
+    "choose_reasons": [
+      {
+        "id": "taste",
+        "label": "It sounds tasty",
+        "criterion": null,
+        "taste_bonus": 0.2
+      },
+      {
+        "id": "health",
+        "label": "It is healthy",
+        "criterion": "h",
+        "weight": 1
+      },
+      {
+        "id": "climate",
+        "label": "It is climate-friendly",
+        "criterion": "s",
+        "weight": 1
+      },
+      {
+        "id": "easy",
+        "label": "It is easy to make",
+        "criterion": "t",
+        "weight": 1
+      }
+    ],
+    "reject_reasons": [
+      {
+        "id": "not_my_taste",
+        "label": "Not my taste",
+        "criterion": null,
+        "taste_strength": 1
+      },
+      {
+        "id": "not_healthy_enough",
+        "label": "Not healthy enough",
+        "criterion": "h",
+        "weight": 1
+      },
+      {
+        "id": "not_sustainable",
+        "label": "Not sustainable enough",
+        "criterion": "s",
+        "weight": 1
+      },
+      {
+        "id": "too_complicated",
+        "label": "Too many ingredients",
+        "criterion": "t",
+        "weight": 1
+      },
+      {
+        "id": "had_recently",
+        "label": "Had it recently",
+        "criterion": null,
+        "effect": "recency"
+      },
+      {
+        "id": "other",
+        "label": "Something else",
+        "criterion": null,
+        "taste_strength": 0.5,
+        "show": false
+      }
+    ],
+    "learning": {
+      "eta": 1,
+      "nudge": 0.2,
+      "anchor": 0.05,
+      "floor": 0.02,
+      "today_nudge": 0.1,
+      "conf_k": 5
+    }
   }
 }

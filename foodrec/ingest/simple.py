@@ -14,7 +14,10 @@ The file is a JSON list (or {"recipes": [...]}) of objects:
                             "protein_g": 6, "carbs_g": 15},      kcal is required
      "nutrition_per_serving": {...same keys...},   optional (gives the serving size)
      "tags": ["Vegetarian"],                       optional ("Vegetarian", "Vegan", "Contains Gluten" ...)
-     "url": "...", "image_url": "...", "fsa_score": 0.4}         optional
+     "url": "...", "image_url": "...", "fsa_score": 0.4,         optional
+     "extra": {"price_eur": 2.4, "prep_minutes": 25}}             optional numeric fields
+Values in "extra" are kept in the catalogue as extra.<name> and can be used as field criteria
+(e.g. {"id": "c", "kind": "field", "label": "Low price", "field": "extra.price_eur", ...}).
 Food groups, CO2e footprints, allergens, diets, cuisine and meal type are derived exactly
 as for HUMMUS (model labels when Ollama is available, keyword rules otherwise).
 """
@@ -51,6 +54,11 @@ def rows_from_simple(path):
                "recipe_url": r.get("url"), "image_url": r.get("image_url"), "fsa_score": r.get("fsa_score")}
         for k, (c100, cs) in NUTRIENT_COLUMNS.items():
             row[c100], row[cs] = per100.get(k), serv.get(k)
+        extra = r.get("extra") or {}
+        bad = [k for k, v in extra.items() if isinstance(v, bool) or not isinstance(v, (int, float))]
+        if bad:
+            problems.append(f"recipe {i} ({r['title']}): extra values must be numbers ({', '.join(bad)})")
+        row["extra"] = {k: float(v) for k, v in extra.items() if k not in bad}
         rows.append(row)
     if problems:
         raise ValueError("; ".join(problems[:10]) + (f" (and {len(problems) - 10} more)" if len(problems) > 10 else ""))

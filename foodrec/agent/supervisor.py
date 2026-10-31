@@ -10,6 +10,7 @@ Division of labour (docs/supervisor.md):
 """
 from dataclasses import dataclass
 
+from .. import CRITERION_LABELS, VALUE_CRITERIA
 from ..constraints import SUPPORTED_ALLERGENS, SUPPORTED_DIETS
 from ..explain import BANNED, _NUM
 from ..llm import LLMUnavailable
@@ -22,7 +23,13 @@ HELP = ("I can suggest five recipes (\"something with lentils and few ingredient
         "does (\"why #2?\"), compare two dishes, show what would change if a priority moved (\"what if I cared "
         "more about sustainability?\"), tell you what I believe about your preferences and why, search your "
         "history (\"what did I reject last week?\"), answer questions from the recipe and ingredient knowledge "
-        "base (how healthiness, sustainability and convenience are scored), and prepare profile changes for you to confirm. Everything I do is shown step by step above.")
+        "base (how each criterion is scored), and prepare profile changes for you to confirm. Everything I do is shown step by step above.")
+
+
+def _criteria_list():
+    names = [CRITERION_LABELS[k].lower() for k in VALUE_CRITERIA]
+    text = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]
+    return text[0].upper() + text[1:]
 
 
 @dataclass
@@ -170,7 +177,7 @@ class Supervisor:
             if not refs:
                 return [], "Which recipe do you mean? You can say \"#2\" or use its name."
             plan = [("explain_recipe", {"recipe_id": refs[0]})]
-            if it["criterion"] in ("h", "s", "t") and it["direction"] == "more":
+            if it["criterion"] in VALUE_CRITERIA and it["direction"] == "more":
                 plan.append(("alternatives", {"recipe_id": refs[0], "criterion": it["criterion"]}))
             return plan, None
         if i == "compare_recipes":
@@ -183,11 +190,11 @@ class Supervisor:
             return [("compare_recipes", {"a": refs[0], "b": refs[1]})], None
         if i == "what_if":
             if not it["criterion"]:
-                return [], ("Which priority should change? Healthiness, sustainability or convenience.")
+                return [], f"Which priority should change? {_criteria_list()}."
             return [("what_if", {"criterion": it["criterion"], "direction": it["direction"] or "more"})], None
         if i == "adjust_goal":
-            if it["criterion"] not in ("h", "s", "t"):
-                return [], "Which priority should get more weight? Healthiness, sustainability or convenience."
+            if it["criterion"] not in VALUE_CRITERIA:
+                return [], f"Which priority should get more weight? {_criteria_list()}."
             return [("goal_options", {"increase": it["criterion"],
                                       "decrease": it.get("secondary_criterion")})], None
         if i == "why_preference":
@@ -249,7 +256,7 @@ class Supervisor:
         done = {n for n, _ in results}
         last_rid = next((r.data.get("recipe", {}).get("recipe_id") for n, r in results if n == "explain_recipe"), None)
         options = {}
-        if last_rid and it["criterion"] in ("h", "s", "t") and "alternatives" not in done:
+        if last_rid and it["criterion"] in VALUE_CRITERIA and "alternatives" not in done:
             options["alternatives"] = {"recipe_id": last_rid, "criterion": it["criterion"]}
         if it["concept"] and "graph_lookup" not in done:
             options["graph_lookup"] = {"concept": it["concept"]}

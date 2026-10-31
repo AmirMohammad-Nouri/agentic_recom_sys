@@ -32,6 +32,7 @@ writes graph queries.
 import time
 from collections import Counter, defaultdict
 
+from .. import VALUE_CRITERIA
 from ..constraints import SUPPORTED_DIETS
 from ..features import health_grade
 
@@ -84,8 +85,8 @@ class GraphProjection:
                 "recipe_id": r["id"], "title": r["title"], "cuisine": r["cuisine"], "meal": r.get("meal"),
                 "n_ingredients": r.get("n_ingredients"), "co2e_kg_per_kg": fp.get("kg_co2e_per_kg"),
                 "kcal": r.get("kcal_per_serving"), "fsa_score": r.get("fsa_score"),
-                "health_grade": health_grade(sc["h"]), "image_url": r.get("image_url"),
-                **{f"score_{k}": sc[k] for k in ("h", "s", "t")}})
+                "health_grade": health_grade(sc.get("h")), "image_url": r.get("image_url"),
+                **{f"score_{k}": sc[k] for k in VALUE_CRITERIA}})
             self.merge_node(f"cuisine:{r['cuisine']}", "Cuisine", {"name": r["cuisine"]})
             self.merge_edge(u, "OF_CUISINE", f"cuisine:{r['cuisine']}")
             for i in r["ingredients"]:

@@ -28,10 +28,17 @@ Sustainability (s)
 
 Convenience (t)
     Number of ingredients (from ingredients_title): 3 or fewer -> 1, 15 or more -> 0, linear.
+
+Field criteria (configured in foodrec.config.json, see model_spec.py)
+    One numeric recipe field (e.g. nutrition_per_100g.kcal) scored between a "best" and a
+    "worst" anchor, linear or on a log scale; outside the anchors the score is clipped to 0/1.
+Only the ENABLED criteria are scored and ranked; h, s and t are still computed for the
+breakdown so the explanations of the built-in criteria keep working when one is switched off.
 """
 import math
 
-VALUE_CRITERIA = ("h", "s", "t")
+from . import CRITERION_SPECS, VALUE_CRITERIA
+from .model_spec import extract
 SCORER_VERSION = "criteria_v2"
 MIN_NUTRIENT_COVERAGE = 0.6
 
@@ -135,10 +142,28 @@ def convenience(recipe):
     return None if n is None else _lin(n, ING_BEST, ING_WORST)
 
 
+def field_score(recipe, spec):
+    """Score of a configured field criterion: (score, raw value)."""
+    v = extract(recipe, spec["field"])
+    if v is None:
+        return None, None
+    best, worst = spec["best"], spec["worst"]
+    if spec.get("scale") == "log":
+        v2 = max(v, 1e-9)
+        x = (math.log(worst) - math.log(v2)) / (math.log(worst) - math.log(best))
+    else:
+        x = (worst - v) / (worst - best)
+    return min(1.0, max(0.0, x)), v
+
+
 def raw_values(recipe):
     """Raw values behind each criterion (for display and for the assistant)."""
     fp = recipe.get("footprint") or {}
-    return {"h": None, "s": fp.get("kg_co2e_per_kg"), "t": recipe.get("n_ingredients")}
+    out = {"h": None, "s": fp.get("kg_co2e_per_kg"), "t": recipe.get("n_ingredients")}
+    for k, c in CRITERION_SPECS.items():
+        if c["kind"] == "field":
+            out[k] = extract(recipe, c["field"])
+    return {k: out.get(k) for k in VALUE_CRITERIA}
 
 
 def health_grade(score):
@@ -159,7 +184,7 @@ def breakdown(recipe, goal=None, min_coverage=MIN_NUTRIENT_COVERAGE):
     s, t = sustainability(recipe), convenience(recipe)
     g = GOALS.get(goal or DEFAULT_GOAL, GOALS[DEFAULT_GOAL])
     used = [r for r in rows if r["score"] is not None]
-    return {
+    out = {
         "recipe_id": recipe["id"], "title": recipe["title"],
         "h": {"score": h, "grade": health_grade(h), "goal": goal or DEFAULT_GOAL, "goal_label": g["label"],
               "factors": rows, "missing": [r["label"] for r in rows if r["score"] is None],
@@ -174,6 +199,16 @@ def breakdown(recipe, goal=None, min_coverage=MIN_NUTRIENT_COVERAGE):
               "anchors": {"best": ING_BEST, "worst": ING_WORST},
               "formula": f"({ING_WORST} - n) / ({ING_WORST} - {ING_BEST}), clipped to 0-1"},
     }
+    for k, c in CRITERION_SPECS.items():
+        if c["kind"] == "field":
+            sc, v = field_score(recipe, c)
+            b, w = c["best"], c["worst"]
+            out[k] = {"score": sc, "kind": "field", "label": c["label"], "field": c["field"], "value": v,
+                      "unit": c.get("unit", ""), "direction": c["direction"], "scale": c["scale"],
+                      "anchors": {"best": b, "worst": w},
+                      "formula": (f"(ln {w} - ln x) / (ln {w} - ln {b})" if c["scale"] == "log"
+                                  else f"({w} - x) / ({w} - {b})") + ", clipped to 0-1"}
+    return out
 
 
 class Scorer:
@@ -195,8 +230,12 @@ class Scorer:
             cov = health_coverage(rows)
             self._cov[key] = {"coverage": cov, "missing": [r["label"] for r in rows if r["score"] is None],
                               "below_min": cov < self.min_coverage}
-            self._cache[key] = {"h": None if cov < self.min_coverage else h, "s": sustainability(recipe),
-                                "t": convenience(recipe)}
+            allc = {"h": None if cov < self.min_coverage else h, "s": sustainability(recipe),
+                    "t": convenience(recipe)}
+            for k, c in CRITERION_SPECS.items():
+                if c["kind"] == "field":
+                    allc[k] = field_score(recipe, c)[0]
+            self._cache[key] = {k: allc[k] for k in VALUE_CRITERIA}
         return dict(self._cache[key])
 
     def coverage(self, recipe, goal=None):
@@ -208,4 +247,5 @@ class Scorer:
         return {"version": self.version, "min_nutrient_coverage": self.min_coverage,
                 "health_factors": {k: v[:5] for k, v in HEALTH_FACTORS.items()},
                 "goals": {k: v["label"] for k, v in GOALS.items()},
-                "sustainability_anchors": [CO2_BEST, CO2_WORST], "convenience_anchors": [ING_BEST, ING_WORST]}
+                "sustainability_anchors": [CO2_BEST, CO2_WORST], "convenience_anchors": [ING_BEST, ING_WORST],
+                "criteria": list(VALUE_CRITERIA)}

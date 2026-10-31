@@ -53,8 +53,9 @@ Requires Python 3.11+.
 ```bash
 python -m venv .venv && source .venv/bin/activate        # or: uv venv && source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest                                          # 96 tests, no services needed
+python -m pytest                                          # 108 tests, no services needed
 foodrec                                                   # http://127.0.0.1:8000
+foodrec config open                                       # the Config page (model, dataset, criteria, roles, study)
 foodrec scenario run scenarios/sara_goal_drift.json       # scripted run, report in out/scenarios
 ```
 
@@ -85,6 +86,11 @@ and how much each of the three values should count.
 ---
 
 ## Choosing the supervisor model (4 GB GPU)
+
+> **Hosted models.** Instead of a local model you can use any OpenAI-compatible API or the Claude API:
+> set `llm.provider`, `llm.model` (and `llm.base_url` for OpenAI-compatible servers) on the Config page or
+> in `foodrec.config.json`, and put the key in `.env` under the variable named by `llm.api_key_env`. See
+> the Language model guide on the Config page and [docs/configuration.md](docs/configuration.md#language-models).
 
 **Yes, a small Qwen3.5 model works as the supervisor on an RTX 3050 Ti (4 GB),** because the
 architecture asks very little of it. (There is no "Qwen 3.5M" model. The Qwen3.5 small series
@@ -316,10 +322,19 @@ modules, no build step; the only external script is the pinned graph renderer (v
 
 ## Configuration and degradation
 
-**Config file.** `foodrec.config.json` holds the model, dataset, ranking, **access roles** (what each user
-sees: explanations, scores, food details, the assistant ...) and **study** settings (who may register, how
-many, how roles are assigned). The **Config** page edits the same file; it is visible to roles with the
-`configure` feature (`admin` and `demo` by default). `foodrec export` writes the standard per-user study
+**Config file.** `foodrec.config.json` holds everything that shapes a run:
+
+* the **language model**: Ollama, any OpenAI-compatible API, or the Claude API (API keys stay in `.env`);
+* the **dataset**: HUMMUS or your own recipes (`python -m foodrec.ingest --recipes ...`);
+* the **criteria** users weigh at onboarding (switch the built-ins off, or add criteria such as energy,
+  protein or price from any numeric recipe field) and the **feedback options** with their learning weights;
+* **access roles** (what each user sees: explanations, scores, food details, the assistant ...);
+* the **study**: who may register, how roles are assigned, and a generated study population with
+  usernames and passwords (optional sign-in).
+
+The **Config page** (`foodrec config open`; a separate page, not linked from the app) edits the same
+file, with a guide for every section; API keys typed there are written to `.env`, never to the config file. The running app watches the file: live settings apply at once, the others restart the app
+automatically, and an unchanged file changes nothing. `foodrec export` writes the standard per-user study
 output, and `foodrec scenario run` replays scripted JSON scenarios. All of this is described in
 [docs/configuration.md](docs/configuration.md).
 
@@ -396,6 +411,9 @@ python -m pytest
 * `tests/test_config_access.py`: config precedence and validation, role redaction and API enforcement,
   study registration and round-robin assignment, the config API and admin token, the export, and
   scenario runs.
+* `tests/test_study_reload.py`: configurable criteria (an energy criterion end to end, in a subprocess)
+  and interactions, the OpenAI-compatible client against a stub server, live provider switching, study
+  population generation, sign-in enforcement, signed sessions, and the config-file reload decisions.
 * `tests/test_fixes.py`: regression tests for zero weights, the candidate pool (diversity 0 =
   full-catalogue top five), missing nutrition and coverage, repeated clicks, proposal and
   option normalisation, full event replay, "only today" / "keep my goal", "had it recently"
@@ -412,14 +430,17 @@ is not covered by the automatic tests. Check it with `docker compose up -d neo4j
 ```
 foodrec/
   api.py  service.py  store.py  config.py  llm.py          application, persistence, model client
-  appconfig.py access.py                                   config file, access roles and their enforcement
+  appconfig.py access.py model_spec.py                     config file, access roles, criteria and interactions
+  llm.py llm_openai.py llm_anthropic.py                    supervisor model clients (Ollama, OpenAI-compatible, Claude)
+  study.py reload.py                                       study population and sign-in, config-file reloading
   cli.py  export.py  scenario.py                           command line, study export, scenario runner
   engine.py constraints.py features.py ranker.py diversity.py preference.py
   explain.py compare.py router.py telemetry.py learner.py catalogue.py   recommendation core
   ingest/     build.py parse.py classify.py foodgroups.py simple.py     HUMMUS or your own recipes → catalogue file
   agent/      supervisor.py policy.py skills.py intent.py trace.py
   knowledge/  graph.py neo4j_graph.py retrieval.py documents.py
-  web/        index.html app.css app.js lib.js dock.js trace.js components.js views/*.js
+  web/        index.html config.html app.css app.js config-main.js lib.js dock.js trace.js components.js
+              markdown.js views/*.js guides/*.md (the Config page guides and dataset templates)
 foodrec.config.json                                        the config file (Config page)
 scenarios/    scripted scenario files (foodrec scenario run)
 data/

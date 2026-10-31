@@ -13,7 +13,8 @@ import time
 
 from collections import Counter
 
-from . import CRITERION_LABELS, TASTE_SHARE, VALUE_CRITERIA
+from . import (CRITERION_LABELS, CRITERION_SPECS, INTERACTIONS, MODEL_SPEC_ERRORS, TASTE_SHARE,
+               VALUE_CRITERIA)
 from .access import snapshot
 from .appconfig import FIELDS, AppConfig
 from .catalogue import Catalogue, read_payload
@@ -24,7 +25,7 @@ from .features import DEFAULT_GOAL, GOALS, Scorer
 from .knowledge import make_graph, make_retriever
 from .knowledge.documents import build_corpus
 from .learner import SCOPES, Learner
-from .llm import OllamaLLM
+from .llm import make_llm
 from .ranker import DEFAULT_WEIGHTS, resolve_weights
 from .router import MODES
 from .store import Store
@@ -36,9 +37,9 @@ UI_EVENTS = ("page_view", "details_opened", "assistant_opened", "assistant_close
 LEARNER_EVENTS = ("profile_created", "profile_updated", "goal_saved", "proposal_accepted", "feedback",
                   "profile_correction", "question_answered")
 FEEDBACK_TYPES = ("like", "save", "choose", "reject")
-REJECT_REASONS = ("not_my_taste", "not_healthy_enough", "not_sustainable", "too_complicated",
-                  "had_recently", "other")
-CHOOSE_REASONS = ("taste", "health", "climate", "easy")
+# configured feedback reasons ("interactions" in foodrec.config.json, model_spec.py)
+REJECT_REASONS = tuple(r["id"] for r in INTERACTIONS["reject_reasons"])
+CHOOSE_REASONS = tuple(r["id"] for r in INTERACTIONS["choose_reasons"])
 # Discover's meal selector -> catalogue meal types (request-only filter, never saved)
 MEAL_CONTEXTS = {"breakfast": ["breakfast"], "lunch": ["main", "salad", "soup", "side"],
                  "dinner": ["main", "soup", "salad"], "snack": ["snack"], "dessert": ["dessert"],
@@ -50,11 +51,15 @@ class App:
         self.s = settings
         self.cfg = getattr(settings, "config", None) or AppConfig({})
         self.restart_pending = []
+        # what the restart-type settings were at start, as the file (not overrides) gave them
+        self._started = self.resolved_settings(self.cfg)
+        from .study import Sessions
+        self.sessions = Sessions(settings.data_dir)
         self.lock = threading.RLock()
         self.store = Store(settings.db_path)
         self.catalogue, self.catalogue_import = self._load_catalogue(settings.catalogue_path)
         self.scaler = Scorer(self.catalogue, getattr(settings, "min_nutrient_coverage", 0.6))
-        self.llm = llm if llm is not None else OllamaLLM(settings)
+        self.llm = llm if llm is not None else make_llm(settings)
         self.graph, self.graph_note = make_graph(settings)
         self.retriever, self.retriever_note = make_retriever(settings, self.llm)
         self.learners = {}
@@ -109,6 +114,8 @@ class App:
                             "feedback_scopes": SCOPES},
                 "criteria": CRITERION_LABELS, "value_criteria": VALUE_CRITERIA, "taste_share": TASTE_SHARE,
                 "top_k": self.s.top_k,
+                "criteria_specs": list(CRITERION_SPECS.values()), "interactions": INTERACTIONS,
+                "default_weights": DEFAULT_WEIGHTS, "model_spec_errors": MODEL_SPEC_ERRORS,
                 "study": {k: self.cfg.study.get(k) for k in ("name", "description", "registration")},
                 "config": {"path": str(self.cfg.path) if self.cfg.path else None, "version": self.cfg.version,
                            "restart_pending": self.restart_pending}}
@@ -125,7 +132,8 @@ class App:
         """May this user (still) complete onboarding? {"allowed": bool, "reason": str|None}."""
         if self.store.profile(user_id) or self._is_admin(user_id):
             return {"allowed": True, "reason": None}
-        st, listed = self.cfg.study, user_id in (self.cfg.data["access"].get("users") or {})
+        st = self.cfg.study
+        listed = user_id in (self.cfg.data["access"].get("users") or {}) or self.cfg.participant(user_id) is not None
         name = st.get("name") or "this study"
         reg = st.get("registration", "open")
         if reg == "closed":
@@ -144,7 +152,8 @@ class App:
         """Store a role for a new participant when the study assigns roles (round robin or
         seeded random). Users named in access.users and the "default" method store nothing."""
         cfg = self.cfg
-        if user_id in (cfg.data["access"].get("users") or {}) or self.store.assigned_role(user_id):
+        if user_id in (cfg.data["access"].get("users") or {}) or cfg.participant(user_id) or \
+                self.store.assigned_role(user_id):
             return
         st = cfg.study
         method = st.get("assignment", "default")
@@ -166,35 +175,83 @@ class App:
         self.store.assign_role(user_id, role, "admin")
         return self.access(user_id)
 
-    def apply_config(self, cfg):
-        """Use a newly saved config: access and study rules and "live" settings apply at once;
-        returns the settings that need a restart."""
+    @staticmethod
+    def resolved_settings(cfg):
+        """{Settings attr: value} that `cfg` gives (file value, else environment/default)."""
         from .config import Settings
         from .appconfig import coerce, resolve_path
-        fresh = Settings()  # environment and defaults, for settings the file leaves unset
-        pending = []
+        fresh = Settings()
+        out = {}
         for f in FIELDS:
             v = coerce(f, cfg.value(f["section"], f["key"]))
-            if v is None:
-                v = getattr(fresh, f["attr"])
-            elif f["type"] == "path":
-                v = resolve_path(v)
-            cur = getattr(self.s, f["attr"])
-            if cur == v:
-                continue
+            out[f["attr"]] = getattr(fresh, f["attr"]) if v is None else (resolve_path(v) if f["type"] == "path" else v)
+        return out
+
+    def apply_config(self, cfg):
+        """Use a newly saved config: access and study rules and "live" settings apply at once.
+        Returns the changes that need a restart: restart-type settings that differ from what
+        this process STARTED with (so command-line overrides never count), and the criteria /
+        interactions sections, which are fixed when the package is imported."""
+        import foodrec
+        from .model_spec import fingerprint, normalize
+        new = self.resolved_settings(cfg)
+        pending = []
+        for f in FIELDS:
+            v, attr = new[f["attr"]], f["attr"]
             if f["apply"] == "live":
-                setattr(self.s, f["attr"], v)
-                self.s.sources[f["attr"]] = "config"
-            else:
+                if getattr(self.s, attr) != v:
+                    setattr(self.s, attr, v)
+                    self.s.sources[attr] = "config"
+            elif v != self._started[attr]:
                 pending.append({"setting": f"{f['section']}.{f['key']}", "label": f["label"],
-                                "running": str(cur), "saved": str(v)})
-        if hasattr(self.llm, "model") and hasattr(self.llm, "s"):
-            self.llm.model = self.s.llm_model
-            self.llm._status = None
+                                "running": str(getattr(self.s, attr)), "saved": str(v)})
+        spec, errors = normalize(cfg.raw.get("criteria"), cfg.raw.get("interactions"))
+        if not errors and fingerprint(spec) != fingerprint(foodrec.MODEL_SPEC):
+            pending.append({"setting": "criteria / interactions", "label": "Criteria and interaction options",
+                            "running": "as at start", "saved": "changed"})
+        if hasattr(self.llm, "provider") and hasattr(self.llm, "s"):  # a real client, not a test double
+            if self.llm.provider != self.s.llm_provider or self.llm.model != self.s.llm_model:
+                self.llm = make_llm(self.s)  # the retriever keeps embedding through its own client
+            else:
+                self.llm._status = None
         self.cfg = cfg
         self.s.config = cfg
         self.restart_pending = pending
         return pending
+
+    # ---- numeric recipe fields (for configuring field criteria) ------------------------------
+    def numeric_fields(self, min_share=0.3):
+        """Dotted paths of numeric recipe fields present in at least `min_share` of recipes."""
+        if not hasattr(self, "_num_fields"):
+            from collections import Counter
+            c = Counter()
+
+            def walk(d, prefix):
+                for k, v in d.items():
+                    p = f"{prefix}{k}"
+                    if isinstance(v, bool):
+                        continue
+                    if isinstance(v, (int, float)):
+                        c[p] += 1
+                    elif isinstance(v, dict) and p.count(".") < 2:
+                        walk(v, p + ".")
+            sample = self.catalogue.recipes[:: max(1, len(self.catalogue) // 2000)]
+            for r in sample:
+                walk(r, "")
+            skip = {"source_id", "pos"}
+            self._num_fields = sorted(p for p, n in c.items() if n >= min_share * len(sample) and p not in skip)
+        return self._num_fields
+
+    def field_stats(self, path):
+        """Distribution of one numeric field over the catalogue (to choose best/worst anchors)."""
+        from .model_spec import extract
+        vals = sorted(v for v in (extract(r, path) for r in self.catalogue.recipes) if v is not None)
+        if not vals:
+            return {"field": path, "count": 0, "of": len(self.catalogue)}
+        q = lambda p: round(vals[min(len(vals) - 1, int(p * (len(vals) - 1)))], 3)  # noqa: E731
+        return {"field": path, "count": len(vals), "of": len(self.catalogue), "min": round(vals[0], 3),
+                "p10": q(0.10), "p25": q(0.25), "median": q(0.5), "p75": q(0.75), "p90": q(0.90),
+                "max": round(vals[-1], 3)}
 
     def log_ui_event(self, user_id, kind, data=None):
         if kind not in UI_EVENTS:
@@ -489,6 +546,10 @@ class App:
         A repeated click (same button, same recipe, same list) is not logged again."""
         if ftype not in FEEDBACK_TYPES:
             raise ValueError(f"feedback type must be one of {FEEDBACK_TYPES}")
+        allowed = {"choose": CHOOSE_REASONS, "reject": REJECT_REASONS}.get(ftype, ())
+        if reason is not None and reason not in allowed:
+            raise ValueError(f"reason '{reason}' is not configured for {ftype}" +
+                             (f" (use one of {', '.join(allowed)})" if allowed else ""))
         if recipe_id not in self.catalogue.by_id:
             raise ValueError(f"unknown recipe {recipe_id}")
         scope = scope or "lasting"

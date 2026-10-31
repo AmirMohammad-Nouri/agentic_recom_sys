@@ -1,6 +1,6 @@
 [project]
 name = "foodrec"
-version = "0.3.0"
+version = "0.4.0"
 description = "Transparent, controllable multi-criteria food recommendation with a supervisor agent, knowledge graph and hybrid retrieval"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,6 +15,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# Claude as the supervisor model (llm.provider = "anthropic")
+anthropic = ["anthropic>=2.3"]
 # only for rebuilding the catalogue from the HUMMUS spreadsheet (python -m foodrec.ingest)
 ingest = ["pandas>=2.0", "openpyxl>=3.1"]
 
@@ -29,7 +31,7 @@ build-backend = "setuptools.build_meta"
 include = ["foodrec*"]
 
 [tool.setuptools.package-data]
-foodrec = ["web/*", "web/views/*"]
+foodrec = ["web/*", "web/views/*", "web/guides/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

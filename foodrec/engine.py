@@ -15,7 +15,7 @@ utility for repeat_window_days. It is disclosed per recipe and changes nothing e
 """
 import math
 
-from . import CRITERIA, CRITERION_LABELS, TASTE_SHARE
+from . import CRITERIA, CRITERION_LABELS, TASTE_SHARE, VALUE_CRITERIA
 from .constraints import (active_constraints, diagnose, eligible, per_serving,
                           request_filter_fails, validate_request_filters)
 from .diversity import rerank
@@ -253,7 +253,7 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
                 "serving_grams": r.get("serving_grams"), "fsa_score": r.get("fsa_score"),
                 "diet": r["diet"], "allergens": r["allergens"],
                 "allergens_complete": r.get("allergens_complete", False),
-                "health_grade": health_grade(x["scores"].get("h")),
+                "health_grade": health_grade(x["scores"].get("h")) if "h" in VALUE_CRITERIA else None,
                 "per_serving": {k: (None if per_serving(r, k) is None else round(per_serving(r, k), 1))
                                 for k in ("protein_g", "sugars_g", "fibre_g", "sat_fat_g")},
                 "scores": x["scores"], "raw": raw_values(r), "breakdown": bd, "utility": x["utility"],
@@ -278,7 +278,7 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
 def _missing_info(x, bd):
     """What is unknown about this recipe and how the ranking handled it (shown on the card)."""
     out = []
-    h = bd["h"]
+    h = bd["h"] if "h" in VALUE_CRITERIA else {"missing": []}
     if h.get("below_min_coverage"):
         out.append({"criterion": "h", "text": (f"Healthiness not scored: only {round(100 * h['coverage'])}% of the "
                                                 f"nutrient data is known (minimum {round(100 * h['min_coverage'])}%). "
@@ -287,7 +287,7 @@ def _missing_info(x, bd):
         out.append({"criterion": "h", "text": (f"Healthiness uses {round(100 * h['coverage'])}% of the nutrient data; "
                                                 f"missing: {', '.join(h['missing']).lower()}.")})
     for k in x["missing_criteria"]:
-        if k in ("s", "t"):
+        if k not in ("h", "p"):
             out.append({"criterion": k, "text": f"{CRITERION_LABELS[k]} could not be scored."})
     if any(k != "p" for k in x["missing_criteria"]) and x["missing_policy"] == "renormalize":
         out.append({"criterion": None, "text": ("Its other values were weighted up to fill the gap; taste keeps "
