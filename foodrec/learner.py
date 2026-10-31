@@ -270,11 +270,25 @@ class ValueModel:
                                                                                  for k, v in self.ack["gap"].items()}})
 
     def drift(self, stated=None):
-        """Gap beyond what the user acknowledged with "Keep my goal" (= gap() without one)."""
+        """Gap beyond what the user acknowledged with "Keep my goal" (= gap() without one).
+
+        Only movement FURTHER from the saved goal counts. Per criterion, with g the current gap
+        and a the accepted one:
+            g on the same side as a   ->  only the part beyond a: sign(g) * max(0, |g| - |a|)
+                                           (moving back toward the goal gives 0)
+            g on the other side       ->  g (a new drift in the opposite direction)
+        """
         g = self.gap(stated)
         if not self.ack:
             return g
-        return {k: g[k] - self.ack["gap"].get(k, 0.0) for k in VALUE_CRITERIA}
+        out = {}
+        for k in VALUE_CRITERIA:
+            a = self.ack["gap"].get(k, 0.0)
+            if abs(a) < 1e-9 or (g[k] > 0) != (a > 0):
+                out[k] = g[k]
+            else:
+                out[k] = math.copysign(max(0.0, abs(g[k]) - abs(a)), g[k])
+        return out
 
     def events_since_ack(self):
         return self.n - (self.ack["n"] if self.ack else 0)

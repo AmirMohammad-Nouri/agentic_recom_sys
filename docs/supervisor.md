@@ -73,7 +73,8 @@ for transparency but never trusted.
 **Answers control what is learned.** Questions offer the two winners (lasting evidence),
 *Only today* (today's lists change, the day's drift is rolled back) and *Keep my goal* (the goal
 stays, the learned weights are kept, and the gap seen at that moment counts as acknowledged: the
-supervisor measures later gaps from there and only asks again on further drift). Proposals offer
+supervisor measures later gaps from there and only asks again when the choices move further from the
+goal; moving back toward the goal never counts, while passing it in the other direction does). Proposals offer
 *Update my goal*, *Only today* and *Keep my goal*.
 
 **Several small options.** A message such as "more convenient, with only a small reduction in

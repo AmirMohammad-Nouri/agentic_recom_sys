@@ -295,6 +295,45 @@ def test_keep_goal_asks_again_only_after_further_drift(onboarded):
     assert vm.events_since_ack() >= policy.THRESHOLDS["ask_min_events"]
 
 
+def test_keep_goal_moving_back_toward_the_goal_is_not_drift(onboarded):
+    app = onboarded
+    vm = app.learner("u").values
+
+    def choose_best(crit):
+        res = app.recommend("u")
+        r = max(res["results"], key=lambda x: x["scores"][crit] or 0)
+        app.feedback("u", res["request_id"], r["recipe_id"], "choose", None)
+
+    for _ in range(8):
+        choose_best("t")
+    rv = policy.review(app, "u", Trace())
+    app.resolve_decision("u", rv["decisions"][0]["decision_id"], "answer", "keep_goal")
+    accepted = dict(vm.ack["gap"])
+    assert accepted["s"] < 0 < accepted["t"]
+    # now behave like the saved goal (sustainability first): while the gaps only shrink back toward
+    # the goal, nothing counts as drift and nothing is raised
+    steps = 0
+    while vm.gap()["s"] < 0 and steps < 12:
+        choose_best("s")
+        steps += 1
+        g, d = vm.gap(), vm.drift()
+        assert d["t"] == 0.0                                    # convenience only shrank back
+        assert d["s"] == (0.0 if g["s"] < 0 else pytest.approx(g["s"]))  # 0 until it passes the goal
+        assert not policy.review(app, "u", Trace())["decisions"], "returning toward the goal is not drift"
+    assert steps >= 2
+    # overshooting past the goal in the other direction is new drift, and is raised again
+    for _ in range(10):
+        choose_best("s")
+        if policy.review(app, "u", Trace())["decisions"]:
+            break
+    assert vm.gap()["s"] > 0 and vm.drift()["s"] >= policy.THRESHOLDS["ask_gap"]
+    # the rule itself: beyond the accepted gap counts, on the other side the full gap counts
+    vm.ack = {"gap": {"h": -0.1, "s": -0.1, "t": 0.2}, "n": vm.n}
+    vm.observed = {"h": vm.stated["h"] - 0.05, "s": vm.stated["s"] + 0.12, "t": vm.stated["t"] + 0.35}
+    d = vm.drift()
+    assert d["h"] == 0.0 and d["s"] == pytest.approx(0.12) and d["t"] == pytest.approx(0.15)
+
+
 # ---- 8. had it recently ---------------------------------------------------------------------------
 def test_had_recently_is_recency_not_dislike(onboarded):
     app = onboarded

@@ -92,7 +92,7 @@ Supervisor questions and proposals offer the same choice:
 | --- | --- |
 | Name a winner / *Update my goal* | lasting: recorded as evidence, or the proposal is saved as a new goal version |
 | *Only today* | today's lists use the proposed weights (or a +10 point nudge); the value model is rolled back to how it was at the start of the day |
-| *Keep my goal* | the saved goal stays and the observed weights are **kept** (Insights still show what your choices reveal). The current gap is recorded as acknowledged: the supervisor only asks again when your choices drift further from there, counted in events since then |
+| *Keep my goal* | the saved goal stays and the observed weights are **kept** (Insights still show what your choices reveal). The current gap is recorded as acknowledged: the supervisor only asks again when your choices drift **further from the goal** than that, counted in events since then. Moving back toward the goal never counts; passing the goal in the other direction counts in full |
 
 ### Recency ("had it recently")
 
