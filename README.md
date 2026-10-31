@@ -26,11 +26,31 @@ accounts, and exports one standard record per user.
 * Sign-in for everyone, generated participant accounts, a standard **export** for analysis, and scripted
   **scenarios** for reproducible tests.
 
-## Author
+---
 
-**AmirMohammad Nouri** · [GitHub](https://github.com/AmirMohammad-Nouri)
+## Contents
 
-## The complete guide
+1. [Detailed explanation of the model](#detailed-explanation-of-the-model)
+2. [Requirements](#requirements)
+3. [Installation: step by step](#installation-step-by-step)
+4. [A tour of the app](#a-tour-of-the-app)
+5. [Optional: language model and services](#optional-language-model-and-services)
+6. [Running a study](#running-a-study)
+7. [Configuration](#configuration)
+8. [Command reference](#command-reference)
+9. [Using your own dataset](#using-your-own-dataset)
+10. [Demo and server deployment](#demo-and-server-deployment)
+11. [Troubleshooting](#troubleshooting)
+12. [How it works](#how-it-works)
+13. [API](#api)
+14. [Testing](#testing)
+15. [Project layout](#project-layout)
+16. [The catalogue (HUMMUS)](#the-catalogue-hummus)
+17. [Limitations](#limitations)
+
+---
+
+## Detailed explanation of the model
 
 **[FoodRec: how it works, how it learns, and the math](https://amirmohammad-nouri.github.io/agentic_recom_sys/guide/)**
 explains the system in depth, with diagrams and a live simulator:
@@ -45,27 +65,6 @@ explains the system in depth, with diagrams and a live simulator:
 Read it online (link above), in the app (account menu → **How FoodRec works**, or
 `http://127.0.0.1:8000/guide`), or open [`docs/guide/index.html`](docs/guide/index.html) in a browser.
 This README covers installation and use; the guide covers the concepts and the mathematics.
-
----
-
-## Contents
-
-1. [Requirements](#requirements)
-2. [Installation: step by step](#installation-step-by-step)
-3. [A tour of the app](#a-tour-of-the-app)
-4. [Optional: language model and services](#optional-language-model-and-services)
-5. [Running a study](#running-a-study)
-6. [Configuration](#configuration)
-7. [Command reference](#command-reference)
-8. [Using your own dataset](#using-your-own-dataset)
-9. [Demo and server deployment](#demo-and-server-deployment)
-10. [Troubleshooting](#troubleshooting)
-11. [How it works](#how-it-works)
-12. [API](#api)
-13. [Testing](#testing)
-14. [Project layout](#project-layout)
-15. [The catalogue (HUMMUS)](#the-catalogue-hummus)
-16. [Limitations](#limitations)
 
 ---
 
@@ -397,7 +396,7 @@ User message ─▶ Supervisor agent: perceive → understand → plan → act (
   against the evidence.
 
 Every formula, threshold and parameter, with the reason for each value, is in the
-[complete guide](#the-complete-guide). Specifications: [docs/supervisor.md](docs/supervisor.md),
+[detailed explanation of the model](#detailed-explanation-of-the-model). Specifications: [docs/supervisor.md](docs/supervisor.md),
 [docs/user-model.md](docs/user-model.md), [docs/features.md](docs/features.md),
 [docs/architecture.md](docs/architecture.md).
 
