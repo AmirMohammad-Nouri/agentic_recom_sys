@@ -52,8 +52,8 @@ accounts, and exports one standard record per user.
 
 ## Detailed explanation of the model
 
-**[FoodRec: how it works, how it learns, and the math](docs/guide/index.html)** explains the system in depth,
-with diagrams and a live simulator:
+**[FoodRec: how it works, how it learns, and the math](docs/guide/guide.md)** explains the system in depth,
+with diagrams and worked examples:
 
 1. **How FoodRec works**: the components, from HUMMUS to the database, how five recipes are chosen, what one
    click and one chat turn set off, and why nothing is lost.
@@ -64,15 +64,12 @@ with diagrams and a live simulator:
 
 **How to open it**
 
-* **In the app** (easiest): account menu → **How FoodRec works**, or `http://127.0.0.1:8000/guide` while
-  FoodRec runs.
-* **From your copy of the repository**: open `docs/guide/index.html` in a web browser (double-click it in
-  your file manager). GitHub itself shows `.html` files as source code, not as a page.
-* **Online**: [the guide on GitHub Pages](https://amirmohammad-nouri.github.io/agentic_recom_sys/guide/)
-  (available once GitHub Pages is enabled for this repository).
+* **On GitHub**: click the title above. It opens [`docs/guide/guide.md`](docs/guide/guide.md), which GitHub
+  shows as a formatted page with the equations, tables and diagrams.
+* **The interactive version** (with a live simulator you can click through): in the app, account menu →
+  **How FoodRec works** (or `http://127.0.0.1:8000/guide`), or open `docs/guide/index.html` in a browser.
 
-The page loads its formulas and fonts from the internet. This README covers installation and use; the
-guide covers the concepts and the mathematics.
+This README covers installation and use; the guide covers the concepts and the mathematics.
 
 ---
 
@@ -470,7 +467,8 @@ data/
   knowledge/                method notes the assistant cites
   examples/                 template for your own recipes
 docs/                       configuration, deployment, architecture, supervisor, user model, features
-  guide/index.html          the complete guide (concepts and every equation)
+  guide/                    the complete guide: guide.md (renders on GitHub), index.html (interactive),
+                            figures/, convert.py (regenerates guide.md from index.html)
 tests/
 ```
 
