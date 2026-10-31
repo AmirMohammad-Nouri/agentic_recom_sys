@@ -270,7 +270,7 @@ export function decisionCard(d, { onResolved } = {}) {
       const today = String(answer || "").startsWith("today");
       clear(box, h("div.small.muted", `${kindLabel} · ${out.decision.status}`), h("h4", d.title),
         h("div.resolved", action === "dismiss" ? "Dismissed. Your saved goal is unchanged." :
-          answer === "keep_goal" ? "Keeping your goal. The drift since it was saved is forgotten." :
+          answer === "keep_goal" ? "Keeping your goal. What was learned from your choices is kept; I'll only ask again if they drift further." :
           today ? "Used for today only. Nothing lasting was saved or learned." :
           action === "answer" ? "Thanks — recorded as evidence. Your saved goal was not changed." : "Applied as a new version."));
     } catch (e) { toast(e.message, "err"); }

@@ -71,8 +71,10 @@ labelled **unverified**: the verified steps are the agent's, the model's reasoni
 for transparency but never trusted.
 
 **Answers control what is learned.** Questions offer the two winners (lasting evidence),
-*Only today* (today's lists change, the day's drift is rolled back) and *Keep my goal* (the
-drift is forgotten). Proposals offer *Update my goal*, *Only today* and *Keep my goal*.
+*Only today* (today's lists change, the day's drift is rolled back) and *Keep my goal* (the goal
+stays, the learned weights are kept, and the gap seen at that moment counts as acknowledged: the
+supervisor measures later gaps from there and only asks again on further drift). Proposals offer
+*Update my goal*, *Only today* and *Keep my goal*.
 
 **Several small options.** A message such as "more convenient, with only a small reduction in
 healthiness" is parsed as `adjust_goal`. The `goal_options` skill builds up to four normalised

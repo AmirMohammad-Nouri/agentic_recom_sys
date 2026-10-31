@@ -64,6 +64,9 @@ def review(app, user_id, trace, trigger="feedback"):
     vm = lr.values
     stated = {k: goal["weights"][k] for k in VALUE_CRITERIA}
     gap = vm.gap(stated)
+    # After "Keep my goal" the gap the user accepted is not raised again: decisions use the drift
+    # beyond it, counted in events since then. Without one, drift == gap and n_new == vm.n.
+    drift, n_new = vm.drift(stated), vm.events_since_ack()
     match = vm.match(stated)
     result["confidence"] = vm.confidence()
     result["preference_match"] = match
@@ -76,22 +79,28 @@ def review(app, user_id, trace, trigger="feedback"):
                          "observed": {k: round(vm.observed[k], 3) for k in VALUE_CRITERIA},
                          "gap": {k: round(gap[k], 3) for k in VALUE_CRITERIA},
                          "preference_match": round(match, 3), "confidence": round(vm.confidence(), 2),
+                         "acknowledged_gap": {k: round(v, 3) for k, v in vm.ack["gap"].items()} if vm.ack else None,
                          "trigger": trigger}, source="learner")
+    if vm.ack:
+        trace.step("reason", "You chose to keep your goal",
+                   f"The gap you saw then is accepted and not raised again; only drift beyond it counts "
+                   f"({n_new} event(s) since).", evidence={x: round(drift[x], 3) for x in VALUE_CRITERIA})
 
-    k = max(VALUE_CRITERIA, key=lambda x: abs(gap[x]))
-    big = abs(gap[k]) >= THRESHOLDS["ask_gap"] and vm.n >= THRESHOLDS["ask_min_events"]
+    k = max(VALUE_CRITERIA, key=lambda x: abs(drift[x]))
+    big = abs(drift[k]) >= THRESHOLDS["ask_gap"] and n_new >= THRESHOLDS["ask_min_events"]
     if not big:
-        result["status"] = "aligned" if vm.n >= THRESHOLDS["ask_min_events"] else "uncertain"
+        result["status"] = "aligned" if n_new >= THRESHOLDS["ask_min_events"] else "uncertain"
         trace.step("reason", "Goal and behaviour agree" if result["status"] == "aligned" else "Still learning",
-                   f"Largest gap is {CRITERION_LABELS[k]} ({gap[k]:+.2f}); the supervisor acts only when a gap "
-                   f"reaches {THRESHOLDS['ask_gap']:.2f} after {THRESHOLDS['ask_min_events']} or more events.",
-                   evidence={x: round(gap[x], 3) for x in VALUE_CRITERIA})
+                   f"Largest {'new drift' if vm.ack else 'gap'} is {CRITERION_LABELS[k]} ({drift[k]:+.2f}); "
+                   f"the supervisor acts only when it reaches {THRESHOLDS['ask_gap']:.2f} after "
+                   f"{THRESHOLDS['ask_min_events']} or more events.",
+                   evidence={x: round(drift[x], 3) for x in VALUE_CRITERIA})
     else:
         result["status"] = "conflict"
         result["conflicts"] = [{"criterion": x, "gap": gap[x], "stated": stated[x], "observed": vm.observed[x],
                                 "direction": "higher" if gap[x] > 0 else "lower"}
-                               for x in sorted(VALUE_CRITERIA, key=lambda x: -abs(gap[x]))
-                               if abs(gap[x]) >= THRESHOLDS["ask_gap"]]
+                               for x in sorted(VALUE_CRITERIA, key=lambda x: -abs(drift[x]))
+                               if abs(drift[x]) >= THRESHOLDS["ask_gap"]]
         topic = f"criterion:{k}"
         trace.step("reason", f"Gap on {CRITERION_LABELS[k]}",
                    f"Saved weight {stated[k]:.2f}; your choices behave like {vm.observed[k]:.2f} "
@@ -107,7 +116,7 @@ def review(app, user_id, trace, trigger="feedback"):
                        f"The user dismissed this topic within the last {THRESHOLDS['cooldown_events']} events; "
                        "respecting that and not asking again yet.")
         else:
-            _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result)
+            _resolve_conflict(app, user_id, trace, k, stated, vm, drift, result, n_new)
 
     _taste_conflicts(app, user_id, trace, lr, result)
     return result
@@ -126,12 +135,14 @@ def _history_evidence(app, user_id, trace, k):
     return rows, support
 
 
-def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result):
+def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result, n_events=None):
+    """`gap`: the drift to act on (beyond an acknowledged gap); `n_events`: events behind it."""
+    n_events = vm.n if n_events is None else n_events
     rows, support = _history_evidence(app, user_id, trace, k)
-    strong = abs(gap[k]) >= THRESHOLDS["propose_gap"] and vm.n >= THRESHOLDS["propose_min_events"]
+    strong = abs(gap[k]) >= THRESHOLDS["propose_gap"] and n_events >= THRESHOLDS["propose_min_events"]
     trace.step("decide", "Enough evidence to propose a change?" + (" Yes" if strong else " No"),
                f"Rule: propose only if the gap is at least {THRESHOLDS['propose_gap']:.2f} after "
-               f"{THRESHOLDS['propose_min_events']} events. Here gap = {abs(gap[k]):.2f}, events = {vm.n}. "
+               f"{THRESHOLDS['propose_min_events']} events. Here gap = {abs(gap[k]):.2f}, events = {n_events}. "
                + ("Preparing a proposal; the saved goal stays unchanged until you accept it."
                   if strong else "Asking a targeted question instead of guessing."),
                source="policy", data={"options": ["propose", "ask"], "chosen": "propose" if strong else "ask"})
@@ -162,7 +173,8 @@ def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result):
                                                  f"{vm.observed[k]:.2f} ({vm.n} events). Accepting "
                                                  f"moves it halfway, to {proposed[k]:.2f}. \"Only today\" uses "
                                                  f"it for today's lists without saving or learning; \"Keep my "
-                                                 f"goal\" forgets this drift."),
+                                                 f"goal\" keeps your goal and what was learned; I only ask "
+                                                 f"again if your choices drift further."),
                                  "stated": stated, "observed": dict(vm.observed),
                                  "proposed_weights": proposed, "gap": gap[k],
                                  "evidence_events": evidence_events, "counterfactual": cf,
@@ -180,7 +192,8 @@ def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result):
                             f"{CRITERION_LABELS[k].lower()} than your saved goal, but there is not yet enough "
                             f"evidence to suggest a change. Naming a winner updates what I have learned about "
                             f"you; \"Only today\" adjusts today's lists without learning anything; \"Keep my "
-                            f"goal\" tells me to stop drawing conclusions. None of them edits your saved goal."),
+                            f"goal\" keeps your goal and what was learned, and I only ask again if your choices "
+                            f"drift further. None of them edits your saved goal."),
             "options": [{"id": hi, "label": f"{CRITERION_LABELS[hi]} usually wins", "winner": hi, "loser": lo,
                          "scope": "lasting"},
                         {"id": lo, "label": f"{CRITERION_LABELS[lo]} usually wins", "winner": lo, "loser": hi,

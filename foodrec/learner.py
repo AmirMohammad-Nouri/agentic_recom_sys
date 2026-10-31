@@ -33,7 +33,8 @@ Temporary vs lasting (the "scope" of a signal)
              touches either model; it only adds a same-day adjustment (temporary_effects): a small
              weight nudge, a replacement weight set, or hiding a recipe until the end of the day.
              Answering "only today" also rolls the value model back to how it was at the start of
-             the day; "keep my goal" resets the observed weights to the saved goal.
+             the day; "keep my goal" keeps the saved goal AND the observed weights, and marks the current gap
+             as acknowledged so the supervisor only reacts to further drift.
 
 Recency      Choosing a recipe or rejecting it as "had it recently" stores WHEN it was eaten
              (recent[recipe_id] = ts). The engine applies a temporary repetition penalty that
@@ -162,6 +163,9 @@ class ValueModel:
         self.stated = conform_weights(stated)
         self.observed = dict(self.stated)
         self.n = 0                  # informative events since the last goal save
+        # "Keep my goal": the gap the user saw and accepted, and the event count at that moment.
+        # The observed weights are kept; the supervisor only reacts to drift beyond this.
+        self.ack = None
         self.counts = {"choices": 0, "reasons": 0, "rejections": 0, "answers": 0, "goal_saves": 0}
         self.evidence = []          # last 40 updates, newest last
         self.ts = None              # timestamp of the event being applied (set by Learner)
@@ -239,6 +243,7 @@ class ValueModel:
         before = dict(self.observed)
         self.stated = conform_weights(weights)
         self.observed = {k: (self.observed[k] + self.stated[k]) / 2 for k in VALUE_CRITERIA}
+        self.ack = None  # a new goal is a new baseline
         self.n = 0
         self.day_start = {}
         self.counts["goal_saves"] += 1
@@ -251,14 +256,28 @@ class ValueModel:
             return False
         before = dict(self.observed)
         self.observed, self.n = dict(snap[0]), snap[1]
+        if self.ack and self.ack["n"] > self.n:
+            self.ack["n"] = self.n
         self._log("rolled_back_today", event_id, before)
         return True
 
-    def reset_to_goal(self, event_id):
-        """"Keep my goal": forget the drift since the goal was saved."""
-        before = dict(self.observed)
-        self.observed, self.n, self.day_start = dict(self.stated), 0, {}
-        self._log("kept_goal", event_id, before)
+    def keep_goal(self, event_id):
+        """"Keep my goal": the saved goal stays and NOTHING learned is discarded. The current gap
+        is recorded as acknowledged, so the supervisor does not raise it again; it only reacts
+        when the choices drift further from here (see drift() and events_since_ack())."""
+        self.ack = {"gap": self.gap(), "n": self.n}
+        self._log("kept_goal", event_id, dict(self.observed), {"acknowledged_gap": {k: round(v, 3)
+                                                                                 for k, v in self.ack["gap"].items()}})
+
+    def drift(self, stated=None):
+        """Gap beyond what the user acknowledged with "Keep my goal" (= gap() without one)."""
+        g = self.gap(stated)
+        if not self.ack:
+            return g
+        return {k: g[k] - self.ack["gap"].get(k, 0.0) for k in VALUE_CRITERIA}
+
+    def events_since_ack(self):
+        return self.n - (self.ack["n"] if self.ack else 0)
 
     # ---- read-outs ---------------------------------------------------------------------
     def gap(self, stated=None):
@@ -274,7 +293,8 @@ class ValueModel:
 
     def to_dict(self):
         return {"stated": self.stated, "observed": self.observed, "n": self.n, "counts": self.counts,
-                "match": self.match(), "confidence": self.confidence(), "evidence": self.evidence}
+                "match": self.match(), "confidence": self.confidence(), "evidence": self.evidence,
+                "acknowledged": self.ack}
 
 
 # ======================================================================================
@@ -359,8 +379,8 @@ class Learner:
             why = "you said this was only for today (no lasting change)"
         elif typ == "question_answered" and pl.get("scope") == "keep_goal":
             if self.values:
-                self.values.reset_to_goal(eid)
-            why = "you chose to keep your goal"
+                self.values.keep_goal(eid)
+            why = "you chose to keep your goal (what was learned is kept)"
         elif typ == "question_answered":
             w, l = pl.get("winner"), pl.get("loser")
             if self.values and w in VALUE_CRITERIA and l in VALUE_CRITERIA and w != l:

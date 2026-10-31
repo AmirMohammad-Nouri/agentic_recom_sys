@@ -252,9 +252,47 @@ def test_question_scopes_control_lasting_updates(onboarded):
         res = app.recommend("u")
         r = min(res["results"], key=lambda x: x["n_ingredients"])
         app.feedback("u", res["request_id"], r["recipe_id"], "choose", "easy")
+    before, n = dict(vm.observed), vm.n
+    assert before != pytest.approx(vm.stated)
     d2 = app.add_decision("u", "tradeoff_question", "q2", d["body"], "policy")
     app.resolve_decision("u", d2["decision_id"], "answer", "keep_goal")
-    assert vm.observed == pytest.approx(vm.stated) and vm.n == 0
+    # "keep my goal": the goal stays, and what was learned is kept (not reset to the goal)
+    assert vm.observed == pytest.approx(before) and vm.n == n
+    assert app.store.goal("u")["version"] == 1
+    assert vm.drift() == pytest.approx({k: 0.0 for k in vm.observed})   # the current gap is acknowledged
+
+
+def test_keep_goal_asks_again_only_after_further_drift(onboarded):
+    app = onboarded
+    vm = app.learner("u").values
+
+    def choose_most_convenient():
+        res = app.recommend("u")
+        r = max(res["results"], key=lambda x: x["scores"]["t"] or 0)
+        app.feedback("u", res["request_id"], r["recipe_id"], "choose", "easy")
+
+    for _ in range(8):
+        choose_most_convenient()
+    rv = policy.review(app, "u", Trace())
+    assert rv["decisions"], "the drift toward convenience should be raised"
+    app.resolve_decision("u", rv["decisions"][0]["decision_id"], "answer", "keep_goal")
+    kept = dict(vm.observed)
+    assert kept["t"] > app.store.goal("u")["weights"]["t"] + 0.2          # learned drift is not reset
+    ins = app.insight("u")
+    assert {c["criterion"]: c["observed"] for c in ins["criteria"]} == pytest.approx(kept)  # Insights keep it
+    # the gap the user accepted is not raised again, even after the cool-down
+    for _ in range(policy.THRESHOLDS["cooldown_events"] + 1):
+        app.store.append_event("u", "feedback", {"type": "like", "recipe_id": app.catalogue.recipes[0]["id"]})
+    rv = policy.review(app, "u", Trace())
+    assert not rv["decisions"]
+    # further drift in the same direction is raised again, measured from the accepted gap
+    for i in range(20):
+        choose_most_convenient()
+        rv = policy.review(app, "u", Trace())
+        if rv["decisions"]:
+            break
+    assert rv["decisions"] and vm.drift()["t"] >= policy.THRESHOLDS["ask_gap"]
+    assert vm.events_since_ack() >= policy.THRESHOLDS["ask_min_events"]
 
 
 # ---- 8. had it recently ---------------------------------------------------------------------------
