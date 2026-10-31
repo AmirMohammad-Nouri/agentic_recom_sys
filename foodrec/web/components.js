@@ -14,7 +14,7 @@ export async function sendFeedback(r, requestId, type, reason, scope = "lasting"
       method: "POST",
       body: { request_id: requestId, recipe_id: r.recipe_id, type, reason, scope, context: state.context || {} },
     });
-    if (out.duplicate) { toast("Already recorded for this list"); return out; }
+    if (out.duplicate) { toast(type === "save" || type === "like" ? `Already in My dishes (${type === "save" ? "Saved" : "Liked"})` : "Already recorded for this list"); return out; }
     emit("review", { ...out.review, recipe: r.title, type, reason, scope, ts: Date.now() / 1000 });
     if (out.review.decisions.length) toast("The supervisor has a question for you");
     return out;
@@ -27,7 +27,7 @@ export async function sendFeedback(r, requestId, type, reason, scope = "lasting"
 export const personalFits = (r) => (r.evidence?.fit || []).filter((f) => f.type !== "constraint").map((f) => f.text);
 const ruleCount = (r) => (r.evidence?.fit || []).filter((f) => f.type === "constraint").length;
 
-function thumb(r) {
+export function thumb(r) {
   const box = h("div.thumb", icon("bowl"));
   if (r.image_url) {
     const img = h("img", { src: r.image_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" });
@@ -72,6 +72,7 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
       const out = await sendFeedback(r, requestId, type, reason, scope);
       if (out.duplicate) return;
       clear(status, icon("check"), ` ${human(type === "choose" ? "chosen" : type + "d")}${reason ? " · " + human(reason) : ""}${scope === "today" ? " · today only" : ""}`);
+      if (type === "save" && can("page_dishes")) toast(state.system?.hide_saved ? "Saved to My dishes; it waits there instead of in Discover" : "Saved to My dishes");
     } catch { /* toast already shown */ }
   };
   // Second step for reasons that may be temporary: only today, or update what is learned.
@@ -107,7 +108,10 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
       explain && ruleCount(r) ? h("div.small.muted", { style: { marginTop: "4px" }, title: r.evidence.fit.filter((f) => f.type === "constraint").map((f) => f.text).join("\n") },
         `Passes your ${ruleCount(r)} mandatory rule${ruleCount(r) === 1 ? "" : "s"}`) : null,
       explain && r.reasons?.compromises?.length ? h("ul.reason-list.comp", r.reasons.compromises.slice(0, 1).map((x) => h("li", x))) : null,
-      (r.missing_info?.length || (explain && r.repetition)) ? h("div.row.wrap", { style: { marginTop: "4px", gap: "4px" } },
+      (r.missing_info?.length || (explain && r.repetition) || r.freshness?.new_cuisine || (explain && r.freshness?.exposure_penalty)) ? h("div.row.wrap", { style: { marginTop: "4px", gap: "4px" } },
+        r.freshness?.new_cuisine ? h("span.tag.accent", { title: `No ${r.cuisine} dish was in your recent lists` }, `New for you: ${r.cuisine}`) : null,
+        explain && r.freshness?.exposure_penalty ? h("span.tag", { title: `Shown ${r.freshness.times_shown} time(s) recently without a reaction; it gives way a little (−${f2(r.freshness.exposure_penalty)}) so other dishes get a turn` },
+          `Shown ${r.freshness.times_shown}× recently`) : null,
         explain && r.repetition ? h("span.tag.warn", { title: `Temporary penalty; utility ${f2(r.repetition.utility_before_penalty)} before it` },
           `Had it ${ago(r.repetition.last_eaten_ts)} · -${f2(r.repetition.penalty)}`) : null,
         (r.missing_info || []).map((m) => h("span.tag.warn", { title: m.text }, m.criterion ? `Missing data: ${CRIT_META[m.criterion].long.toLowerCase()}` : "Weights adjusted for missing data"))) : null,

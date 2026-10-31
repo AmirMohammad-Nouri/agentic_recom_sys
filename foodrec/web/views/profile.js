@@ -148,6 +148,7 @@ const EVENT_TEXT = {
   goal_saved: (p) => `Goal saved as v${p.goal_version}`, proposal_accepted: (p) => `Accepted a proposal → goal v${p.goal_version}`,
   proposal_dismissed: (p) => `Dismissed ${human(p.kind)}`, question_answered: (p) => `Answered a question: ${human(p.answer)}`,
   profile_correction: (p) => `Corrected belief ${p.concept} → ${f2(p.mean)}`,
+  dish_removed: (p) => `Removed ${p.recipe_title || p.recipe_id} from ${human(p.collection)}`,
 };
 
 export function activityView() {

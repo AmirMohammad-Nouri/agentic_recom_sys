@@ -2,6 +2,7 @@
 import { api, can, clear, h, icon, on, safeGet, safeSet, setCriteria, state, toast, track, userPath } from "./lib.js";
 import { mountDock } from "./dock.js";
 import { discoverView } from "./views/discover.js";
+import { dishesView } from "./views/dishes.js";
 import { insightsView } from "./views/insights.js";
 import { knowledgeView } from "./views/knowledge.js";
 import { activityView, onboarding, profileView } from "./views/profile.js";
@@ -9,6 +10,7 @@ import { activityView, onboarding, profileView } from "./views/profile.js";
 // `feature`: the access-role feature a page needs (see the Config page, Access roles).
 const ROUTES = {
   discover: { label: "Discover", view: discoverView, icon: "bowl" },
+  dishes: { label: "My dishes", view: dishesView, icon: "bookmark", feature: "page_dishes", menu: true },  // in the account menu
   insights: { label: "Insights", view: insightsView, icon: "info", feature: "page_insights" },
   knowledge: { label: "Knowledge", view: knowledgeView, icon: "graph", feature: "page_knowledge" },
   activity: { label: "Activity", view: activityView, icon: "clock", feature: "page_activity" },
@@ -31,7 +33,7 @@ applyTheme(safeGet("foodrec.theme"));
 function renderNav() {
   const route = location.hash.replace("#/", "") || "discover";
   const open = state.user_state?.open_decisions?.length || 0;
-  clear(nav, Object.entries(ROUTES).filter(([k]) => allowed(k)).map(([k, r]) => h("a" + (k === route ? ".active" : ""), { href: `#/${k}`, title: r.label },
+  clear(nav, Object.entries(ROUTES).filter(([k, r]) => allowed(k) && !r.menu).map(([k, r]) => h("a" + (k === route ? ".active" : ""), { href: `#/${k}`, title: r.label },
     icon(r.icon), h("span.label", r.label), k === "discover" && open ? h("span.count", { title: `${open} open question(s)` }, open) : null)));
 }
 
@@ -68,36 +70,36 @@ function systemPanel() {
   document.body.append(overlay);
 }
 
+// The account menu (the user button, top right): My dishes, and either switching the
+// pseudonymous user id or, when the study requires sign-in, who is signed in and sign out.
 function userMenu(anchor) {
-  if (state.system?.login_required) return accountMenu(anchor);
-  const input = h("input", { type: "text", value: state.user, style: { width: "100%" }, "aria-label": "User id" });
-  const pop = h("div.menu", { style: { padding: "10px", width: "240px" } },
-    h("div.menu-label", { style: { padding: "0 0 6px" } }, "Pseudonymous user id"), input,
-    h("div.btn-row", { style: { marginTop: "8px" } }, h("button.btn.primary.sm", {
-      onclick: () => { const v = input.value.trim(); if (v) { safeSet("foodrec.user", v); location.reload(); } },
-    }, "Switch")),
-    h("div.hint", { style: { marginTop: "6px" } }, "Each id has its own profile, goals and history."));
+  const close = () => pop.remove();
+  const dishes = can("page_dishes") ? h("button.menu-item", { onclick: () => { close(); location.hash = "#/dishes"; } },
+    icon("bookmark"), h("span", h("b", "My dishes"), h("span.small.muted", { style: { display: "block" } }, "Saved for later, liked and cooked"))) : null;
+  let account = null;
+  let input = null;
+  if (state.system?.login_required) {
+    account = [h("div.menu-label", { style: { padding: "0 0 6px" } }, `Signed in as ${state.user}`),
+      h("button.btn.sm", { onclick: () => { safeSet("foodrec.session", ""); location.reload(); } }, "Sign out")];
+  } else if (can("switch_user")) {
+    input = h("input", { type: "text", value: state.user, style: { width: "100%" }, "aria-label": "User id",
+      onkeydown: (e) => { if (e.key === "Enter") go(); } });
+    const go = () => { const v = input.value.trim(); if (v) { safeSet("foodrec.user", v); location.reload(); } };
+    account = [h("div.menu-label", { style: { padding: "0 0 6px" } }, "Pseudonymous user id"), input,
+      h("div.btn-row", { style: { marginTop: "8px" } }, h("button.btn.primary.sm", { onclick: go }, "Switch")),
+      h("div.hint", { style: { marginTop: "6px" } }, "Each id has its own profile, goals and history.")];
+  } else {
+    account = h("div.menu-label", { style: { padding: "0" } }, `User ${state.user}`);
+  }
+  if (!dishes && !account) return;
+  const pop = h("div.menu.account-menu", { style: { padding: "10px", width: "250px" } },
+    dishes, dishes ? h("div.divider", { style: { margin: "8px 0" } }) : null, account);
   document.querySelectorAll(".menu").forEach((m) => m.remove());
   document.body.append(pop);
   const r = anchor.getBoundingClientRect();
   pop.style.top = `${window.scrollY + r.bottom + 4}px`;
-  pop.style.left = `${Math.max(8, r.right - 240)}px`;
-  input.focus();
-  setTimeout(() => document.addEventListener("click", function off(e) {
-    if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("click", off); }
-  }), 0);
-}
-
-// With login required: who is signed in, and a sign-out button instead of "switch user".
-function accountMenu(anchor) {
-  const pop = h("div.menu", { style: { padding: "10px", width: "220px" } },
-    h("div.menu-label", { style: { padding: "0 0 6px" } }, `Signed in as ${state.user}`),
-    h("button.btn.sm", { onclick: () => { safeSet("foodrec.session", ""); location.reload(); } }, "Sign out"));
-  document.querySelectorAll(".menu").forEach((m) => m.remove());
-  document.body.append(pop);
-  const r = anchor.getBoundingClientRect();
-  pop.style.top = `${window.scrollY + r.bottom + 4}px`;
-  pop.style.left = `${Math.max(8, r.right - 220)}px`;
+  pop.style.left = `${Math.max(8, r.right - 250)}px`;
+  input?.focus();
   setTimeout(() => document.addEventListener("click", function off(e) {
     if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("click", off); }
   }), 0);
@@ -152,7 +154,7 @@ async function boot() {
   });
   document.querySelector(".user-btn").addEventListener("click", (e) => {
     e.stopPropagation();
-    if (state.system?.login_required || can("switch_user")) userMenu(e.currentTarget);
+    userMenu(e.currentTarget);
   });
   document.querySelector(".user-btn .uid").textContent = state.user;
   statusPill.addEventListener("click", systemPanel);
@@ -171,7 +173,7 @@ async function boot() {
     return;
   }
   renderStatus();
-  document.querySelector(".user-btn").title = can("switch_user") ? "Switch user" : `Signed in as ${state.user}`;
+  document.querySelector(".user-btn").title = "Account: My dishes" + (can("switch_user") && !state.system.login_required ? ", switch user" : "");
   if (state.system.study?.name) document.title = `${state.system.study.name} · FoodRec`;
   // The dock waits for onboarding: a study may assign a role without the assistant at that point.
   const dockToggle = document.querySelector(".dock-toggle");

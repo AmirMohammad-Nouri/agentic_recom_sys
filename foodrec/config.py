@@ -123,6 +123,17 @@ class Settings:
 
     # List size and the starting goal of new users.
     top_k: int = field(default_factory=lambda: int(_env("FOODREC_TOP_K", 5)))
+    # Fresh lists (engine.py "Freshness"): saved dishes, fatigue, variety across lists, discovery.
+    hide_saved: bool = True
+    fatigue_per_view: float = 0.03
+    fatigue_max: float = 0.12
+    fatigue_half_life_days: float = 2.0
+    cuisine_fatigue_per_slot: float = 0.01
+    cuisine_fatigue_max: float = 0.06
+    history_lists: int = 3
+    discovery_slots: int = 0
+    discovery_days: float = 7.0
+    freshness_window_days: float = 14.0
     default_diversity: float = 0.3
     default_mode: str = "lightweight"
 

@@ -105,6 +105,16 @@ FIELDS = [
     {"section": "ranking", "key": "max_missing_share", "attr": "max_missing_share", "env": "FOODREC_MAX_MISSING_SHARE",
      "type": "float", "min": 0, "max": 1, "apply": "live", "label": "Max. missing weight share",
      "help": "A recipe whose missing criteria carry more of the user's weight than this is not ranked."},
+    {"section": "ranking", "key": "hide_saved", "attr": "hide_saved", "env": None, "type": "bool", "apply": "live", "label": "Keep saved dishes out of Discover", "help": "Saved dishes wait in My dishes instead of taking Discover places; removing one from Saved brings it back."},
+    {"section": "ranking", "key": "fatigue_per_view", "attr": "fatigue_per_view", "env": None, "type": "float", "apply": "live", "label": "Fatigue per showing", "help": "Utility a recipe loses each time it is shown and the user does not react (0 = off).", "min": 0, "max": 0.3},
+    {"section": "ranking", "key": "fatigue_max", "attr": "fatigue_max", "env": None, "type": "float", "apply": "live", "label": "Maximum recipe fatigue", "help": "Cap of the fatigue of one recipe.", "min": 0, "max": 0.5},
+    {"section": "ranking", "key": "fatigue_half_life_days", "attr": "fatigue_half_life_days", "env": None, "type": "float", "apply": "live", "label": "Fatigue half-life (days)", "help": "How fast fatigue fades: after this many days a showing counts half.", "min": 0.1, "max": 60},
+    {"section": "ranking", "key": "cuisine_fatigue_per_slot", "attr": "cuisine_fatigue_per_slot", "env": None, "type": "float", "apply": "live", "label": "Cuisine fatigue per place", "help": "Utility every recipe of a cuisine loses for each list place that cuisine filled recently (0 = off). 'Other' is not a cuisine and never fatigues.", "min": 0, "max": 0.1},
+    {"section": "ranking", "key": "cuisine_fatigue_max", "attr": "cuisine_fatigue_max", "env": None, "type": "float", "apply": "live", "label": "Maximum cuisine fatigue", "help": "Cap of the fatigue of one cuisine.", "min": 0, "max": 0.3},
+    {"section": "ranking", "key": "history_lists", "attr": "history_lists", "env": None, "type": "int", "apply": "live", "label": "Variety across lists (lists)", "help": "The variety step also keeps new lists apart from this many recent lists (0 = only within one list). Scaled by the user's diversity setting.", "min": 0, "max": 10},
+    {"section": "ranking", "key": "discovery_slots", "attr": "discovery_slots", "env": None, "type": "int", "apply": "live", "label": "'New for you' places", "help": "List places given to the best recipe of a cuisine the user has not been shown recently (0 = off).", "min": 0, "max": 3},
+    {"section": "ranking", "key": "discovery_days", "attr": "discovery_days", "env": None, "type": "float", "apply": "live", "label": "'New for you' window (days)", "help": "A cuisine counts as new when it was not shown in this many days.", "min": 1, "max": 90},
+    {"section": "ranking", "key": "freshness_window_days", "attr": "freshness_window_days", "env": None, "type": "float", "apply": "live", "label": "Look-back window (days)", "help": "How far back showings count for fatigue and variety.", "min": 1, "max": 90},
     {"section": "ranking", "key": "min_nutrient_coverage", "attr": "min_nutrient_coverage",
      "env": "FOODREC_MIN_NUTRIENT_COVERAGE", "type": "float", "min": 0, "max": 1, "apply": "restart",
      "label": "Min. nutrient coverage", "help": "Below this share of nutrient factors, healthiness counts as missing."},
@@ -139,6 +149,7 @@ FEATURES = {
     "feedback": ("Feedback buttons", "Like, save, I'll cook this, not for me."),
     "supervisor": ("Supervisor questions", "The supervisor's questions and goal proposals after feedback."),
     "weight_controls": ("Priority controls", "Sliders on Discover, saving goals and what-if previews."),
+    "page_dishes": ("My dishes page", "Dishes the user saved for later, liked and cooked."),
     "page_insights": ("Insights page", "What the system has learned about the user."),
     "page_knowledge": ("Knowledge page", "Knowledge graph, document library and retrieval tester."),
     "page_activity": ("Activity page", "The user's own event log and decisions."),
@@ -211,7 +222,10 @@ _BUILTIN = {"llm_enabled": True, "ollama_url": "http://127.0.0.1:11434", "llm_mo
             "max_missing_share": 0.5, "min_nutrient_coverage": 0.6, "max_agent_steps": 3,
             "llm_provider": "ollama", "llm_base_url": "", "llm_api_key_env": "", "llm_effort": "low",
             "llm_max_tokens": 4096, "llm_fallbacks": True, "embed_provider": "ollama",
-            "host": "127.0.0.1", "port": 8000, "auto_reload": True}
+            "host": "127.0.0.1", "port": 8000, "auto_reload": True,
+            "hide_saved": True, "fatigue_per_view": 0.03, "fatigue_max": 0.12, "fatigue_half_life_days": 2.0,
+            "cuisine_fatigue_per_slot": 0.01, "cuisine_fatigue_max": 0.06, "history_lists": 3,
+            "discovery_slots": 0, "discovery_days": 7.0, "freshness_window_days": 14.0}
 
 
 def _builtin_default(f):

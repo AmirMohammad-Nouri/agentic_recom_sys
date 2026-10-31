@@ -8,6 +8,10 @@
                                                                 same command line (a few seconds)
 
 The same path is taken whether the file was edited by hand or saved from the Config page.
+
+The watcher also restarts the app when its own Python code changes (e.g. after `git pull` or
+an edit), so a running server never serves an older backend to a newer web page. Web files
+(JS, CSS) need no restart: the browser loads them fresh.
 """
 import logging
 import os
@@ -28,6 +32,7 @@ class ConfigWatcher(threading.Thread):
         self.core, self.path, self.interval = core, Path(path), interval
         self.restart = restart or restart_process
         self._stamp = self._stat()
+        self._code = self._code_stamp()
         self._stop = threading.Event()
 
     def _stat(self):
@@ -37,11 +42,46 @@ class ConfigWatcher(threading.Thread):
         except OSError:
             return None
 
+    @staticmethod
+    def _code_stamp():
+        pkg = Path(__file__).resolve().parent
+        try:
+            return max(p.stat().st_mtime_ns for p in pkg.rglob("*.py"))
+        except (OSError, ValueError):
+            return None
+
+    @staticmethod
+    def _compile_errors(since):
+        """Syntax errors in the files changed after `since` (a restart into them would fail)."""
+        import py_compile
+        pkg = Path(__file__).resolve().parent
+        for p in pkg.rglob("*.py"):
+            try:
+                if since is None or p.stat().st_mtime_ns > since:
+                    py_compile.compile(str(p), doraise=True, cfile=os.devnull)
+            except py_compile.PyCompileError as e:
+                return f"{p.name}: {e.msg.strip().splitlines()[-1]}"
+            except OSError:
+                continue
+        return None
+
     def stop(self):
         self._stop.set()
 
     def run(self):
         while not self._stop.wait(self.interval):
+            code = self._code_stamp()
+            if code != self._code and not getattr(self.core, "restarting", False):
+                old, self._code = self._code, code
+                broken = self._compile_errors(old)
+                if broken:
+                    log.error("the app's code changed but does not compile (%s); keeping the running version",
+                              broken)
+                    continue
+                log.warning("the app's Python code changed: restarting to use it")
+                self.core.restarting = True
+                threading.Timer(0.8, self.restart).start()
+                continue
             stamp = self._stat()
             if stamp != self._stamp:
                 self._stamp = stamp

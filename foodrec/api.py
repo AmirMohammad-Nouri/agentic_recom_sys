@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 
 from . import CRITERION_LABELS
-from .access import redact_attachments, redact_message, redact_result
+from .access import redact_attachments, redact_message, redact_recipe, redact_result
 from .agent import Supervisor
 from .agent import policy
 from .agent.trace import Trace
@@ -371,6 +371,17 @@ def create_app(settings=None, llm=None):
     def events(uid: str, limit: int = 100):
         need(uid, "page_activity")
         return core.store.events(uid, limit=limit, newest_first=True)
+
+    @api.get("/api/users/{uid}/dishes")
+    def dishes(uid: str):
+        """My dishes: saved for later, liked and cooked (each shown as the role allows)."""
+        acc = need(uid, "page_dishes")
+        return {col: [redact_recipe(r, acc) for r in rows] for col, rows in core.my_dishes(uid).items()}
+
+    @api.post("/api/users/{uid}/dishes/remove")
+    def remove_dish(uid: str, body: dict = Body(...)):
+        need(uid, "page_dishes")
+        return core.remove_dish(uid, body.get("recipe_id"), body.get("collection"))
 
     @api.post("/api/users/{uid}/ui-events")
     def ui_event(uid: str, body: dict = Body(...)):

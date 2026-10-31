@@ -32,7 +32,7 @@ writes graph queries.
 import time
 from collections import Counter, defaultdict
 
-from .. import VALUE_CRITERIA
+from .. import VALUE_CRITERIA, clock
 from ..constraints import SUPPORTED_DIETS
 from ..features import health_grade
 
@@ -170,7 +170,7 @@ class GraphProjection:
     def record_request(self, user_id, result):
         rq = f"request:{result['request_id']}"
         self.merge_node(f"user:{user_id}", "User", {"user_id": user_id})
-        self.merge_node(rq, "Request", {"request_id": result["request_id"], "ts": time.time(),
+        self.merge_node(rq, "Request", {"request_id": result["request_id"], "ts": clock.now(),
                                         "origin": result.get("origin", "ui"),
                                         "mode": result["config"]["mode"]})
         self.merge_edge(f"user:{user_id}", "RECEIVED", rq)

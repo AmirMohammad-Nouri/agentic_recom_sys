@@ -34,7 +34,7 @@ from .export import export, to_json
 
 ACTIONS = ("onboard", "recommend", "feedback", "chat", "review", "resolve", "update_profile", "save_goal",
            "revert_goal", "what_if", "goal_options", "correct_belief", "add_document", "insight", "set_user",
-           "set_role", "expect", "repeat", "note", "ui_event")
+           "set_role", "expect", "repeat", "note", "ui_event", "advance_time", "dishes", "remove_dish")
 
 
 class ScenarioError(Exception):
@@ -70,7 +70,8 @@ def check(sc):
             need = {"feedback": ("recipe", "type"), "chat": ("text",), "resolve": ("do",), "expect": ("that",),
                     "repeat": ("times", "steps"), "set_user": ("user",), "set_role": ("role",),
                     "add_document": ("title", "text"), "correct_belief": ("concept", "mean"),
-                    "goal_options": ("increase",), "revert_goal": ("version",), "ui_event": ("kind",)}.get(a, ())
+                    "goal_options": ("increase",), "revert_goal": ("version",), "ui_event": ("kind",),
+                    "remove_dish": ("recipe", "collection")}.get(a, ())
             out.extend(f"{where} step {i} ({a}): missing '{k}'" for k in need if k not in st)
             if a == "repeat":
                 walk(st.get("steps"), f"{where} step {i}")
@@ -130,6 +131,8 @@ class Runner:
         from .config import load_settings
         from .agent import Supervisor
         from .service import App
+        from . import clock
+        clock.reset()  # every run starts at the real time; advance_time moves it forward
         self.cfg = scenario_config(scenario, overrides)
         if self.cfg.errors:
             raise ScenarioError("config: " + "; ".join(self.cfg.errors))
@@ -152,6 +155,8 @@ class Runner:
         self.assertions = []
 
     def close(self):
+        from . import clock
+        clock.reset()
         if self.tmp:
             shutil.rmtree(self.tmp, ignore_errors=True)
 
@@ -169,6 +174,13 @@ class Runner:
         scores highest / lowest on a criterion), a recipe id, or a title (exact, then substring)."""
         ref = str(ref).strip()
         cat = self.app.catalogue
+        m = re.fullmatch(r"(saved|liked|cooked):(\d+)", ref)  # the n-th dish of a My dishes list
+        if m:
+            rows = self.app.my_dishes(uid)[m.group(1)]
+            n = int(m.group(2))
+            if not 1 <= n <= len(rows):
+                raise ScenarioError(f"{ref}: the {m.group(1)} list has {len(rows)} dish(es)")
+            return rows[n - 1]["recipe_id"], None
         m = re.fullmatch(r"(best|worst):([a-z][a-z0-9_]*)", ref)
         if m:
             last = self._last_list(uid)
@@ -255,6 +267,27 @@ class Runner:
         if a != "expect":
             self.log(f"  {mark} {n:>6} {a:<15} {' '.join(str(rec['summary']).split())[:160]}")
 
+    def _a_advance_time(self, uid, st):
+        """Move the app clock forward: {"days": 2} or {"hours": 3}."""
+        from . import clock
+        secs = float(st.get("days", 0)) * 86400 + float(st.get("hours", 0)) * 3600
+        if secs <= 0:
+            raise ScenarioError("advance_time needs days or hours > 0")
+        clock.advance(secs)
+        return {"offset_days": round(clock.offset() / 86400, 3)}, \
+            f"+{secs / 86400:g} day(s); now {round(clock.offset() / 86400, 2)} day(s) after the start"
+
+    def _a_dishes(self, uid, st):
+        d = self.app.my_dishes(uid)
+        res = {k: [{"title": r["title"], "recipe_id": r["recipe_id"], "count": r["count"]} for r in v] for k, v in d.items()}
+        self.ctx["dishes"] = res
+        return res, ", ".join(f"{k} {len(v)}" for k, v in res.items())
+
+    def _a_remove_dish(self, uid, st):
+        rid, _ = self._recipe(uid, st["recipe"])
+        out = self.app.remove_dish(uid, rid, st["collection"])
+        return out, f"removed {self.app.catalogue.by_id[rid]['title']} from {st['collection']}"
+
     def _a_note(self, uid, st):
         return None, st.get("text", "")
 
@@ -289,10 +322,18 @@ class Runner:
         rows = res.get("results") or []
         out = {"request_id": res["request_id"], "eligible": res["eligibility"]["eligible_count"],
                "results": [{"rank": r["final_rank"], "recipe_id": r["recipe_id"], "title": r["title"],
-                            "utility": round(r["utility"], 4),
-                            "scores": {k: (None if v is None else round(v, 4)) for k, v in r["scores"].items()}}
+                            "cuisine": r["cuisine"], "utility": round(r["utility"], 4),
+                            "scores": {k: (None if v is None else round(v, 4)) for k, v in r["scores"].items()},
+                            "freshness": r.get("freshness")}
                            for r in rows],
                "comparison": {k: res["comparison"][k] for k in ("entered", "left")} if res.get("comparison") else None}
+        # running totals over the whole run, for checks like "seen.recipes gte 20"
+        seen = self.ctx.setdefault("_seen", {"recipes": set(), "cuisines": set(), "lists": 0})
+        seen["recipes"].update(r["recipe_id"] for r in rows)
+        seen["cuisines"].update(r["cuisine"] for r in rows if r["cuisine"] != "Other")
+        seen["lists"] += 1
+        self.ctx["seen"] = {"recipes": len(seen["recipes"]), "cuisines": len(seen["cuisines"]),
+                            "lists": seen["lists"], "cuisine_names": sorted(seen["cuisines"])}
         return out, (", ".join(f"#{r['rank']} {r['title']}" for r in out["results"]) or "no eligible recipe")
 
     def _a_feedback(self, uid, st):

@@ -327,6 +327,8 @@ modules, no build step; the only external script is the pinned graph renderer (v
 
 * the **language model**: Ollama, any OpenAI-compatible API, or the Claude API (API keys stay in `.env`);
 * the **dataset**: HUMMUS or your own recipes (`python -m foodrec.ingest --recipes ...`);
+* **fresh lists**: dishes shown and ignored, and cuisines shown often, slowly give way; saved dishes wait on the
+  **My dishes** page in the account menu (with liked and cooked dishes) instead of taking a Discover place;
 * the **criteria** users weigh at onboarding (switch the built-ins off, or add criteria such as energy,
   protein or price from any numeric recipe field) and the **feedback options** with their learning weights;
 * **access roles** (what each user sees: explanations, scores, food details, the assistant ...);

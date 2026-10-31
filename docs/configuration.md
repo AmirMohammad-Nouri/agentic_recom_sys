@@ -26,6 +26,10 @@ markdown files in `foodrec/web/guides/`, readable in the repository as well).
 | `foodrec status` | is the app running, on which port, with which process id |
 | `foodrec stop` | stops the running app, from any terminal |
 
+The running app also restarts itself when its own Python code changes (after an edit or `git pull`), so the
+server never stays older than the web pages; a change that does not compile is not used. `foodrec stop`
+also finds servers started by older versions.
+
 Only one FoodRec runs per port. If one is already running, `foodrec` and `foodrec config open` just open
 the browser, and `foodrec serve` says so instead of starting a second copy (a second copy could not use
 the port, and would find the embedded vector store locked). If another program uses the port, the command
@@ -72,6 +76,7 @@ the file: `NEO4J_PASSWORD` and `FOODREC_ADMIN_TOKEN` are read from the environme
 | `services` | `neo4j_uri`, `neo4j_user`, `neo4j_database`, `qdrant` | after restart | `null` = environment |
 | `ranking` | `top_k`, `default_diversity`, `default_mode`, `max_missing_share` | at once | |
 | `ranking` | `min_nutrient_coverage` | after restart | |
+| `ranking` | `hide_saved`, `fatigue_per_view`, `fatigue_max`, `fatigue_half_life_days`, `cuisine_fatigue_per_slot`, `cuisine_fatigue_max`, `history_lists`, `discovery_slots`, `discovery_days`, `freshness_window_days` | at once | *Fresh lists* below |
 | `supervisor` | `max_agent_steps` | at once | |
 
 The Config page marks each setting **live** or **restart**. After saving, it lists the changes that are still
@@ -133,6 +138,27 @@ criteria change (a removed criterion is dropped, a new one starts at 0, the rest
 enabled criterion gets a choose and a reject reason (added automatically when missing); reasons with a
 criterion move the revealed weights, reasons without one are about taste. Scenario files can use other
 criteria in their `config`: they then run in a separate process automatically.
+
+## Fresh lists and My dishes
+
+Without help the same dishes would stay on top of Discover day after day. These mechanisms keep the lists
+fresh, all disclosed on the card, stored with each list and adjustable in `ranking`:
+
+* **Saved for later** dishes (the Save button) wait on the **My dishes** page (in the account menu, top right,
+  where the user id is) instead of taking a Discover place (`hide_saved`). My dishes also lists what the user **liked** and **cooked**; any dish can be removed
+  from a list there (nothing that was learned changes), and removing it from Saved lets Discover show it again.
+* **Dish fatigue**: every past session in which a dish was shown and ignored lowers its utility a little
+  (`fatigue_per_view`, capped by `fatigue_max`, fading with `fatigue_half_life_days`).
+* **Cuisine fatigue**: a cuisine that filled many recent list places lowers all its dishes a little
+  (`cuisine_fatigue_per_slot`, `cuisine_fatigue_max`), so other cuisines come up.
+* **Variety across lists**: the diversity step also keeps a new list apart from the last `history_lists` lists.
+* **New for you** (off by default): `discovery_slots` places for the best dish of a cuisine not shown within
+  `discovery_days`.
+
+Lists of the last hour do not count yet, so a list stays stable while the user works with it. Measured on
+HUMMUS over two simulated weeks (`scenarios/fresh_lists.json`, 30 lists): 27 different dishes and 5 cuisines
+without freshness, 55 and 7 with the defaults, 61 and 10 with one New-for-you place. Set the fatigue values
+and `history_lists` to 0 to get the old, fixed ranking.
 
 ## Your own (private) dataset
 
@@ -243,6 +269,7 @@ It is also available on the Config page (**Export** tab), at `GET /api/export?fo
 | `decisions` | Supervisor questions and proposals, with the user's resolution |
 | `conversation` | Chat turns with the agent steps behind each answer |
 | `ui_events` | Page views, details opened, assistant opened/closed, suggestion clicks |
+| `my_dishes` | What is in Saved for later, Liked and Cooked at export time |
 | `events` | The raw append-only event log |
 | `log` | One chronological timeline merging everything above |
 | `summary` | Counts, proposal acceptance rate, mean rank / utility chosen, preference match, active minutes |
@@ -288,12 +315,17 @@ assertion failed, so scenarios can run in CI.
 | `save_goal`, `revert_goal`, `what_if`, `goal_options` | As in the API |
 | `correct_belief`, `add_document`, `insight`, `ui_event` | |
 | `set_user` | `user`, optional `role`; `set_role`: `role` |
+| `advance_time` | `days` and/or `hours`: move the app clock forward (fatigue fading, "only today", cool-downs) |
+| `dishes` | read My dishes into `dishes` (e.g. `dishes.saved.length`) |
+| `remove_dish` | `recipe`, `collection` (`saved`, `liked`, `cooked`) |
 | `repeat` | `times`, `steps` |
 | `note` | `text` (shown in the report) |
 | `expect` | `that` + one or more of `equals`, `not_equals`, `gt`, `gte`, `lt`, `lte`, `contains`, `not_contains`, `in`, `exists`, `matches` |
 
 **Recipe references:** `"#2"` (rank in the last list), `"best:t"` / `"worst:h"` (the recipe in the last list
-with the highest or lowest score on a criterion, for simulating consistent behaviour), a recipe id, or a title.
+with the highest or lowest score on a criterion, for simulating consistent behaviour), `"saved:1"` (the first
+dish on a My dishes list), a recipe id, or a title. Every `recommend` also updates `seen` (`seen.recipes`,
+`seen.cuisines`: distinct dishes and cuisines shown so far in the run).
 
 **`expect` paths** read from `result` (last list), `chat`, `feedback`, `review`, `resolved`, `what_if`,
 `insight`, `state` (fresh user state), `open_decisions`, `error` (error of the previous step), and
@@ -302,4 +334,4 @@ with the highest or lowest score on a criterion, for simulating consistent behav
 `"allow_error": true` (for steps that should be refused).
 
 Example scenarios are in `scenarios/`: `sara_goal_drift`, `reza_safety_rules`, `study_access_roles`,
-`model_comparison` and `energy_criterion` (other criteria and reasons, run in its own process).
+`model_comparison`, `energy_criterion` and `fresh_lists` (two simulated weeks, with `advance_time`) (other criteria and reasons, run in its own process).

@@ -1,0 +1,142 @@
+{
+  "name": "fresh_lists",
+  "description": "Two simulated weeks: every day the user opens Discover for lunch and dinner, cooks one dish and ignores the others; one dish is saved for later. Measured on HUMMUS (30 lists): without freshness 27 different dishes and 5 cuisines, with the defaults 55 dishes and 7 cuisines, with one 'New for you' place 61 dishes and 10 cuisines. Saved dishes wait in My dishes. Compare: foodrec scenario run scenarios/fresh_lists.json --matrix ranking.discovery_slots=0,1",
+  "user": "fio",
+  "config": {
+    "llm": {
+      "enabled": false
+    }
+  },
+  "steps": [
+    {
+      "action": "onboard",
+      "declared": {
+        "diets": [
+          "vegetarian"
+        ],
+        "preferred_cuisines": [
+          "Indian"
+        ]
+      },
+      "weights": {
+        "h": 0.4,
+        "s": 0.3,
+        "t": 0.3
+      }
+    },
+    {
+      "action": "recommend",
+      "meal": "dinner"
+    },
+    {
+      "action": "feedback",
+      "recipe": "#3",
+      "type": "save"
+    },
+    {
+      "action": "dishes"
+    },
+    {
+      "action": "expect",
+      "that": "dishes.saved.length",
+      "equals": 1,
+      "label": "the saved dish is in My dishes"
+    },
+    {
+      "action": "advance_time",
+      "hours": 2
+    },
+    {
+      "action": "recommend",
+      "meal": "dinner"
+    },
+    {
+      "action": "expect",
+      "that": "result.eligibility.kept_for_later",
+      "equals": 1,
+      "label": "the saved dish is kept out of Discover"
+    },
+    {
+      "action": "repeat",
+      "times": 14,
+      "steps": [
+        {
+          "action": "advance_time",
+          "hours": 5
+        },
+        {
+          "action": "recommend",
+          "meal": "lunch"
+        },
+        {
+          "action": "advance_time",
+          "hours": 6
+        },
+        {
+          "action": "recommend",
+          "meal": "dinner"
+        },
+        {
+          "action": "feedback",
+          "recipe": "#1",
+          "type": "choose",
+          "reason": "taste"
+        },
+        {
+          "action": "advance_time",
+          "hours": 13
+        }
+      ]
+    },
+    {
+      "action": "dishes"
+    },
+    {
+      "action": "expect",
+      "that": "dishes.cooked.length",
+      "gte": 5,
+      "label": "cooked dishes are listed"
+    },
+    {
+      "action": "expect",
+      "that": "seen.recipes",
+      "gte": 45,
+      "label": "many different dishes over two weeks"
+    },
+    {
+      "action": "expect",
+      "that": "seen.cuisines",
+      "gte": 7,
+      "label": "at least seven cuisines appear"
+    },
+    {
+      "action": "expect",
+      "that": "result.eligibility.kept_for_later",
+      "equals": 1,
+      "label": "still saved, still out of Discover"
+    },
+    {
+      "action": "remove_dish",
+      "recipe": "saved:1",
+      "collection": "saved"
+    },
+    {
+      "action": "recommend",
+      "meal": "dinner"
+    },
+    {
+      "action": "expect",
+      "that": "result.eligibility.kept_for_later",
+      "equals": 0,
+      "label": "removed from Saved: back in Discover"
+    },
+    {
+      "action": "dishes"
+    },
+    {
+      "action": "expect",
+      "that": "dishes.saved.length",
+      "equals": 0
+    }
+  ]
+}

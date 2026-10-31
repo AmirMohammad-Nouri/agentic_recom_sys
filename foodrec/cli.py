@@ -120,15 +120,59 @@ def _status(a):
     return 1
 
 
+def _listening_pid(port):
+    """Linux: the pid of the process listening on a TCP port, from /proc (None elsewhere).
+    Used for servers started by an older FoodRec version that does not report its pid."""
+    inodes = set()
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            with open(table) as f:
+                next(f)
+                for line in f:
+                    parts = line.split()
+                    if parts[3] == "0A" and int(parts[1].rsplit(":", 1)[1], 16) == port:  # 0A = LISTEN
+                        inodes.add(parts[9])
+        except (OSError, StopIteration, IndexError, ValueError):
+            continue
+    if not inodes:
+        return None
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            for fd in (proc / "fd").iterdir():
+                link = os.readlink(fd)
+                if link.startswith("socket:[") and link[8:-1] in inodes:
+                    return int(proc.name)
+        except OSError:
+            continue
+    return None
+
+
+def _is_foodrec_process(pid):
+    try:
+        cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+    except OSError:
+        return False
+    return "foodrec" in cmd
+
+
 def _stop(a):
     import signal
     import time
     s, host, port, bhost = _where(a)
     state, info = probe(bhost, port)
-    if state != "foodrec" or not info.get("pid"):
+    if state != "foodrec":
         print(f"FoodRec is not running on {bhost}:{port}.")
         return 0 if state == "free" else 1
-    pid = int(info["pid"])
+    pid = info.get("pid")
+    if not pid:  # an older FoodRec that does not report its pid
+        pid = _listening_pid(port)
+        if not pid or not _is_foodrec_process(pid):
+            print(f"FoodRec answers on {bhost}:{port}, but its process could not be found. Stop it with Ctrl+C "
+                  f"where it runs, or: fuser -k {port}/tcp")
+            return 1
+    pid = int(pid)
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:

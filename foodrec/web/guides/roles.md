@@ -23,7 +23,7 @@ Every switch is **enforced by the server**: hidden fields are removed from the A
 | Feedback buttons | no like / save / cook / reject |
 | Supervisor questions | the supervisor never asks or proposes |
 | Priority controls | no sliders, goal saving or what-if previews: the saved goal is always used |
-| Insights / Knowledge / Activity / Profile | that page is hidden |
+| My dishes (account menu) / Insights / Knowledge / Activity / Profile | that page is hidden |
 | Download own data | no personal export |
 | Switch user | the user id cannot be changed in the top bar |
 | Configuration | this page, all exports, study administration |

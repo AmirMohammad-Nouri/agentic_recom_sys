@@ -11,6 +11,8 @@ import time
 import uuid
 from pathlib import Path
 
+from . import clock
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     user_id TEXT PRIMARY KEY,
@@ -158,7 +160,7 @@ class Store:
     # ---- users -------------------------------------------------------------------
     def ensure_user(self, user_id):
         with self._conn() as c:
-            c.execute("INSERT OR IGNORE INTO users VALUES (?, ?)", (user_id, time.time()))
+            c.execute("INSERT OR IGNORE INTO users VALUES (?, ?)", (user_id, clock.now()))
 
     def users(self):
         with self._conn() as c:
@@ -191,7 +193,7 @@ class Store:
     def assign_role(self, user_id, role, method):
         self.ensure_user(user_id)
         with self._conn() as c:
-            c.execute("INSERT OR REPLACE INTO role_assignments VALUES (?,?,?,?)", (user_id, role, method, time.time()))
+            c.execute("INSERT OR REPLACE INTO role_assignments VALUES (?,?,?,?)", (user_id, role, method, clock.now()))
 
     def role_counts(self):
         with self._conn() as c:
@@ -208,7 +210,7 @@ class Store:
             v = (c.execute("SELECT MAX(version) FROM profile_versions WHERE user_id=?",
                            (user_id,)).fetchone()[0] or 0) + 1
             c.execute("INSERT INTO profile_versions VALUES (?,?,?,?,?,?)",
-                      (user_id, v, time.time(), json.dumps(declared), source, note))
+                      (user_id, v, clock.now(), json.dumps(declared), source, note))
         return v
 
     def profile(self, user_id, version=None):
@@ -236,7 +238,7 @@ class Store:
             v = (c.execute("SELECT MAX(version) FROM goal_versions WHERE user_id=?",
                            (user_id,)).fetchone()[0] or 0) + 1
             c.execute("INSERT INTO goal_versions VALUES (?,?,?,?,?,?,?,?,?)",
-                      (user_id, v, name, time.time(), json.dumps(weights), diversity, mode, source, note))
+                      (user_id, v, name, clock.now(), json.dumps(weights), diversity, mode, source, note))
         return v
 
     @staticmethod
@@ -261,7 +263,7 @@ class Store:
     # ---- event log -----------------------------------------------------------------
     def append_event(self, user_id, type_, payload, context=None, ts=None):
         self.ensure_user(user_id)
-        ev = {"event_id": new_id("ev"), "user_id": user_id, "ts": ts or time.time(),
+        ev = {"event_id": new_id("ev"), "user_id": user_id, "ts": ts or clock.now(),
               "type": type_, "payload": payload, "context": context or {}}
         with self._conn() as c:
             cur = c.execute("INSERT INTO events (event_id,user_id,ts,type,payload_json,context_json) "
@@ -304,7 +306,7 @@ class Store:
         result["request_id"] = rid
         with self._conn() as c:
             c.execute("INSERT INTO requests VALUES (?,?,?,?,?,?,?)",
-                      (rid, user_id, time.time(), origin, profile_version, goal_version,
+                      (rid, user_id, clock.now(), origin, profile_version, goal_version,
                        json.dumps(result, default=float)))
         return rid
 
@@ -313,10 +315,14 @@ class Store:
             r = c.execute("SELECT result_json FROM requests WHERE request_id=?", (request_id,)).fetchone()
         return None if r is None else json.loads(r["result_json"])
 
-    def requests(self, user_id, limit=None):
+    def requests(self, user_id, limit=None, since=None):
         """Stored request snapshots of one user, oldest first."""
-        q = "SELECT * FROM requests WHERE user_id=? ORDER BY ts"
+        q = "SELECT * FROM requests WHERE user_id=?"
         args = [user_id]
+        if since is not None:
+            q += " AND ts>=?"
+            args.append(since)
+        q += " ORDER BY ts"
         if limit:
             q += " LIMIT ?"
             args.append(limit)
@@ -347,7 +353,7 @@ class Store:
 
     # ---- supervisor decisions --------------------------------------------------------
     def add_decision(self, user_id, kind, title, body, source, status="open"):
-        d = {"decision_id": new_id("dec"), "user_id": user_id, "ts": time.time(), "kind": kind,
+        d = {"decision_id": new_id("dec"), "user_id": user_id, "ts": clock.now(), "kind": kind,
              "status": status, "title": title, "body": body, "source": source,
              "resolved_ts": None, "resolution": None}
         with self._conn() as c:
@@ -359,7 +365,7 @@ class Store:
     def resolve_decision(self, decision_id, status, resolution):
         with self._conn() as c:
             c.execute("UPDATE decisions SET status=?, resolved_ts=?, resolution_json=? WHERE decision_id=?",
-                      (status, time.time(), json.dumps(resolution, default=float), decision_id))
+                      (status, clock.now(), json.dumps(resolution, default=float), decision_id))
         return self.decision(decision_id)
 
     @staticmethod
@@ -392,7 +398,7 @@ class Store:
 
     # ---- conversation ----------------------------------------------------------------
     def add_message(self, user_id, role, text, trace=None, attachments=None):
-        m = {"message_id": new_id("msg"), "user_id": user_id, "ts": time.time(), "role": role,
+        m = {"message_id": new_id("msg"), "user_id": user_id, "ts": clock.now(), "role": role,
              "text": text, "trace": trace or [], "attachments": attachments or {}}
         with self._conn() as c:
             c.execute("INSERT INTO messages VALUES (?,?,?,?,?,?,?)",
@@ -418,7 +424,7 @@ class Store:
     def add_document(self, title, text, source="user"):
         doc_id = new_id("doc")
         with self._conn() as c:
-            c.execute("INSERT INTO documents VALUES (?,?,?,?,?)", (doc_id, title, text, source, time.time()))
+            c.execute("INSERT INTO documents VALUES (?,?,?,?,?)", (doc_id, title, text, source, clock.now()))
         return doc_id
 
     def documents(self):

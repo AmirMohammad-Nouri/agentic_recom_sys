@@ -13,6 +13,7 @@ One record per user, for analysis. JSON (`export.json`) or a ZIP with the same J
 | `decisions` | supervisor questions and proposals with the response |
 | `conversation` | chat turns with the agent steps behind each answer |
 | `ui_events` | page views, panels opened, assistant opened/closed |
+| `my_dishes` | what is in Saved for later, Liked and Cooked |
 | `events`, `log` | raw event log; one merged timeline |
 | `summary` | counts, acceptance rate, mean rank chosen, preference match, active minutes |
 

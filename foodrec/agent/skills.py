@@ -15,7 +15,7 @@ import json
 import time
 from dataclasses import dataclass, field
 
-from .. import CRITERIA, CRITERION_LABELS, TASTE_SHARE, VALUE_CRITERIA
+from .. import CRITERIA, CRITERION_LABELS, TASTE_SHARE, VALUE_CRITERIA, clock
 from ..constraints import violations
 from ..features import DEFAULT_GOAL, breakdown, health_grade
 from ..ranker import effective_weights, utility
@@ -373,7 +373,7 @@ class Skills:
 
     def history(self, ctx, days=None, types=None, concept=None, recipe_id=None):
         app = self.app
-        since = time.time() - days * 86400 if days else None
+        since = clock.now() - days * 86400 if days else None
         kw = {}
         if concept and concept.startswith("ingredient:"):
             kw["ingredient"] = concept.split(":", 1)[1]

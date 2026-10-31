@@ -12,6 +12,7 @@ Per user (format "foodrec-export", version 1; see docs/configuration.md#export):
                            scores of the parameters that were visible to this user
   interactions             feedback with the recipe's rank and the scores visible when it was given
   decisions                supervisor questions and proposals, with the user's response
+  my_dishes                what is in Saved for later, Liked and Cooked now
   conversation             chat turns with the agent steps behind each answer
   ui_events                page views and panels opened (interface interaction)
   events                   the raw, append-only event log
@@ -133,6 +134,7 @@ def export_user(app, user_id, include_raw=True):
     decisions = [_decision(d) for d in reversed(store.decisions(user_id, limit=100000))]
     msgs = _conversation(store.messages(user_id, limit=None))
     interactions = _interactions(app, events, recs_by_id)
+    dishes = app.my_dishes(user_id) if hasattr(app, "my_dishes") else {}
     ui = [{"event_id": e["event_id"], "ts": e["ts"], "time": _iso(e["ts"]), **e["payload"]}
           for e in events if e["type"] == "ui"]
 
@@ -181,6 +183,7 @@ def export_user(app, user_id, include_raw=True):
         "profile_versions": (prof or {}).get("version", 0), "goal_versions": (goal or {}).get("version", 0),
         "preference_match": _r(ins.get("preference_match")), "model_confidence": _r(ins.get("confidence")),
         "page_views": dict(Counter(u.get("page") for u in ui if u.get("kind") == "page_view")),
+        "my_dishes": {k: len(v) for k, v in dishes.items()},
     }
     out = {
         "user_id": user_id, "created": _iso(store.user_created(user_id)), "onboarded": prof is not None,
@@ -195,6 +198,8 @@ def export_user(app, user_id, include_raw=True):
         "criteria": criteria,
         "taste_beliefs": [{"concept": t["concept"], "mean": _r(t["mean"]), "evidence": _r(t["evidence"], 2),
                            "declared": t["declared"], "corrected": t["corrected"]} for t in ins.get("taste") or []],
+        "my_dishes": {k: [{"recipe_id": d["recipe_id"], "title": d["title"], "time": _iso(d["ts"]),
+                           "count": d["count"]} for d in v] for k, v in dishes.items()},
         "recommendations": recs, "interactions": interactions, "decisions": decisions,
         "conversation": msgs, "ui_events": ui, "log": log, "summary": summary,
     }

@@ -12,6 +12,16 @@ therefore identical to ranking the whole eligible catalogue.
 Repetition: a recipe eaten recently (chosen, or rejected as "had it recently") loses
     penalty = repeat_penalty * 0.5 ** (days since / repeat_half_life_days)
 utility for repeat_window_days. It is disclosed per recipe and changes nothing else.
+
+Freshness (config["freshness"], computed by the service from the user's recent lists; all
+of it is disclosed on the card and recorded with the request):
+  exclude       recipes kept out of the list (saved for later)
+  exposure      recipe fatigue: utility lost for being shown repeatedly without a reaction
+  cuisine       cuisine fatigue: utility every recipe of a cuisine loses when that cuisine
+                filled many recent list places
+  history       recipes of recent lists; the diversity step keeps the new list apart from them
+  discovery     {"slots": n, "cuisines": [...]}: the best recipe of a cuisine not shown
+                recently takes the last n places ("New for you")
 """
 import math
 
@@ -55,7 +65,7 @@ def _dedupe(recipes):
     return keep, dropped
 
 
-def _pool(candidates, scaler, taste, catalogue, cap, now, goal, weights, cfg, penalties):
+def _pool(candidates, scaler, taste, catalogue, cap, now, goal, weights, cfg, penalties, new_cuisines=()):
     """Cap the candidate set without losing the best recipes.
 
     1. the top max(k, cap/2) recipes by utility (exact utility with the lightweight taste
@@ -79,6 +89,13 @@ def _pool(candidates, scaler, taste, catalogue, cap, now, goal, weights, cfg, pe
     order = sorted(util, key=lambda rid: (-util[rid], rid))
     chosen = list(order[:n_top])
     seen = set(chosen)
+    if new_cuisines:  # the best recipe of each cuisine the user has not seen recently ("New for you")
+        cuisine = {r["id"]: r["cuisine"] for r in candidates}
+        for c in sorted(new_cuisines):
+            best = next((rid for rid in order if cuisine[rid] == c), None)
+            if best and best not in seen:
+                chosen.append(best)
+                seen.add(best)
     lists = [sorted((rid for rid, v in cols[k].items() if v is not None and rid in util),
                     key=lambda rid: (-cols[k][rid], rid)) for k in CRITERIA]
     pos = [0] * len(lists)
@@ -123,9 +140,12 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
     with tele.stage("filter"):
         elig, report = eligible(catalogue, declared)
         by_filter, kept = {}, []
+        fresh = cfg.get("freshness") or {}
         hidden = set(temp.get("hidden") or [])
         n_hidden = sum(1 for r in elig if r["id"] in hidden)
-        elig = [r for r in elig if r["id"] not in hidden]
+        saved = set(fresh.get("exclude") or ())
+        n_saved = sum(1 for r in elig if r["id"] in saved and r["id"] not in hidden)
+        elig = [r for r in elig if r["id"] not in hidden and r["id"] not in saved]
         for r in elig:
             fails = [f["label"] for f in rfilters if request_filter_fails(r, f)]
             for lab in fails:
@@ -137,7 +157,7 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
                           "excluded_by_code": report["excluded_by_code"],
                           "after_request_filters": len(kept),
                           "excluded_by_request_filter": by_filter,
-                          "hidden_for_today": n_hidden}
+                          "hidden_for_today": n_hidden, "kept_for_later": n_saved}
     out["_excluded"] = report["excluded"]
     if elig and not kept:
         out["empty"] = {"message": ("Your mandatory rules leave recipes, but none also meets the "
@@ -156,10 +176,17 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
     # ---- 2. fixed candidate set ---------------------------------------------------
     with tele.stage("candidates"):
         cands, dropped = _dedupe(elig)
-        penalties = {r["id"]: repetition_penalty(recent.get(r["id"]), now, cfg) for r in cands}
+        rep = {r["id"]: repetition_penalty(recent.get(r["id"]), now, cfg) for r in cands}
+        expo = fresh.get("exposure") or {}
+        cuis = fresh.get("cuisine") or {}
+        fatigue = {r["id"]: ((expo.get(r["id"]) or {}).get("penalty", 0.0),
+                             (cuis.get(r["cuisine"]) or {}).get("penalty", 0.0)) for r in cands}
+        penalties = {rid: rep[rid] + sum(fatigue[rid]) for rid in rep}
         penalties = {k: v for k, v in penalties.items() if v > 0}
+        disc = fresh.get("discovery") or {}
+        new_cuisines = set(disc.get("cuisines") or ()) if disc.get("slots") else set()
         cands, capped = _pool(cands, scaler, taste, catalogue, cfg["candidate_cap"], now, goal, weights, cfg,
-                              penalties)
+                              penalties, new_cuisines)
     out["candidates"] = {"ids": [r["id"] for r in cands], "duplicates_removed": dropped,
                          "capped": capped}
 
@@ -192,9 +219,13 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
             if u is None:
                 unranked.append({"recipe_id": r["id"], "missing_criteria": missing})
                 continue
-            pen = penalties.get(r["id"], 0.0)
-            rows.append({"recipe": r, "scores": c["scores"], "utility": u - pen, "utility_before_penalty": u,
+            pen = rep.get(r["id"], 0.0)
+            fexp, fcui = fatigue.get(r["id"], (0.0, 0.0))
+            rows.append({"recipe": r, "scores": c["scores"], "utility": u - pen - fexp - fcui,
+                         "utility_before_penalty": u,
                          "repetition_penalty": pen, "last_eaten_ts": recent.get(r["id"]) if pen else None,
+                         "exposure_penalty": fexp, "times_shown": (expo.get(r["id"]) or {}).get("views", 0),
+                         "cuisine_penalty": fcui, "cuisine_slots": (cuis.get(r["cuisine"]) or {}).get("slots", 0),
                          "effective_weights": eff,
                          "missing_criteria": missing, "missing_policy": cfg["missing_policy"],
                          "contributions": contrib, "p_info": c["p_info"], "support": c["support"]})
@@ -213,14 +244,17 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
     with tele.stage("rerank"):
         util = {x["recipe"]["id"]: x["utility"] for x in rows}
         by_id = {x["recipe"]["id"]: x for x in rows}
+        history = [catalogue.by_id[i] for i in fresh.get("history") or () if i in catalogue.by_id]
         final = rerank([x["recipe"] for x in rows], util,
-                       lambda a, b: catalogue.similarity(a, b), cfg["k"], cfg["diversity"])
+                       lambda a, b: catalogue.similarity(a, b), cfg["k"], cfg["diversity"], history)
+        final = _discovery(final, rows, util, new_cuisines, int(disc.get("slots") or 0))
     ranked = []
     for f in final:
         x = dict(by_id[f["recipe"]["id"]])
         x.update({k: f[k] for k in ("utility_rank", "final_rank", "max_similarity_to_earlier",
                                     "most_similar_earlier", "promoted_by_diversity",
                                     "demoted_by_diversity", "passed_over")})
+        x["new_cuisine"] = f.get("new_cuisine", False)
         ranked.append(x)
     shown = {x["recipe"]["id"]: x["final_rank"] for x in ranked}
     urank = {r["recipe"]["id"]: i + 1 for i, r in enumerate(
@@ -264,7 +298,11 @@ def recommend(catalogue, scaler, learner, declared, config, now, cache=None, tel
                 "repetition": ({"penalty": x["repetition_penalty"], "last_eaten_ts": x["last_eaten_ts"],
                                 "utility_before_penalty": x["utility_before_penalty"]}
                                if x["repetition_penalty"] else None),
-                "evidence": ev, "reasons": _with_repetition(template_reasons(ev), x, now),
+                "freshness": {"times_shown": x["times_shown"], "exposure_penalty": x["exposure_penalty"],
+                              "cuisine_slots": x["cuisine_slots"], "cuisine_penalty": x["cuisine_penalty"],
+                              "new_cuisine": x["new_cuisine"],
+                              "utility_before_penalty": x["utility_before_penalty"]},
+                "evidence": ev, "reasons": _with_freshness(_with_repetition(template_reasons(ev), x, now), x),
             })
     if pipeline["narrative_allowed"] and narrator is not None:
         with tele.stage("narrative"):
@@ -293,6 +331,56 @@ def _missing_info(x, bd):
         out.append({"criterion": None, "text": ("Its other values were weighted up to fill the gap; taste keeps "
                                                 "its fixed share.")})
     return out
+
+
+def _discovery(final, rows, util, new_cuisines, slots):
+    """Give the last `slots` places to the best recipes of cuisines not shown recently, unless
+    the list already has them. Marks them new_cuisine; ranks are renumbered."""
+    if not slots or not new_cuisines:
+        return final
+    have = {f["recipe"]["cuisine"] for f in final}
+    missing = slots - len(have & new_cuisines)
+    if missing <= 0:
+        return final
+    in_list = {f["recipe"]["id"] for f in final}
+    urank = {rid: i + 1 for i, rid in enumerate(sorted(util, key=lambda r: (-util[r], r)))}
+    picks, used = [], set(have)
+    for x in sorted(rows, key=lambda x: (-x["utility"], x["recipe"]["id"])):
+        c = x["recipe"]["cuisine"]
+        if c in new_cuisines and c not in used and x["recipe"]["id"] not in in_list:
+            picks.append(x["recipe"])
+            used.add(c)
+            if len(picks) == missing:
+                break
+    if not picks:
+        return final
+    keep = final[:max(0, len(final) - len(picks))]
+    for f in keep:
+        if f["recipe"]["cuisine"] in new_cuisines:
+            f["new_cuisine"] = True
+    out = keep + [{"recipe": r, "utility_rank": urank[r["id"]], "final_rank": 0, "max_similarity_to_earlier": None,
+                   "most_similar_earlier": None, "promoted_by_diversity": False, "demoted_by_diversity": False,
+                   "passed_over": None, "new_cuisine": True} for r in picks]
+    for pos, f in enumerate(out, 1):
+        f["final_rank"] = pos
+        f["promoted_by_diversity"] = f.get("promoted_by_diversity") or pos < f["utility_rank"]
+        f["demoted_by_diversity"] = pos > f["utility_rank"]
+    return out
+
+
+def _with_freshness(reasons, x):
+    notes = []
+    if x.get("new_cuisine"):
+        notes.append(f"New for you: no {x['recipe']['cuisine']} dish was in your recent lists")
+    if x.get("exposure_penalty"):
+        notes.append(f"shown {x['times_shown']} time(s) recently without a reaction: utility -{x['exposure_penalty']:.2f} "
+                     "so that other dishes get a turn")
+    if x.get("cuisine_penalty"):
+        notes.append(f"{x['recipe']['cuisine']} filled {x['cuisine_slots']:.0f} recent list place(s): "
+                     f"utility -{x['cuisine_penalty']:.2f} for variety")
+    if notes:
+        reasons = {**reasons, "ranked_here": list(reasons.get("ranked_here", [])) + notes}
+    return reasons
 
 
 def _with_repetition(reasons, x, now):

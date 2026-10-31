@@ -13,6 +13,7 @@ import time
 
 from collections import Counter
 
+from . import clock
 from . import (CRITERION_LABELS, CRITERION_SPECS, INTERACTIONS, MODEL_SPEC_ERRORS, TASTE_SHARE,
                VALUE_CRITERIA)
 from .access import snapshot
@@ -31,6 +32,10 @@ from .router import MODES
 from .store import Store
 
 log = logging.getLogger("foodrec.service")
+# Lists that count as "shown to the user" for freshness (not previews or goal-option lists).
+SHOWN_ORIGINS = ("ui", "assistant", "scenario")
+SESSION_S = 3600  # lists of the last hour do not count yet; older ones count once per clock hour
+COLLECTIONS = {"saved": "save", "liked": "like", "cooked": "choose"}  # My dishes -> the feedback that adds to it
 # Interface events the client reports (page views, panels opened); logged for studies only.
 UI_EVENTS = ("page_view", "details_opened", "assistant_opened", "assistant_closed", "export_downloaded",
              "suggestion_clicked", "session_start")
@@ -113,7 +118,7 @@ class App:
                             "reject_reasons": REJECT_REASONS, "choose_reasons": CHOOSE_REASONS,
                             "feedback_scopes": SCOPES},
                 "criteria": CRITERION_LABELS, "value_criteria": VALUE_CRITERIA, "taste_share": TASTE_SHARE,
-                "top_k": self.s.top_k,
+                "top_k": self.s.top_k, "hide_saved": bool(self.s.hide_saved),
                 "criteria_specs": list(CRITERION_SPECS.values()), "interactions": INTERACTIONS,
                 "default_weights": DEFAULT_WEIGHTS, "model_spec_errors": MODEL_SPEC_ERRORS,
                 "study": {k: self.cfg.study.get(k) for k in ("name", "description", "registration")},
@@ -384,7 +389,7 @@ class App:
     def today_weights(self, user_id, base, now=None):
         """Saved weights with today's temporary adjustments ("only today" answers and feedback).
         Returns (weights, note) where note is None when nothing applies."""
-        temp = self.learner(user_id).temporary_effects(now or time.time())
+        temp = self.learner(user_id).temporary_effects(now or clock.now())
         if not temp["weights"] and not temp["nudges"]:
             return dict(base), None
         w = dict(temp["weights"] or base)
@@ -400,7 +405,7 @@ class App:
         """use_temporary=False ranks with exactly the saved (or given) weights, ignoring today's
         adjustments; counterfactual previews use it so they compare like with like."""
         overrides = overrides or {}
-        now = time.time()
+        now = clock.now()
         prof = self.store.profile(user_id) or {"version": 0, "declared": {}}
         goal = self.store.goal(user_id) or {"version": 0, "weights": dict(DEFAULT_WEIGHTS),
                                             "diversity": 0.3, "mode": "lightweight"}
@@ -415,7 +420,8 @@ class App:
                "mode": overrides.get("mode") or goal["mode"],
                "request_filters": overrides.get("request_filters") or [],
                "last_valid_weights": goal["weights"], "k": int(getattr(self.s, "top_k", 5)),
-               "max_missing_share": getattr(self.s, "max_missing_share", 0.5)}
+               "max_missing_share": getattr(self.s, "max_missing_share", 0.5),
+               "freshness": self.freshness(user_id, now)}
         with self.lock:
             res = public(recommend(self.catalogue, self.scaler, self.learner(user_id), prof["declared"], cfg,
                                    now=now, cache=self.score_cache))
@@ -558,13 +564,124 @@ class App:
         pl = {"type": ftype, "recipe_id": recipe_id, "reason": reason, "request_id": request_id, "scope": scope,
               "role": self.access(user_id)["role"]}
         with self.lock:
-            if self.learner(user_id).is_duplicate(pl):
+            if ftype in ("save", "like"):
+                # duplicate = already in Saved / Liked. After removing it from that list, saving or
+                # liking again puts it back (the learner still counts its taste only once).
+                if recipe_id in self.dish_ids(user_id, "saved" if ftype == "save" else "liked"):
+                    return {"event_id": None, "duplicate": True, "trail": []}
+            elif self.learner(user_id).is_duplicate(pl):
                 return {"event_id": None, "duplicate": True, "trail": []}
             req = self.store.request(request_id) if request_id else None
             pl["shown"] = [{"recipe_id": r["recipe_id"], "scores": r["scores"]}
                            for r in (req or {}).get("results", [])]
             ev, trail = self._emit(user_id, "feedback", pl, context)
         return {"event_id": ev["event_id"], "duplicate": False, "scope": scope, "trail": trail}
+
+    # ---- freshness: what the user saw recently -------------------------------------------------
+    def freshness(self, user_id, now=None):
+        """Inputs for the engine's freshness step (engine.py), from the lists stored for this user.
+
+        A list counts as seen once its session (SESSION_S) is over, so the list stays stable while
+        the user works with it. Per recipe, every past session in which it was shown and got no
+        choice or rejection adds fatigue_per_view x 0.5 ** (age / half-life), capped; per cuisine,
+        every list place it filled adds cuisine_fatigue_per_slot the same way ("Other" excluded)."""
+        s, now = self.s, now or clock.now()
+        half = max(0.01, float(s.fatigue_half_life_days))
+        reqs = [q for q in self.store.requests(user_id, since=now - float(s.freshness_window_days) * 86400)
+                if q["origin"] in SHOWN_ORIGINS and q["result"].get("results")]
+        reacted = {(e["payload"].get("request_id"), e["payload"].get("recipe_id"))
+                   for e in self.store.events(user_id, since=now - float(s.freshness_window_days) * 86400,
+                                              types=["feedback"])
+                   if e["payload"].get("type") in ("choose", "reject")}
+        views, cuisine, counted, sessions = {}, {}, set(), {}
+        for q in reqs:
+            if q["ts"] > now - SESSION_S:  # the current session: the user is still looking at it
+                continue
+            b = int(q["ts"] // SESSION_S)
+            decay = 0.5 ** (max(0.0, now - q["ts"]) / 86400 / half)
+            sessions[b] = [r["recipe_id"] for r in q["result"]["results"]]
+            for r in q["result"]["results"]:
+                rid, c = r["recipe_id"], r.get("cuisine")
+                if (rid, b) in counted:
+                    continue
+                counted.add((rid, b))
+                if c and c != "Other":
+                    n, w = cuisine.get(c, (0, 0.0))
+                    cuisine[c] = (n + 1, w + decay)
+                if (q["request_id"], rid) in reacted:
+                    continue
+                n, w = views.get(rid, (0, 0.0))
+                views[rid] = (n + 1, w + decay)
+        exposure = {rid: {"views": n, "penalty": round(min(s.fatigue_max, s.fatigue_per_view * w), 4)}
+                    for rid, (n, w) in views.items() if s.fatigue_per_view > 0}
+        cuis = {c: {"slots": n, "penalty": round(min(s.cuisine_fatigue_max, s.cuisine_fatigue_per_slot * w), 4)}
+                for c, (n, w) in cuisine.items() if s.cuisine_fatigue_per_slot > 0}
+        history = [rid for b in sorted(sessions)[-int(s.history_lists):] for rid in sessions[b]] \
+            if s.history_lists > 0 else []
+        out = {"exposure": exposure, "cuisine": cuis, "history": history,
+               "exclude": sorted(self.dish_ids(user_id, "saved")) if s.hide_saved else []}
+        if s.discovery_slots > 0:
+            since = now - float(s.discovery_days) * 86400
+            shown = {r.get("cuisine") for q in reqs if q["ts"] >= since for r in q["result"]["results"]}
+            out["discovery"] = {"slots": int(s.discovery_slots),
+                                "cuisines": sorted({r["cuisine"] for r in self.catalogue.recipes}
+                                                   - shown - {"Other"})}
+        return out
+
+    # ---- My dishes: saved, liked and cooked --------------------------------------------------
+    def _dish_events(self, user_id):
+        """{collection: {recipe_id: {"added": ts, "count": n, "removed": ts|None, "reasons": [...]}}}."""
+        out = {k: {} for k in COLLECTIONS}
+        kind = {v: k for k, v in COLLECTIONS.items()}
+        for e in self.store.events(user_id, types=["feedback", "dish_removed"]):
+            p = e["payload"]
+            if e["type"] == "dish_removed":
+                item = out.get(p.get("collection"), {}).get(p.get("recipe_id"))
+                if item:
+                    item["removed"] = e["ts"]
+                continue
+            col = kind.get(p.get("type"))
+            if not col or p.get("recipe_id") not in self.catalogue.by_id:
+                continue
+            item = out[col].setdefault(p["recipe_id"], {"first": e["ts"], "added": e["ts"], "count": 0,
+                                                        "removed": None, "reasons": []})
+            item["added"] = e["ts"]
+            item["count"] += 1
+            if p.get("reason") and p["reason"] not in item["reasons"]:
+                item["reasons"].append(p["reason"])
+        for col in out.values():
+            for item in col.values():
+                item["visible"] = item["removed"] is None or item["added"] > item["removed"]
+        return out
+
+    def dish_ids(self, user_id, collection):
+        return {rid for rid, it in self._dish_events(user_id)[collection].items() if it["visible"]}
+
+    def my_dishes(self, user_id):
+        """The dishes the user wants to find again, newest first: saved for later, liked, cooked."""
+        out = {}
+        for col, items in self._dish_events(user_id).items():
+            rows = []
+            for rid, it in items.items():
+                if not it["visible"]:
+                    continue
+                r = self.catalogue.by_id[rid]
+                rows.append({"recipe_id": rid, "title": r["title"], "cuisine": r["cuisine"], "meal": r.get("meal"),
+                             "image_url": r.get("image_url"), "url": r.get("url"),
+                             "n_ingredients": r.get("n_ingredients"), "kcal": r.get("kcal_per_serving"),
+                             "scores": self.scaler.scores(r), "ts": it["added"], "first_ts": it["first"],
+                             "count": it["count"], "why": it["reasons"]})
+            out[col] = sorted(rows, key=lambda x: -x["ts"])
+        return out
+
+    def remove_dish(self, user_id, recipe_id, collection):
+        """Take a dish off a My dishes list. Nothing that was learned changes."""
+        if collection not in COLLECTIONS:
+            raise ValueError(f"collection must be one of {', '.join(COLLECTIONS)}")
+        if recipe_id not in self.dish_ids(user_id, collection):
+            raise ValueError("that dish is not on this list")
+        ev, _ = self._emit(user_id, "dish_removed", {"recipe_id": recipe_id, "collection": collection})
+        return {"event_id": ev["event_id"]}
 
     # ---- decisions ----------------------------------------------------------------------------
     def add_decision(self, user_id, kind, title, body, source):

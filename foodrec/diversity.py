@@ -4,15 +4,22 @@ Definitions (documented in docs/features.md):
 * similarity: cosine between recipe vectors (cuisine, ingredient shares, categories),
   see Catalogue.vector.
 * diversity setting d in [0, 1]: lambda = 1 - d. d = 0 reproduces utility order.
-* first item: the highest-utility recipe.
+* first item: the highest-utility recipe (unless recent lists are given, see below).
 * selection step: maximise  lambda * U(i) - (1 - lambda) * max_{j in S} sim(i, j).
+* variety across lists: with `history` (recipes of the user's recent lists), the similarity
+  term is max(max_{j in S} sim(i, j), HISTORY_WEIGHT * max_{h in history} sim(i, h)), so a new
+  list also keeps away from what was just shown. d = 0 still reproduces utility order.
 * tie breaking: higher utility, then lexicographically smaller recipe id.
 Utility rank and final rank are both returned.
 """
 
 
-def rerank(candidates, utilities, similarity, k=5, diversity=0.3):
-    """candidates: list of recipe dicts; utilities: {id: U}; similarity(a, b) -> [0, 1].
+HISTORY_WEIGHT = 0.5  # recent lists count half as much as the dishes already in this list
+
+
+def rerank(candidates, utilities, similarity, k=5, diversity=0.3, history=None):
+    """candidates: list of recipe dicts; utilities: {id: U}; similarity(a, b) -> [0, 1];
+    history: recipe dicts shown in recent lists (variety across lists).
 
     Returns a list of dicts (final order) with utility_rank, final_rank and diversity info.
     """
@@ -27,8 +34,10 @@ def rerank(candidates, utilities, similarity, k=5, diversity=0.3):
     while remaining and len(chosen) < k:
         best, best_val, best_sim, best_near = None, None, 0.0, None
         for r in remaining:
-            if chosen:
-                sims = [(similarity(r, c), c["id"]) for c in chosen]
+            sims = [(similarity(r, c), c["id"]) for c in chosen]
+            if history and diversity > 0:
+                sims += [(HISTORY_WEIGHT * similarity(r, h), "shown:" + h["id"]) for h in history]
+            if sims:
                 msim, near = max(sims, key=lambda x: (x[0], x[1]))
             else:
                 msim, near = 0.0, None
