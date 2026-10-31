@@ -1,0 +1,47 @@
+# Runs on GitHub's servers for every push and pull request (Actions tab on GitHub).
+# No language model and no Ollama there: scenarios use the rules and templates, and the
+# in-memory vector store. Add a scenario: put a JSON file in scenarios/ and it runs here too.
+name: CI
+
+on:
+  push:
+    branches: [main, config-access-scenarios]
+  pull_request:
+  workflow_dispatch:          # "Run workflow" button on the Actions tab
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: python -m pytest -q
+
+  scenarios:
+    runs-on: ubuntu-latest
+    env:
+      OLLAMA_URL: http://127.0.0.1:9   # nothing listens there: no model, fallbacks are used
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - name: Check every scenario file
+        run: foodrec scenario check scenarios/*.json
+      - name: Run the scenarios
+        # model_comparison needs a real language model, so it only runs locally
+        run: |
+          foodrec scenario run $(ls scenarios/*.json | grep -v model_comparison) \
+            --set llm.url=http://127.0.0.1:9 --out out/scenarios
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-reports
+          path: out/scenarios
