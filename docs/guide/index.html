@@ -1,0 +1,1212 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>FoodRec Complete Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<script>
+window.MathJax = { tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] }, svg: { fontCache: "global" } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script>
+<style>
+/* Layout: one reading column with full-width figure bands; a live simulator anchors section 3. */
+:root {
+  --bg: #f6f8f5; --surface: #ffffff; --ink: #1d2a24; --ink-2: #4f5f57; --line: #dbe3dd;
+  --accent: #2f7a57; --accent-soft: #e2efe7;
+  --c-h: #2f8f5b; --c-s: #2a7f9e; --c-t: #c4862a; --warn: #b5562e; --ok: #2f8f5b;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #131a17; --surface: #1b2420; --ink: #e5ece8; --ink-2: #a3b2aa; --line: #2c3833;
+  --accent: #6cc79a; --accent-soft: #1f3329; --c-h: #5fc28b; --c-s: #5cb4d4; --c-t: #e2a94f; --warn: #e88a62; --ok: #5fc28b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #131a17; --surface: #1b2420; --ink: #e5ece8; --ink-2: #a3b2aa; --line: #2c3833;
+  --accent: #6cc79a; --accent-soft: #1f3329; --c-h: #5fc28b; --c-s: #5cb4d4; --c-t: #e2a94f; --warn: #e88a62; --ok: #5fc28b; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 5vw, 2.9rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.6rem; font-weight: 700; }
+h3 { font-size: 1.12rem; font-weight: 600; }
+p { margin: 0; max-width: 66ch; }
+section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.eyebrow { font: 500 0.75rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.15rem; color: var(--ink-2); }
+.muted { color: var(--ink-2); }
+code, .f { font-family: var(--mono); font-size: 0.88em; }
+.formula { font-family: var(--mono); font-size: 0.95rem; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 0.72rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+.pill { display: inline-block; font: 500 0.72rem var(--mono); padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.pill.rule { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+.crit { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.crit > div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; border-top: 3px solid var(--c); }
+.crit b { font-family: var(--display); font-size: 1.05rem; }
+.crit .f { color: var(--ink-2); font-size: 0.8rem; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--c); margin-right: 6px; }
+
+/* flow */
+.flow { display: grid; grid-template-columns: 1fr; gap: 0; }
+.node { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; display: grid; grid-template-columns: 9.5rem 1fr; gap: 12px; align-items: baseline; }
+.node .who { font: 500 0.72rem var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+.node.agent { border-color: var(--accent); background: var(--accent-soft); }
+.arrow { height: 22px; margin-left: 4.5rem; border-left: 2px solid var(--line); position: relative; }
+.arrow::after { content: ""; position: absolute; left: -6px; bottom: 0; border: 5px solid transparent; border-top-color: var(--ink-2); border-bottom: 0; }
+.loop { font: 0.82rem var(--mono); color: var(--ink-2); padding: 8px 0 0 4.5rem; }
+@media (max-width: 560px) { .node { grid-template-columns: 1fr; gap: 2px; } .arrow, .loop { margin-left: 1.5rem; padding-left: 0; } }
+
+/* ladder */
+.ladder { display: flex; flex-direction: column; gap: 8px; }
+.rung { display: grid; grid-template-columns: 8rem 1fr; gap: 14px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; align-items: baseline; }
+.rung .when { font: 500 0.85rem var(--mono); }
+@media (max-width: 560px) { .rung { grid-template-columns: 1fr; gap: 4px; } }
+
+/* simulator */
+.sim { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+.sim-top { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
+.stats { display: flex; gap: 22px; flex-wrap: wrap; }
+.stat { display: flex; flex-direction: column; }
+.stat span { font: 0.72rem var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+.stat b { font: 700 1.6rem var(--display); font-variant-numeric: tabular-nums; }
+.agent-box { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); font-size: 0.95rem; max-width: 30rem; }
+.agent-box.ask { border-color: var(--c-t); background: color-mix(in srgb, var(--c-t) 12%, transparent); }
+.agent-box.propose { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.bars { display: flex; flex-direction: column; gap: 12px; }
+.bar-row { display: grid; grid-template-columns: 8.5rem 1fr 4.5rem; gap: 12px; align-items: center; }
+.track { position: relative; height: 22px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+.track .obs { position: absolute; inset: 0 auto 0 0; background: var(--c); border-radius: 6px; transition: width .35s ease; }
+.track .st { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--ink); border-radius: 2px; transition: left .35s; }
+.gap { font: 500 0.85rem var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.legend { font-size: 0.82rem; color: var(--ink-2); display: flex; gap: 16px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 3px; height: 12px; background: var(--ink); vertical-align: middle; margin-right: 6px; }
+.dishes { overflow-x: auto; }
+.dishes table { min-width: 620px; }
+.dishes td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; }
+button, select { font: 600 0.82rem var(--body); border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 5px 10px; cursor: pointer; }
+button.go { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+button:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.log { font: 0.82rem var(--mono); color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; max-height: 9.5rem; overflow-y: auto; }
+.log div b { color: var(--ink); font-weight: 500; }
+@media (max-width: 560px) { .bar-row { grid-template-columns: 1fr 3.8rem; } .bar-row .lab { grid-column: 1 / -1; } }
+@media (prefers-reduced-motion: reduce) { .track .obs, .track .st { transition: none; } }
+footer { font-size: 0.88rem; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 16px; }
+
+/* Layout: one reading column; each section = short prose + one diagram that carries the mechanism. */
+:root {
+  --bg: #f6f8f5; --surface: #ffffff; --ink: #1d2a24; --ink-2: #55655d; --line: #cfd9d2;
+  --accent: #2f7a57; --accent-soft: #e2efe7; --llm: #a46a14; --llm-soft: #f8eedb;
+  --store: #3f5f8a; --store-soft: #e5ecf6; --warn: #b5562e;
+  --c-h: #2f8f5b; --c-s: #2a7f9e; --c-t: #c4862a;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #131a17; --surface: #1b2420; --ink: #e5ece8; --ink-2: #a3b2aa; --line: #34423c;
+  --accent: #6cc79a; --accent-soft: #1f3329; --llm: #e2ab5a; --llm-soft: #33291a;
+  --store: #8fb0e0; --store-soft: #1e2938; --warn: #e88a62;
+  --c-h: #5fc28b; --c-s: #5cb4d4; --c-t: #e2a94f; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #131a17; --surface: #1b2420; --ink: #e5ece8; --ink-2: #a3b2aa; --line: #34423c;
+  --accent: #6cc79a; --accent-soft: #1f3329; --llm: #e2ab5a; --llm-soft: #33291a;
+  --store: #8fb0e0; --store-soft: #1e2938; --warn: #e88a62;
+  --c-h: #5fc28b; --c-s: #5cb4d4; --c-t: #e2a94f; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); }
+.wrap { max-width: 920px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 5vw, 2.9rem); font-weight: 700; }
+h2 { font-size: 1.6rem; font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.eyebrow { font: 500 0.75rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.15rem; color: var(--ink-2); }
+.muted { color: var(--ink-2); }
+code { font-family: var(--mono); font-size: 0.86em; }
+.formula { font-family: var(--mono); font-size: 0.92rem; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; color: var(--ink); }
+.fig svg { display: block; width: 100%; min-width: 640px; height: auto; }
+.fig.small svg { min-width: 420px; max-width: 560px; margin: 0 auto; }
+figcaption { font-size: 0.9rem; color: var(--ink-2); max-width: 72ch; }
+svg .node { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+svg .node.agent { fill: var(--accent-soft); stroke: var(--accent); }
+svg .node.llm { fill: var(--llm-soft); stroke: var(--llm); }
+svg .node.store { fill: var(--store-soft); stroke: var(--store); }
+svg .group { fill: none; stroke: var(--ink-2); stroke-dasharray: 5 4; }
+svg .t { font: 600 13px var(--body); fill: var(--ink); }
+svg .s { font: 11.5px var(--body); fill: var(--ink-2); }
+svg .l { font: 500 11px var(--mono); fill: var(--ink-2); }
+svg .edge { fill: none; stroke: currentColor; stroke-width: 1.4; opacity: .75; }
+svg .axis { stroke: var(--ink-2); }
+svg .grid { stroke: var(--line); stroke-dasharray: 2 4; }
+svg .thresh { stroke: var(--warn); stroke-dasharray: 6 4; stroke-width: 1.5; }
+svg .warnt { fill: var(--warn); }
+svg .line { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+svg .dot { fill: var(--accent); }
+svg .dot.warnd { fill: var(--warn); }
+.key { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.85rem; color: var(--ink-2); }
+.key span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1.5px solid var(--b); background: var(--f); }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.94rem; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 0.72rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bars { display: flex; flex-direction: column; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.bar-row { display: grid; grid-template-columns: 8.5rem 1fr 7.5rem; gap: 12px; align-items: center; }
+.track { position: relative; height: 20px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+.track .obs { position: absolute; inset: 0 auto 0 0; background: var(--c); border-radius: 6px; }
+.track .st { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--ink); }
+.bar-row .v { font: 0.85rem var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--c); margin-right: 6px; }
+@media (max-width: 560px) { .bar-row { grid-template-columns: 1fr 6.5rem; } .bar-row .lab { grid-column: 1 / -1; } }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.cols > div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cols b { font-family: var(--display); }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+footer { font-size: 0.88rem; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 16px; }
+
+/* Layout: a reference manual. Sticky contents on wide screens, numbered equations in cards, code paths in the margin of each block. */
+:root {
+  --bg: #f6f8f5; --surface: #ffffff; --ink: #1d2a24; --ink-2: #55655d; --line: #d3ddd6;
+  --accent: #2f7a57; --accent-soft: #e2efe7; --code: #3f5f8a;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #131a17; --surface: #1b2420; --ink: #e5ece8; --ink-2: #a3b2aa; --line: #34423c;
+  --accent: #6cc79a; --accent-soft: #1f3329; --code: #8fb0e0; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #131a17; --surface: #1b2420; --ink: #e5ece8; --ink-2: #a3b2aa; --line: #34423c;
+  --accent: #6cc79a; --accent-soft: #1f3329; --code: #8fb0e0; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; }
+nav { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; display: flex; flex-direction: column; gap: 6px; font-size: 0.92rem; }
+nav a { color: var(--ink-2); text-decoration: none; }
+nav a:hover, nav a:focus-visible { color: var(--accent); }
+nav b { font: 500 0.72rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+main { display: flex; flex-direction: column; gap: 52px; min-width: 0; }
+@media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px 14px; } }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 5vw, 2.7rem); font-weight: 700; }
+h2 { font-size: 1.55rem; font-weight: 700; }
+h3 { font-size: 1.08rem; font-weight: 600; }
+p { margin: 0; max-width: 72ch; }
+section { display: flex; flex-direction: column; gap: 14px; min-width: 0; scroll-margin-top: 24px; }
+.eyebrow { font: 500 0.75rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.12rem; color: var(--ink-2); }
+.muted { color: var(--ink-2); }
+code { font-family: var(--mono); font-size: 0.85em; color: var(--code); }
+.eq { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 16px; display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); gap: 8px; align-items: center; }
+.eq .no { font: 500 0.78rem var(--mono); color: var(--ink-2); }
+.eq .m { overflow-x: auto; overflow-y: hidden; }
+.src { font: 0.78rem var(--mono); color: var(--code); }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 0.72rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+ul { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 4px; max-width: 72ch; }
+mjx-container { color: var(--ink); }
+mjx-container[display="true"] { margin: 0.4em 0 !important; }
+footer { font-size: 0.88rem; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 16px; }
+
+.part { border-top: 2px solid var(--accent); padding-top: 18px; display: flex; flex-direction: column; gap: 8px; scroll-margin-top: 24px; }
+.part span { font: 600 0.8rem var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.part .ph { font-size: 2rem; }
+nav b.np { margin-top: 12px; font-size: 0.7rem; }
+nav { max-height: calc(100vh - 48px); overflow-y: auto; }
+</style>
+<div class="wrap">
+  <nav aria-label="Contents"><b>Contents</b><b class="np">PART I</b><a href="#components">Components</a><a href="#data">Data pipeline</a><a href="#ranking-flow">Ranking</a><a href="#loop">Learning loop</a><a href="#chat">Chat turn</a><a href="#storage">Storage</a><b class="np">PART II</b><a href="#onboarding">Onboarding</a><a href="#journey">User journey</a><a href="#taste-model">Taste model</a><a href="#value-model">Value model + simulator</a><a href="#interactions">Every interaction</a><a href="#supervisor">Supervisor</a><b class="np">PART III</b><a href="#notation">Notation</a><a href="#scores">Criterion scores</a><a href="#ranking">Ranking math</a><a href="#taste">Taste model math</a><a href="#values">Value model math</a><a href="#policy">Supervisor policy</a><a href="#events">Event table</a><a href="#params">Parameters</a></nav>
+  <main>
+    <header style="display:flex;flex-direction:column;gap:12px">
+      <div class="eyebrow">FoodRec v0.3 · complete guide</div>
+      <h1>FoodRec: how it works, how it learns, and the math</h1>
+      <p class="lede">FoodRec recommends five recipes from 9,605 real HUMMUS recipes. A fixed formula ranks them; two small models learn from what the user does; an AI supervisor watches the gap between what the user says and what they do, and asks before anything changes. This guide covers the system (Part I), the user model (Part II) and every equation (Part III).</p>
+      <div class="key">
+      <span style="--b:var(--accent);--f:var(--accent-soft)">agent and decision logic</span>
+      <span style="--b:var(--llm);--f:var(--llm-soft)">language model (Qwen)</span>
+      <span style="--b:var(--store);--f:var(--store-soft)">stored data</span>
+      <span style="--b:var(--line);--f:var(--surface)">deterministic code</span>
+    </div>
+  </header>
+
+  
+
+  <section>
+    </header>
+    <div class="part" id="p1"><span>Part I</span><h2 class="ph">How FoodRec works</h2><p class="muted">Components, data, ranking, the learning loop, the assistant and storage.</p></div><section id="components">
+    <div class="eyebrow">1.1 · Components</div>
+    <h2>Who talks to whom</h2>
+    <p>The browser talks to one API. Chat goes to the supervisor agent; clicks and saved goals go to the app service. The service is the only part that writes. It appends an event to SQLite, and the user model and the knowledge graph are rebuilt from those events.</p>
+    <figure>
+      <div class="fig"><svg viewBox="0 0 880 350" role="img" aria-label="FoodRec components and how they talk"><defs><marker id="ah0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs><rect x="20" y="150" width="120" height="64" rx="8" class="node"/><text x="80.0" y="176.0" text-anchor="middle" class="t">Web UI</text><text x="80.0" y="192.0" text-anchor="middle" class="s">Discover · Insights · chat</text><rect x="180" y="150" width="110" height="64" rx="8" class="node"/><text x="235.0" y="176.0" text-anchor="middle" class="t">API</text><text x="235.0" y="192.0" text-anchor="middle" class="s">REST + live stream</text><rect x="340" y="40" width="160" height="64" rx="8" class="node agent"/><text x="420.0" y="66.0" text-anchor="middle" class="t">Supervisor agent</text><text x="420.0" y="82.0" text-anchor="middle" class="s">chat turns · reviews</text><rect x="340" y="262" width="160" height="64" rx="8" class="node"/><text x="420.0" y="288.0" text-anchor="middle" class="t">App service</text><text x="420.0" y="304.0" text-anchor="middle" class="s">the only writer</text><rect x="560" y="10" width="140" height="52" rx="8" class="node llm"/><text x="630.0" y="30.0" text-anchor="middle" class="t">Qwen via Ollama</text><text x="630.0" y="46.0" text-anchor="middle" class="s">intent · wording</text><rect x="560" y="76" width="140" height="52" rx="8" class="node agent"/><text x="630.0" y="96.0" text-anchor="middle" class="t">Policy</text><text x="630.0" y="112.0" text-anchor="middle" class="s">gap thresholds</text><rect x="560" y="150" width="140" height="60" rx="8" class="node"/><text x="630.0" y="174.0" text-anchor="middle" class="t">Ranking engine</text><text x="630.0" y="190.0" text-anchor="middle" class="s">rules → scores → top 5</text><rect x="560" y="262" width="140" height="64" rx="8" class="node store"/><text x="630.0" y="288.0" text-anchor="middle" class="t">SQLite</text><text x="630.0" y="304.0" text-anchor="middle" class="s">events · goals · recipes</text><rect x="760" y="214" width="110" height="52" rx="8" class="node"/><text x="815.0" y="234.0" text-anchor="middle" class="t">User model</text><text x="815.0" y="250.0" text-anchor="middle" class="s">taste + weights</text><rect x="760" y="290" width="110" height="52" rx="8" class="node"/><text x="815.0" y="310.0" text-anchor="middle" class="t">Graph + search</text><text x="815.0" y="326.0" text-anchor="middle" class="s">links · BM25 · vectors</text><polyline points="140,182 180,182" class="edge" marker-end="url(#ah0)"/><text x="160" y="174" text-anchor="middle" class="l">HTTP</text><polyline points="290,170 315,170 315,72 340,72" class="edge" marker-end="url(#ah0)"/><text x="308" y="124" text-anchor="end" class="l">chat</text><polyline points="290,196 315,196 315,294 340,294" class="edge" marker-end="url(#ah0)"/><text x="308" y="250" text-anchor="end" class="l">clicks · goals</text><polyline points="500,52 560,36" class="edge" marker-end="url(#ah0)"/><text x="530" y="36" text-anchor="middle" class="l">parse</text><polyline points="500,74 560,102" class="edge" marker-end="url(#ah0)"/><text x="522" y="70" text-anchor="middle" class="l">review</text><polyline points="500,96 560,170" class="edge" marker-end="url(#ah0)"/><text x="520" y="138" text-anchor="end" class="l">rank</text><polyline points="500,280 560,196" class="edge" marker-end="url(#ah0)"/><text x="538" y="250" text-anchor="start" class="l">rank</text><polyline points="500,306 560,306" class="edge" marker-end="url(#ah0)"/><text x="530" y="300" text-anchor="middle" class="l">append</text><polyline points="700,282 760,248" class="edge" marker-end="url(#ah0)"/><text x="728" y="254" text-anchor="middle" class="l">replay</text><polyline points="700,310 760,316" class="edge" marker-end="url(#ah0)"/><text x="730" y="330" text-anchor="middle" class="l">project</text><polyline points="815,214 815,180 700,180" class="edge" marker-end="url(#ah0)"/><text x="760" y="174" text-anchor="middle" class="l">taste</text></svg></div>
+      <figcaption>The language model only reads the message and words the answer. Ranking, the policy and every number come from deterministic code that reads the same database.</figcaption>
+    </figure>
+  </section><section id="data">
+    <div class="eyebrow">1.2 · Data</div>
+    <h2>From HUMMUS to the database</h2>
+    <p>The ingest step runs once on your machine and writes one portable file. On every start the app checks that file's version. If it is new, the app copies the recipes into SQLite; if not, it skips the copy. The search index is built from the same recipes and its embeddings are cached, so later starts are fast.</p>
+    <figure>
+      <div class="fig"><svg viewBox="0 0 880 250" role="img" aria-label="From the HUMMUS spreadsheet to the running app"><defs><marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs><rect x="10" y="90" width="120" height="60" rx="8" class="node store"/><text x="70.0" y="114.0" text-anchor="middle" class="t">HUMMUS xlsx</text><text x="70.0" y="130.0" text-anchor="middle" class="s">9,995 rows</text><rect x="160" y="16" width="250" height="218" rx="10" class="group"/><text x="285" y="34" text-anchor="middle" class="s">python -m foodrec.ingest (once)</text><rect x="175" y="44" width="220" height="50" rx="8" class="node"/><text x="285.0" y="63.0" text-anchor="middle" class="t">Parse</text><text x="285.0" y="79.0" text-anchor="middle" class="s">grams · ingredient count</text><rect x="175" y="108" width="220" height="50" rx="8" class="node llm"/><text x="285.0" y="127.0" text-anchor="middle" class="t">Label</text><text x="285.0" y="143.0" text-anchor="middle" class="s">Qwen, or keyword rules</text><rect x="175" y="172" width="220" height="50" rx="8" class="node"/><text x="285.0" y="191.0" text-anchor="middle" class="t">Compute</text><text x="285.0" y="207.0" text-anchor="middle" class="s">CO₂e · allergens · similar</text><polyline points="130,120 150,120 150,69 175,69" class="edge" marker-end="url(#ah1)"/><text x="150" y="62" text-anchor="end" class="l">read</text><polyline points="285,94 285,108" class="edge" marker-end="url(#ah1)"/><polyline points="285,158 285,172" class="edge" marker-end="url(#ah1)"/><polyline points="395,197 420,197 420,120 440,120" class="edge" marker-end="url(#ah1)"/><text x="424" y="212" text-anchor="start" class="l">write</text><rect x="440" y="90" width="130" height="60" rx="8" class="node store"/><text x="505.0" y="114.0" text-anchor="middle" class="t">catalogue.json.gz</text><text x="505.0" y="130.0" text-anchor="middle" class="s">9,605 recipes</text><rect x="620" y="90" width="110" height="60" rx="8" class="node store"/><text x="675.0" y="114.0" text-anchor="middle" class="t">SQLite</text><text x="675.0" y="130.0" text-anchor="middle" class="s">foodrec_v2.db</text><polyline points="570,120 620,120" class="edge" marker-end="url(#ah1)"/><text x="595" y="112" text-anchor="middle" class="l">import</text><rect x="760" y="20" width="110" height="50" rx="8" class="node"/><text x="815.0" y="39.0" text-anchor="middle" class="t">Ranking</text><text x="815.0" y="55.0" text-anchor="middle" class="s">scores at query time</text><rect x="760" y="95" width="110" height="50" rx="8" class="node"/><text x="815.0" y="114.0" text-anchor="middle" class="t">Graph</text><text x="815.0" y="130.0" text-anchor="middle" class="s">recipes · groups</text><rect x="760" y="170" width="110" height="50" rx="8" class="node"/><text x="815.0" y="189.0" text-anchor="middle" class="t">Search index</text><text x="815.0" y="205.0" text-anchor="middle" class="s">embeddings cached</text><polyline points="730,110 760,45" class="edge" marker-end="url(#ah1)"/><text x="742" y="66" text-anchor="end" class="l">load</text><polyline points="730,120 760,120" class="edge" marker-end="url(#ah1)"/><polyline points="730,130 760,195" class="edge" marker-end="url(#ah1)"/></svg></div>
+      <figcaption>Qwen only labels: each ingredient gets a food group, and each recipe gets a cuisine and a meal type (or "not food", which drops it). Answers that fail validation fall back to keyword rules. Labels are cached in <code>labels.json</code>, so a run can resume.</figcaption>
+    </figure>
+    <div class="cols">
+      <div><b>Healthiness</b><span>Nine nutrient factors per 100 g, each scored on a straight line between a good and a poor anchor, then averaged with the health goal's weights.</span></div>
+      <div><b>Sustainability</b><span>Grams of each ingredient × its food group's kg CO₂e per kg, divided by total grams. Log scale: 0.5 → 1, 30 → 0.</span></div>
+      <div><b>Convenience</b><span>Number of ingredients: 3 → 1, 15 → 0.</span></div>
+    </div>
+  </section><section id="ranking-flow">
+    <div class="eyebrow">1.3 · Ranking</div>
+    <h2>Getting five recipes</h2>
+    <p>Every list goes through the same six steps. Rules remove recipes before anything is scored, so an allergen can never be outweighed by a good score.</p>
+    <figure>
+      <div class="fig"><svg viewBox="0 0 880 130" role="img" aria-label="The ranking pipeline from profile to five recipes"><defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs><rect x="10" y="30" width="120" height="64" rx="8" class="node"/><text x="70.0" y="56.0" text-anchor="middle" class="t">Your profile</text><text x="70.0" y="72.0" text-anchor="middle" class="s">rules · goal · taste</text><text x="70" y="118" text-anchor="middle" class="s">saved goal + health goal</text><rect x="160" y="30" width="120" height="64" rx="8" class="node"/><text x="220.0" y="56.0" text-anchor="middle" class="t">Rules filter</text><text x="220.0" y="72.0" text-anchor="middle" class="s">allergy · diet · never</text><text x="220" y="118" text-anchor="middle" class="s">9,605 → safe recipes</text><polyline points="130,62 160,62" class="edge" marker-end="url(#ah2)"/><rect x="310" y="30" width="120" height="64" rx="8" class="node"/><text x="370.0" y="56.0" text-anchor="middle" class="t">Three scores</text><text x="370.0" y="72.0" text-anchor="middle" class="s">3 values</text><text x="370" y="118" text-anchor="middle" class="s">fixed formulas</text><polyline points="280,62 310,62" class="edge" marker-end="url(#ah2)"/><rect x="460" y="30" width="120" height="64" rx="8" class="node agent"/><text x="520.0" y="56.0" text-anchor="middle" class="t">Utility</text><text x="520.0" y="72.0" text-anchor="middle" class="s">weighted sum</text><text x="520" y="118" text-anchor="middle" class="s">0.25 taste + 0.75 values</text><polyline points="430,62 460,62" class="edge" marker-end="url(#ah2)"/><rect x="610" y="30" width="120" height="64" rx="8" class="node"/><text x="670.0" y="56.0" text-anchor="middle" class="t">Diversity</text><text x="670.0" y="72.0" text-anchor="middle" class="s">skip near-duplicates</text><text x="670" y="118" text-anchor="middle" class="s">MMR, slider 0–1</text><polyline points="580,62 610,62" class="edge" marker-end="url(#ah2)"/><rect x="760" y="30" width="120" height="64" rx="8" class="node"/><text x="820.0" y="56.0" text-anchor="middle" class="t">Top five</text><text x="820.0" y="72.0" text-anchor="middle" class="s">saved as a snapshot</text><text x="820" y="118" text-anchor="middle" class="s">with full evidence</text><polyline points="730,62 760,62" class="edge" marker-end="url(#ah2)"/></svg></div>
+      <figcaption>The meal selector and chat filters ("at most 8 ingredients") add rules for one request only. Every list is stored with the goal and profile versions that produced it.</figcaption>
+    </figure>
+        <!-- ============================================================ taste rationale -->
+    <section id="taste-why">
+      <div class="eyebrow">2½ · <span class="src">foodrec/__init__.py (TASTE_SHARE) · learner.py</span></div>
+      <h2>Taste: why it is in the ranking, and what changes it</h2>
+      <p>The user sets three values with sliders. Taste is a fourth term in the ranking that the user does not set: the app learns it from what the user does. This section explains why it is there, why it counts for 25 %, and exactly which interactions change it.</p>
+
+      <div class="card" id="e2w">
+        <div class="card-head"><h3><span class="no">A</span>Why taste is part of the ranking</h3><span class="src">ranker.effective_weights</span></div>
+        <div class="m">\[ U(i) = \underbrace{0.25 \cdot P(i)}_{\text{taste, learned}} \; + \; \underbrace{0.75 \cdot \big(w_h x_h(i) + w_s x_s(i) + w_t x_t(i)\big)}_{\text{the three values, set by the user}} \]</div>
+        <div class="how"><div class="lbl">The problem it solves</div>
+          <ul>
+            <li>Healthiness, sustainability and convenience describe the <b>dish</b>. None of them says whether <b>this user</b> would enjoy it.</li>
+            <li>Without taste, two users with the same sliders would get identical lists, whatever they like.</li>
+            <li>Likes, dislikes, rejections "not my taste" and the dishes picked at onboarding would have no effect on what is recommended.</li>
+            <li>A dish that scores well on all three values but that the user dislikes would keep coming first.</li>
+          </ul></div>
+        <div class="why"><div class="lbl">Why it is a fixed share, not a fourth slider</div>
+          <p>The user is asked for exactly three parameters. Keeping taste out of the sliders means they mean exactly what the user set: "50 % healthiness" is half of the value part. Taste is also consistently the strongest driver of real food choice, so a recommender that ignores it is quickly ignored by its users.</p></div>
+      </div>
+
+      <div class="card" id="e2tau">
+        <div class="card-head"><h3><span class="no">B</span>Why 0.25</h3><span class="src">TASTE_SHARE = 0.25</span></div>
+        <div class="m">\[ \Delta U = 0.25 \times \Delta P \qquad \text{e.g. } \Delta P = 0.4 \ \Rightarrow\ \Delta U = 0.10 \]</div>
+        <dl class="sym">
+          <dt>\(\Delta P\)</dt><dd>difference in taste match between two dishes</dd>
+          <dt>\(\Delta U\)</dt><dd>the resulting difference in utility</dd>
+        </dl>
+        <div class="why"><div class="lbl">Reasoning (a design choice, not a calibrated value)</div>
+          <p>0.25 is large enough that taste decides between dishes that score similarly on the three values, and small enough that it can never override them: even a strong taste difference moves utility by only about 0.10, while the value part can move it by up to 0.75. It has not been fitted to user data.</p></div>
+        <div class="how"><div class="lbl">Alternatives</div>
+          <ul>
+            <li><b>Calibrate it</b> (recommended for an evaluation): collect choices in a user study and choose the τ that best predicts which of the five dishes people picked (a conditional-logit fit).</li>
+            <li><b>Adaptive τ</b>: start near 0 and grow with taste evidence, e.g. \(\tau = 0.25 \cdot n/(n+5)\).</li>
+            <li><b>Taste as a filter</b>: drop dishes with \(P &lt; 0.35\), then rank on the three values only.</li>
+            <li><b>Multiplicative utility</b>: \(U = P^{\tau} V^{1-\tau}\), so a strongly disliked dish cannot win.</li>
+            <li><b>An advanced setting</b> where the user chooses τ.</li>
+          </ul></div>
+      </div>
+
+      <div class="card" id="e2chg">
+        <div class="card-head"><h3><span class="no">C</span>What changes taste</h3><span class="src">TasteModel · Learner._feedback</span></div>
+        <div class="m">\[ \theta_c = \frac{1 + \text{likes}_c}{2 + \text{likes}_c + \text{dislikes}_c} \qquad P(i) = \sum_c \pi_c(i)\, \theta_c \]</div>
+        <p>Every action below adds to the likes or dislikes of <b>every</b> concept of the dish (its cuisine, its ingredients, its food groups).</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Action</th><th>Effect on taste</th></tr></thead>
+          <tbody>
+            <tr><td>Like</td><td class="n">+1 like</td></tr>
+            <tr><td>I'll cook this</td><td class="n">+0.8 like (+1.0 with "it sounds tasty")</td></tr>
+            <tr><td>Save</td><td class="n">+0.6 like</td></tr>
+            <tr><td>Not for me: "not my taste"</td><td class="n">+1 dislike</td></tr>
+            <tr><td>Not for me: "had it recently"</td><td class="n">+0.5 dislike</td></tr>
+            <tr><td>Liking or soft dislike declared at onboarding</td><td class="n">starts at 2 likes / 2 dislikes</td></tr>
+            <tr><td>Dish picked at onboarding</td><td class="n">+1 like</td></tr>
+            <tr><td>Correction on Insights (Like / Neutral / Dislike)</td><td class="n">set to 0.85 / 0.5 / 0.15</td></tr>
+          </tbody>
+        </table></div>
+        <div class="how"><div class="lbl">What does not change taste</div>
+          <p>Moving or saving the sliders, the meal selector, chat filters, and rejections with a value reason ("not healthy enough", "not sustainable", "too many ingredients"). Those reasons say why the dish was rejected, and it was not the flavour, so they update the value model instead.</p></div>
+      </div>
+
+      <div class="card" id="e2who">
+        <div class="card-head"><h3><span class="no">D</span>So what do interactions change?</h3><span class="src">learner.py · service.py</span></div>
+        <p>Taste is not the only thing that learns. Interactions update two learned quantities, while the user's stated values change only by an explicit decision.</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Quantity</th><th>What it is</th><th>Changed by</th><th>Used for</th></tr></thead>
+          <tbody>
+            <tr><td>Taste \(\theta_c\), \(P(i)\)</td><td>how much the user likes each cuisine, ingredient, food group</td><td>likes, saves, choices, taste rejections, onboarding, corrections (table C)</td><td><b>ranking</b> (25 % of utility)</td></tr>
+            <tr><td>Observed weights \(o\)</td><td>how much the user's behaviour weighs health, sustainability, convenience</td><td>choices, value-reason rejections, answers to trade-off questions</td><td>Insights and the <b>supervisor</b>; not used for ranking</td></tr>
+            <tr><td>Stated weights \(w\)</td><td>the three sliders, the saved goal</td><td>only "Save as goal" or accepting a supervisor proposal</td><td><b>ranking</b> (75 % of utility)</td></tr>
+          </tbody>
+        </table></div>
+        <div class="why"><div class="lbl">Why it is split this way</div>
+          <p>Taste is something the user cannot easily state for 9,605 dishes, so the app learns it and uses it directly. The value weights are something the user did state, so the app never overrides them silently: when behaviour drifts from the stated values, the supervisor asks or proposes, and the user decides.</p></div>
+      </div>
+    </section>
+
+    <div class="formula">utility = 0.25 × taste + 0.75 × (w_h × health + w_s × sustainability + w_t × convenience)</div>
+  </section><section id="loop">
+    <div class="eyebrow">1.4 · Learning loop</div>
+    <h2>What one click sets off</h2>
+    <p>A click is stored as an event and never edited. The user model replays it. The supervisor then compares the saved goal w with the observed weights o. If the gap is big enough, it asks a question or proposes a change. The goal changes only when the user saves it or accepts a proposal.</p>
+    <figure>
+      <div class="fig"><svg viewBox="0 0 880 280" role="img" aria-label="What happens after one click"><defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs><rect x="10" y="30" width="140" height="64" rx="8" class="node"/><text x="80.0" y="56.0" text-anchor="middle" class="t">You click</text><text x="80.0" y="72.0" text-anchor="middle" class="s">I'll cook this · easy</text><rect x="200" y="30" width="140" height="64" rx="8" class="node store"/><text x="270.0" y="56.0" text-anchor="middle" class="t">Event log</text><text x="270.0" y="72.0" text-anchor="middle" class="s">append, never edit</text><rect x="390" y="30" width="160" height="64" rx="8" class="node"/><text x="470.0" y="56.0" text-anchor="middle" class="t">User model</text><text x="470.0" y="72.0" text-anchor="middle" class="s">taste counts · weights o</text><rect x="600" y="30" width="140" height="64" rx="8" class="node agent"/><text x="670.0" y="56.0" text-anchor="middle" class="t">Supervisor</text><text x="670.0" y="72.0" text-anchor="middle" class="s">compare w and o</text><rect x="600" y="186" width="140" height="64" rx="8" class="node agent"/><text x="670.0" y="212.0" text-anchor="middle" class="t">Question or proposal</text><text x="670.0" y="228.0" text-anchor="middle" class="s">card in the assistant</text><rect x="390" y="186" width="160" height="64" rx="8" class="node"/><text x="470.0" y="212.0" text-anchor="middle" class="t">You decide</text><text x="470.0" y="228.0" text-anchor="middle" class="s">answer · accept · dismiss</text><rect x="200" y="186" width="140" height="64" rx="8" class="node"/><text x="270.0" y="212.0" text-anchor="middle" class="t">Saved goal w</text><text x="270.0" y="228.0" text-anchor="middle" class="s">new version</text><rect x="10" y="186" width="140" height="64" rx="8" class="node"/><text x="80.0" y="212.0" text-anchor="middle" class="t">Next ranking</text><text x="80.0" y="228.0" text-anchor="middle" class="s">uses w + taste</text><polyline points="150,62 200,62" class="edge" marker-end="url(#ah3)"/><text x="175" y="54" text-anchor="middle" class="l">event</text><polyline points="340,62 390,62" class="edge" marker-end="url(#ah3)"/><text x="365" y="54" text-anchor="middle" class="l">replay</text><polyline points="550,62 600,62" class="edge" marker-end="url(#ah3)"/><text x="575" y="54" text-anchor="middle" class="l">o, n</text><polyline points="670,94 670,186" class="edge" marker-end="url(#ah3)"/><text x="678" y="144" text-anchor="start" class="l">gap ≥ 10 pts</text><text x="752" y="58" class="l">gap &lt; 10 pts:</text><text x="752" y="74" class="l">stay quiet</text><polyline points="600,218 550,218" class="edge" marker-end="url(#ah3)"/><polyline points="390,218 340,218" class="edge" marker-end="url(#ah3)"/><text x="365" y="210" text-anchor="middle" class="l">accept</text><polyline points="470,186 470,94" class="edge" marker-end="url(#ah3)"/><text x="478" y="144" text-anchor="start" class="l">answer = evidence</text><polyline points="200,218 150,218" class="edge" marker-end="url(#ah3)"/><polyline points="80,186 80,94" class="edge" marker-end="url(#ah3)"/><text x="88" y="144" text-anchor="start" class="l">shows 5</text></svg></div>
+      <figcaption>An answered question flows back into the user model as evidence. A dismissed topic is left alone for 6 feedback events.</figcaption>
+    </figure>
+  </section><section id="chat">
+    <div class="eyebrow">1.5 · The assistant</div>
+    <h2>One chat turn</h2>
+    <p>Every message goes through the same eight stages, and each stage appears as a step in the thinking timeline above the answer. Qwen is used in two of them. If it is unavailable or returns something invalid, keyword rules and templates take over.</p>
+    <figure>
+      <div class="fig"><svg viewBox="0 0 880 224" role="img" aria-label="The stages of one chat turn"><defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs><rect x="10" y="20" width="180" height="60" rx="8" class="node"/><text x="100.0" y="44.0" text-anchor="middle" class="t">Perceive</text><text x="100.0" y="60.0" text-anchor="middle" class="s">goal · last list · history</text><rect x="240" y="20" width="180" height="60" rx="8" class="node llm"/><text x="330.0" y="44.0" text-anchor="middle" class="t">Understand</text><text x="330.0" y="60.0" text-anchor="middle" class="s">Qwen JSON, or rules</text><polyline points="190,50 240,50" class="edge" marker-end="url(#ah4)"/><rect x="470" y="20" width="180" height="60" rx="8" class="node"/><text x="560.0" y="44.0" text-anchor="middle" class="t">Plan</text><text x="560.0" y="60.0" text-anchor="middle" class="s">intent → skills</text><polyline points="420,50 470,50" class="edge" marker-end="url(#ah4)"/><rect x="700" y="20" width="180" height="60" rx="8" class="node"/><text x="790.0" y="44.0" text-anchor="middle" class="t">Act</text><text x="790.0" y="60.0" text-anchor="middle" class="s">engine · graph · search</text><polyline points="650,50 700,50" class="edge" marker-end="url(#ah4)"/><rect x="10" y="130" width="180" height="60" rx="8" class="node"/><text x="100.0" y="154.0" text-anchor="middle" class="t">Validate</text><text x="100.0" y="170.0" text-anchor="middle" class="s">numbers & titles checked</text><rect x="240" y="130" width="180" height="60" rx="8" class="node llm"/><text x="330.0" y="154.0" text-anchor="middle" class="t">Phrase</text><text x="330.0" y="170.0" text-anchor="middle" class="s">Qwen rewrites (optional)</text><polyline points="240,160 190,160" class="edge" marker-end="url(#ah4)"/><rect x="470" y="130" width="180" height="60" rx="8" class="node"/><text x="560.0" y="154.0" text-anchor="middle" class="t">Compose</text><text x="560.0" y="170.0" text-anchor="middle" class="s">facts → template</text><polyline points="470,160 420,160" class="edge" marker-end="url(#ah4)"/><rect x="700" y="130" width="180" height="60" rx="8" class="node"/><text x="790.0" y="154.0" text-anchor="middle" class="t">Follow up</text><text x="790.0" y="170.0" text-anchor="middle" class="s">≤ 1 extra skill</text><polyline points="700,160 650,160" class="edge" marker-end="url(#ah4)"/><polyline points="790,80 790,130" class="edge" marker-end="url(#ah4)"/><polyline points="100,190 100,214" class="edge" marker-end="url(#ah4)"/><text x="108" y="210" text-anchor="start" class="l">stream answer</text></svg></div>
+      <figcaption>Understand picks one of 10 intents (recommend, explain, compare, what-if, why, history, knowledge, profile change, review, help) and fills a fixed schema. Validate rejects any number or recipe title that the tools did not produce.</figcaption>
+    </figure>
+  </section><section id="storage">
+    <div class="eyebrow">1.6 · Storage</div>
+    <h2>Why nothing is lost</h2>
+    <div class="cols">
+      <div><b>Event log</b><span>Every click, answer and goal save is appended and never edited. The user model is a replay of this log, so it can be rebuilt at any time.</span></div>
+      <div><b>Versions</b><span>Profiles and goals get a new version on each save. Any earlier goal can be restored from the Profile page.</span></div>
+      <div><b>Snapshots</b><span>Each list of five is stored with the versions that produced it, so "what changed?" compares two recorded lists.</span></div>
+    </div>
+  </section><div class="part" id="p2"><span>Part II</span><h2 class="ph">The user and the user model</h2><p class="muted">What the user is asked, what they do on each screen, and exactly how each interaction updates the two models.</p></div><section id="onboarding">
+    <div class="eyebrow">2.1 · Onboarding</div>
+    <h2>Five questions, two kinds of answer</h2>
+    <p>Some answers are <span class="pill rule">rules</span> that remove recipes and are never relaxed. The others are <span class="pill">preferences</span> that ranking trades off.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Step</th><th>Question</th><th>Kind</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Allergies and diets</td><td><span class="pill rule">rule</span></td><td>Recipes with the allergen, or with unknown allergen data, are never shown.</td></tr>
+        <tr><td>2</td><td>Liked and disliked cuisines and ingredients; "never include"</td><td><span class="pill rule">rule</span> <span class="pill">pref.</span></td><td>"Never include" filters. Likes and dislikes start the taste model at 2 likes or 2 dislikes.</td></tr>
+        <tr><td>3</td><td>Health goal: eat healthier, lose weight, gain weight, build muscle, heart-friendly, less sugar. Optional ingredient limit.</td><td><span class="pill">pref.</span></td><td>Sets the weights of the nine health factors (build muscle weights protein ×4). The limit is strict or soft.</td></tr>
+        <tr><td>4</td><td>A few dishes you like</td><td><span class="pill">pref.</span></td><td>One like for each cuisine, ingredient and food group of the dish.</td></tr>
+        <tr><td>5</td><td>How much healthiness, sustainability and convenience should count</td><td><span class="pill">pref.</span></td><td>The <b>stated weights</b> w<sub>h</sub>, w<sub>s</sub>, w<sub>t</sub>, summing to 1. Saved as goal version 1.</td></tr>
+      </tbody>
+    </table></div>
+  </section><section id="journey">
+    <div class="eyebrow">2.2 · User journey</div>
+    <h2>One session, screen by screen</h2>
+    <div class="ladder">
+      <div class="rung"><span class="when">Onboarding</span><span>Five steps (section 1). Creates profile v1 and goal v1, starts the taste counts and sets observed weights = stated weights. Event: <code>profile_created</code>.</span></div>
+      <div class="rung"><span class="when">Discover</span><span>Shows the top five. The user can move the three sliders and press <b>Apply</b> (this list only, nothing learned), pick a meal (breakfast, lunch, dinner, snack, dessert, drink; this request only), or press <b>Save as goal</b> (new goal version). Every list is stored as a snapshot.</span></div>
+      <div class="rung"><span class="when">Recipe card</span><span>Like, Save, <b>I'll cook this</b> with a reason, <b>Not for me</b> with a reason, <b>How it's scored</b> (the full calculation), and <b>Ask</b> (sends a question to the assistant). Each feedback click is one event.</span></div>
+      <div class="rung"><span class="when">After feedback</span><span>The user model replays the event, then the supervisor runs its check. Its reasoning appears in the assistant's Supervisor tab. A question or proposal shows up as a card there.</span></div>
+      <div class="rung"><span class="when">Assistant</span><span>Docked on every page. Chat requests ("something easy with at most 8 ingredients") become request-only filters and are never saved. Answers show a thinking timeline with the source of each fact.</span></div>
+      <div class="rung"><span class="when">Insights</span><span>Preference match, <b>You chose</b> vs. <b>You do</b> for each value, every event that moved the weights, and the taste table with Like / Neutral / Dislike corrections.</span></div>
+      <div class="rung"><span class="when">Profile</span><span>Edit rules, the health goal and the ingredient limit (new profile version), or restore an earlier goal version.</span></div>
+    </div>
+  </section><section id="taste-model">
+    <div class="eyebrow">2.3 · Model 1</div>
+    <h2>Taste: counting likes and dislikes</h2>
+    <div class="formula">taste(concept) = (1 + likes) / (2 + likes + dislikes)        0.5 = no opinion yet</div>
+    <p>Concepts are cuisines, ingredients and food groups. A dish's taste match is the weighted mean of its concepts (cuisine 35 %, ingredients 45 % by weight, food groups 20 %). A like counts 1 on every concept of the dish, "I'll cook this" 0.8 (1.0 with "it sounds tasty"), save 0.6, and "not my taste" counts 1 dislike. A liking declared at onboarding starts at 2 likes.</p>
+    <figure>
+      <div class="fig small"><svg viewBox="0 0 520 210" role="img" aria-label="Taste for Italian falling below 0.40 after four rejections"><defs><marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs><line x1="50" y1="180" x2="500" y2="180" class="axis"/><line x1="50" y1="20" x2="50" y2="180" class="axis"/><text x="42" y="184" text-anchor="end" class="s">0</text><line x1="50" y1="180" x2="500" y2="180" class="grid"/><text x="42" y="104.0" text-anchor="end" class="s">0.5</text><line x1="50" y1="100.0" x2="500" y2="100.0" class="grid"/><text x="42" y="24" text-anchor="end" class="s">1</text><line x1="50" y1="20" x2="500" y2="20" class="grid"/><line x1="50" y1="116.0" x2="500" y2="116.0" class="thresh"/><text x="56" y="132.0" class="l warnt">0.40: supervisor asks</text><polyline points="80,60.0 180,84.0 280,100.0 380,111.42857142857143 480,120.0" class="line"/><circle cx="80" cy="60.0" r="5" class="dot"/><text x="80" y="48.0" text-anchor="middle" class="t">0.75</text><text x="80" y="198" text-anchor="middle" class="s">declared</text><circle cx="180" cy="84.0" r="5" class="dot"/><text x="180" y="72.0" text-anchor="middle" class="t">0.60</text><text x="180" y="198" text-anchor="middle" class="s">reject 1</text><circle cx="280" cy="100.0" r="5" class="dot"/><text x="280" y="88.0" text-anchor="middle" class="t">0.50</text><text x="280" y="198" text-anchor="middle" class="s">reject 2</text><circle cx="380" cy="111.42857142857143" r="5" class="dot"/><text x="380" y="99.42857142857143" text-anchor="middle" class="t">0.43</text><text x="380" y="198" text-anchor="middle" class="s">reject 3</text><circle cx="480" cy="120.0" r="5" class="dot warnd"/><text x="480" y="108.0" text-anchor="middle" class="t">0.38</text><text x="480" y="198" text-anchor="middle" class="s">reject 4</text></svg></div>
+      <figcaption>Example: the user said they like Italian (2 likes, 0.75), then rejected four Italian dishes as "not my taste". After the fourth, taste is 3 / 8 = 0.375, below 0.40, so the supervisor asks "Do you still want Italian as a preference?"</figcaption>
+    </figure>
+  </section><section id="value-model">
+    <div class="eyebrow">2.4 · Model 2</div>
+    <h2>Values: what the user actually prioritises</h2>
+    <p>The observed weights start equal to the stated weights. Each choice moves them toward the values on which the chosen dish beat the other four shown.</p>
+    <div class="formula">d_k  = score_k(chosen) − mean_k(the five shown)      (+0.2 if the reason names k)
+o_k ← o_k × e^(d_k)
+then rescale to sum 1, and mix in 5 % of the stated goal</div>
+    <h3>Worked example: choosing "Quick tomato pasta" because "it is easy"</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Value</th><th>Chosen</th><th>Mean of five</th><th>d</th><th>Before</th><th>After</th></tr></thead>
+      <tbody>
+        <tr><td>Healthiness</td><td class="n">0.55</td><td class="n">0.72</td><td class="n">−0.17</td><td class="n">0.40</td><td class="n">0.31</td></tr>
+        <tr><td>Sustainability</td><td class="n">0.74</td><td class="n">0.63</td><td class="n">+0.11</td><td class="n">0.40</td><td class="n">0.40</td></tr>
+        <tr><td>Convenience</td><td class="n">0.92</td><td class="n">0.60</td><td class="n">+0.32 + 0.2</td><td class="n">0.20</td><td class="n">0.29</td></tr>
+      </tbody>
+    </table></div>
+    <div class="bars" role="img" aria-label="Observed weights after the choice compared with stated weights">
+      <div class="bar-row" style="--c:var(--c-h)"><span class="lab"><span class="sw"></span>Healthiness</span><div class="track"><div class="obs" style="width:31%"></div><div class="st" style="left:40%"></div></div><span class="v">0.31 (−9 pts)</span></div>
+      <div class="bar-row" style="--c:var(--c-s)"><span class="lab"><span class="sw"></span>Sustainability</span><div class="track"><div class="obs" style="width:40%"></div><div class="st" style="left:40%"></div></div><span class="v">0.40 (0 pts)</span></div>
+      <div class="bar-row" style="--c:var(--c-t)"><span class="lab"><span class="sw"></span>Convenience</span><div class="track"><div class="obs" style="width:29%"></div><div class="st" style="left:20%"></div></div><span class="v">0.29 (+9 pts)</span></div>
+      <span class="muted" style="font-size:.85rem">Bar = observed weight, black mark = stated weight. Preference match = 1 − ½ × (0.09 + 0.00 + 0.09) = 91 %.</span>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>Other updates</th><th>Effect on observed weights</th></tr></thead>
+      <tbody>
+        <tr><td>Rejected as "not healthy enough", "not sustainable" or "too many ingredients"</td><td>Only that value moves, by how much worse the rejected dish was than the average shown. Nothing moves if it was not worse.</td></tr>
+        <tr><td>Answered a trade-off question</td><td>Winner × e<sup>0.2</sup>, loser × e<sup>−0.2</sup>.</td></tr>
+        <tr><td>Saved a goal or accepted a proposal</td><td>Move halfway to the new goal; the event count restarts.</td></tr>
+        <tr><td>Like, save, "not my taste"</td><td>None. These only update taste.</td></tr>
+      </tbody>
+    </table></div>
+  
+<div class="sim" aria-label="Value model simulator">
+      <div class="sim-top">
+        <div>
+          <h3>Try it</h3>
+          <p class="muted" style="font-size:.92rem">Stated goal: health 40 %, sustainability 40 %, convenience 20 %. Example dishes, same arithmetic as the app.</p>
+        </div>
+        <div class="stats">
+          <div class="stat"><span>Match</span><b id="m">100%</b></div>
+          <div class="stat"><span>Confidence</span><b id="c">0%</b></div>
+          <div class="stat"><span>Events</span><b id="n">0</b></div>
+        </div>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="legend"><span><i></i>stated weight</span><span>bar = observed weight</span><span>right = gap (observed − stated)</span></div>
+      <div class="agent-box" id="agent"></div>
+      <div class="dishes tbl"><table>
+        <thead><tr><th>Shown dish (example)</th><th>Health</th><th>Sust.</th><th>Conv.</th><th>Feedback</th></tr></thead>
+        <tbody id="dishes"></tbody>
+      </table></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button id="reset" type="button">Reset</button>
+        <span class="muted" style="font-size:.85rem">Tip: choose the quick pasta with "it is easy" a few times and watch the supervisor react.</span>
+      </div>
+      <div class="log" id="log" aria-live="polite"></div>
+    </div>
+</section><section id="interactions">
+    <div class="eyebrow">2.5 · Reference</div>
+    <h2>Every interaction and what it changes</h2>
+    <p>Everything is recorded as an event in an append-only log. The user model is rebuilt by replaying that log, so each row below is the complete effect of that interaction.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Interaction</th><th>Taste model</th><th>Observed weights</th><th>Goal / rules</th></tr></thead>
+      <tbody>
+        <tr><td>Like</td><td>+1 like on every concept of the dish</td><td>no change</td><td>no change</td></tr>
+        <tr><td>Save</td><td>+0.6 like</td><td>no change</td><td>no change</td></tr>
+        <tr><td>I'll cook this, no reason</td><td>+0.8 like</td><td>o<sub>k</sub> × e<sup>d<sub>k</sub></sup> for all three, d = chosen − mean of the five</td><td>no change</td></tr>
+        <tr><td>… "it sounds tasty"</td><td>+1.0 like</td><td>same as no reason</td><td>no change</td></tr>
+        <tr><td>… "it is healthy / climate-friendly / easy"</td><td>+0.8 like</td><td>same, plus 0.2 on that value; ignored and flagged if the dish is not actually better on it</td><td>no change</td></tr>
+        <tr><td>Not for me: "not my taste"</td><td>+1 dislike</td><td>no change</td><td>no change</td></tr>
+        <tr><td>Not for me: "had it recently"</td><td>+0.5 dislike</td><td>no change</td><td>no change</td></tr>
+        <tr><td>Not for me: "not healthy enough / not sustainable / too many ingredients"</td><td>no change</td><td>only that value: o<sub>k</sub> × e<sup>d</sup>, d = mean of the five − rejected; ignored if the dish was not worse</td><td>no change</td></tr>
+        <tr><td>Answer a trade-off question</td><td>no change</td><td>winner × e<sup>0.2</sup>, loser × e<sup>−0.2</sup></td><td>no change</td></tr>
+        <tr><td>Dismiss a question or proposal</td><td>no change</td><td>no change</td><td>no change; topic paused for 6 feedback events</td></tr>
+        <tr><td>Accept a proposal</td><td>no change</td><td>move halfway to the new goal; event count restarts</td><td>new goal version</td></tr>
+        <tr><td>Save as goal (Discover)</td><td>no change</td><td>move halfway to the new goal; event count restarts</td><td>new goal version</td></tr>
+        <tr><td>Answer "Do you still want Italian?" with No</td><td>no change</td><td>no change</td><td>removed from declared likes (new profile version)</td></tr>
+        <tr><td>Correct a taste belief (Insights)</td><td>counts replaced: Like 0.85, Neutral 0.5, Dislike 0.15, worth 6 observations</td><td>no change</td><td>no change</td></tr>
+        <tr><td>Edit profile</td><td>only newly added likes/dislikes start at 2 counts; learned counts are kept</td><td>no change</td><td>new profile version</td></tr>
+        <tr><td>Apply sliders, meal selector, chat filters</td><td>no change</td><td>no change</td><td>no change; this request only</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">After every weight update: rescale to sum 1, then mix in 5 % of the stated goal. Only choices, reasoned rejections and answers count as events for confidence and for the supervisor's minimum-event rules.</p>
+  </section><section id="supervisor">
+    <div class="eyebrow">2.6 · The supervisor</div>
+    <h2>When it speaks up</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Condition</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td>Every gap below 10 points</td><td>Stay quiet.</td></tr>
+        <tr><td>A gap of 10+ points after 3+ events</td><td>Ask: "When convenience and healthiness pull in different directions, which usually wins for you?"</td></tr>
+        <tr><td>A gap of 15+ points after 6+ events</td><td>Propose moving that weight halfway, with a preview of which recipes would enter or leave the top five.</td></tr>
+        <tr><td>A declared liking below 0.40 with 2+ evidence</td><td>Ask whether to keep it.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">Confidence = n / (n + 5), where n counts choices, reasoned rejections and answers since the goal was saved. One question is open at a time.</p>
+  </section><div class="part" id="p3"><span>Part III</span><h2 class="ph">Model equations</h2><p class="muted">Every formula exactly as the code computes it, with the file it comes from.</p></div><section id="notation">
+      <title>FoodRec Model Equations</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<script>
+window.MathJax = { tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] }, svg: { fontCache: "global" } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script>
+<style>
+/* Layout: a reference manual. Sticky contents; each equation is a card: formula, then symbols, how the app uses it, why this formula. */
+:root {
+  --bg: #f6f8f5; --surface: #ffffff; --ink: #1d2a24; --ink-2: #55655d; --line: #d3ddd6;
+  --accent: #2f7a57; --accent-soft: #e2efe7; --code: #3f5f8a; --why: #8a5a12; --why-soft: #f8efde;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #131a17; --surface: #1b2420; --ink: #e5ece8; --ink-2: #a3b2aa; --line: #34423c;
+  --accent: #6cc79a; --accent-soft: #1f3329; --code: #8fb0e0; --why: #e2b066; --why-soft: #2e2618; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #131a17; --surface: #1b2420; --ink: #e5ece8; --ink-2: #a3b2aa; --line: #34423c;
+  --accent: #6cc79a; --accent-soft: #1f3329; --code: #8fb0e0; --why: #e2b066; --why-soft: #2e2618; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); }
+.wrap { max-width: 1140px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 40px; }
+nav { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; display: flex; flex-direction: column; gap: 5px; font-size: 0.9rem; max-height: calc(100vh - 48px); overflow-y: auto; }
+nav a { color: var(--ink-2); text-decoration: none; }
+nav a:hover, nav a:focus-visible { color: var(--accent); }
+nav a.sub { padding-left: 12px; font-size: 0.84rem; }
+nav b { font: 500 0.72rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+main { display: flex; flex-direction: column; gap: 56px; min-width: 0; }
+@media (max-width: 880px) { .wrap { grid-template-columns: 1fr; } nav { position: static; max-height: none; flex-direction: row; flex-wrap: wrap; gap: 6px 14px; } nav a.sub { display: none; } }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 5vw, 2.7rem); font-weight: 700; }
+h2 { font-size: 1.6rem; font-weight: 700; }
+h3 { font-size: 1.15rem; font-weight: 600; }
+p { margin: 0; max-width: 74ch; }
+section { display: flex; flex-direction: column; gap: 18px; min-width: 0; scroll-margin-top: 24px; }
+.eyebrow { font: 500 0.75rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.12rem; color: var(--ink-2); }
+.muted { color: var(--ink-2); }
+code { font-family: var(--mono); font-size: 0.85em; color: var(--code); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 24px; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.card-head .no { font: 500 0.8rem var(--mono); color: var(--accent); margin-right: 8px; }
+.src { font: 0.76rem var(--mono); color: var(--code); }
+.m { overflow-x: auto; overflow-y: hidden; padding: 4px 0; border-block: 1px dashed var(--line); }
+.lbl { font: 600 0.72rem var(--mono); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); }
+.sym { display: grid; grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 0.96rem; }
+.sym dt { white-space: nowrap; }
+.sym dd { margin: 0; }
+.how, .why { display: flex; flex-direction: column; gap: 6px; }
+.why { background: var(--why-soft); border-radius: 8px; padding: 12px 14px; }
+.why .lbl { color: var(--why); }
+.ex { font-size: 0.94rem; color: var(--ink-2); }
+.ex b { color: var(--ink); }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 0.72rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+ul { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 4px; max-width: 74ch; }
+mjx-container { color: var(--ink); }
+mjx-container[display="true"] { margin: 0.35em 0 !important; }
+@media (max-width: 560px) { .sym { grid-template-columns: 1fr; gap: 2px; } .sym dd { margin-bottom: 8px; } }
+footer { font-size: 0.88rem; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+  <nav aria-label="Contents">
+    <b>Part III · Equations</b>
+    <a href="#notation">0 · Notation</a>
+    <a href="#scores">1 · Criterion scores</a>
+    <a class="sub" href="#e11">1.1 Anchor score</a>
+    <a class="sub" href="#e12">1.2 Healthiness</a>
+    <a class="sub" href="#e13">1.3 Sustainability</a>
+    <a class="sub" href="#e14">1.4 Convenience</a>
+    <a href="#ranking">2 · Ranking</a>
+    <a class="sub" href="#e21">2.1 Utility</a>
+    <a class="sub" href="#e22">2.2 Missing scores</a>
+    <a class="sub" href="#e23">2.3 Candidate pool</a>
+    <a class="sub" href="#e24">2.4 Diversity</a>
+    <a href="#taste">3 · Taste model</a>
+    <a class="sub" href="#e31">3.1 Taste of a concept</a>
+    <a class="sub" href="#e32">3.2 Updates</a>
+    <a class="sub" href="#e33">3.3 Corrections</a>
+    <a class="sub" href="#e34">3.4 Taste match</a>
+    <a class="sub" href="#e35">3.5 Extended mode</a>
+    <a href="#values">4 · Value model</a>
+    <a class="sub" href="#e41">4.1 Update rule</a>
+    <a class="sub" href="#e42">4.2 Choice</a>
+    <a class="sub" href="#e43">4.3 Rejection</a>
+    <a class="sub" href="#e44">4.4 Answer</a>
+    <a class="sub" href="#e45">4.5 Goal save</a>
+    <a class="sub" href="#e46">4.6 Read-outs</a>
+    <a href="#policy">5 · Supervisor</a>
+    <a class="sub" href="#e51">5.1 Action rule</a>
+    <a class="sub" href="#e52">5.2 Proposal</a>
+    <a class="sub" href="#e53">5.3 Taste conflict</a>
+    <a href="#events">6 · Event table</a>
+    <a href="#params">7 · Parameters</a>
+  </nav>
+
+  <main>
+    <header style="display:flex;flex-direction:column;gap:12px">
+      <div class="eyebrow">FoodRec v0.3 · Part III · model equations</div>
+      <h1>Every equation, explained</h1>
+      <p class="lede">Each equation below comes with three things: what every symbol means, how the app uses the result, and why this formula was chosen over the alternatives. The formulas are written exactly as the code computes them, and each card names its source file.</p>
+      <p class="muted">A note on honesty: the anchors come from published nutrition and climate sources, but the learning rates and thresholds are design choices. They were picked to be simple, explainable and stable, not fitted to data, and they still need calibration with real users.</p>
+    </header>
+
+    <!-- ============================================================ 0 -->
+    <section id="notation">
+      <div class="eyebrow">0</div>
+      <h2>Notation used throughout</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Symbol</th><th>Meaning</th><th>Range</th></tr></thead>
+        <tbody>
+          <tr><td>\(i, j\)</td><td>a recipe from the catalogue</td><td>9,605 recipes</td></tr>
+          <tr><td>\(k\)</td><td>one of the three user values: \(h\) healthiness, \(s\) sustainability, \(t\) convenience</td><td>\(\{h,s,t\}\)</td></tr>
+          <tr><td>\(x_k(i)\)</td><td>score of recipe \(i\) on value \(k\); 1 is best, 0 is worst</td><td>\([0,1]\)</td></tr>
+          <tr><td>\(P(i)\)</td><td>taste match: how much this user is likely to enjoy recipe \(i\)</td><td>\([0,1]\)</td></tr>
+          <tr><td>\(w_k\)</td><td><b>stated weight</b>: how much the user said value \(k\) matters (sliders, saved goal)</td><td>\(\ge 0\), sum 1</td></tr>
+          <tr><td>\(o_k\)</td><td><b>observed weight</b>: how much the user's behaviour shows value \(k\) matters</td><td>\(\ge 0\), sum 1</td></tr>
+          <tr><td>\(c\)</td><td>a concept: a cuisine, an ingredient or a food group</td><td>e.g. <code>cuisine:Italian</code></td></tr>
+          <tr><td>\(S\)</td><td>the five recipes on screen when the user clicked</td><td>\(|S| = 5\)</td></tr>
+          <tr><td>\(n\)</td><td>number of informative events (choices, reasoned rejections, answers) since the goal was last saved</td><td>\(0, 1, 2, \dots\)</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ 1 -->
+    <section id="scores">
+      <div class="eyebrow">1 · <span class="src">foodrec/features.py</span></div>
+      <h2>Criterion scores</h2>
+      <p>Every recipe gets a score from 0 to 1 on each of the three values. These scores do not depend on the user (except for the health goal), so they are the fixed, explainable facts that the rest of the system builds on.</p>
+
+      <div class="card" id="e11">
+        <div class="card-head"><h3><span class="no">1.1</span>Anchor score of one factor</h3><span class="src">features._lin</span></div>
+        <div class="m">\[ \ell(v;\, g, b) = \operatorname{clip}_{[0,1]}\!\left(\frac{v - b}{g - b}\right) \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(v\)</dt><dd>the measured value, for example 8 g of saturated fat per 100 g</dd>
+          <dt>\(g\)</dt><dd>the "good" anchor: at or better than this the factor scores 1 (sat. fat 1.5 g)</dd>
+          <dt>\(b\)</dt><dd>the "poor" anchor: at or worse than this the factor scores 0 (sat. fat 5 g)</dd>
+          <dt>\(\operatorname{clip}_{[0,1]}\)</dt><dd>cuts the result to the range 0 to 1, so values beyond an anchor do not go below 0 or above 1</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Every health factor is turned into a 0–1 score with this formula. The same shape is used for convenience (1.4). The "How it's scored" panel on each recipe card lists \(v\), \(g\), \(b\) and the resulting score for every factor.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Nutrition guidelines already define thresholds: the UK FSA traffic lights say what is "low" (green) and "high" (red) per 100 g. Using those as the two anchors means every score is traceable to a published source. A straight line between them is the simplest monotone mapping, and anyone can check it by hand. It works in either direction: when more is better (fibre, protein), \(g &gt; b\) and the same formula still holds.</p></div>
+        <p class="ex"><b>Example.</b> Sat. fat 3.2 g: \((3.2 - 5)/(1.5 - 5) = 0.51\).</p>
+      </div>
+
+      <div class="card" id="e12">
+        <div class="card-head"><h3><span class="no">1.2</span>Healthiness under a health goal</h3><span class="src">features.healthiness</span></div>
+        <div class="m">\[ h_f(i) = \begin{cases} 1 - \ell(v_f; g_f, b_f) & f \in F^G \\ \ell(v_f; g_f, b_f) & \text{otherwise} \end{cases} \qquad x_h(i) = \frac{\sum_{f \in \mathcal{A}(i)} \alpha_f^G\, h_f(i)}{\sum_{f \in \mathcal{A}(i)} \alpha_f^G} \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(f\)</dt><dd>one of nine health factors (table below)</dd>
+          <dt>\(G\)</dt><dd>the user's health goal chosen at onboarding (eat healthier, lose weight, gain weight, build muscle, heart-friendly, less sugar)</dd>
+          <dt>\(\alpha_f^G\)</dt><dd>how important factor \(f\) is for goal \(G\); 1 unless the goal says otherwise</dd>
+          <dt>\(F^G\)</dt><dd>factors the goal reverses. Only "gain weight" uses it: high energy becomes good</dd>
+          <dt>\(h_f(i)\)</dt><dd>score of recipe \(i\) on factor \(f\), from 1.1</dd>
+          <dt>\(\mathcal{A}(i)\)</dt><dd>the factors that have a value for this recipe (missing nutrients are skipped)</dd>
+          <dt>\(x_h(i)\)</dt><dd>the final healthiness score, a weighted average of the factor scores</dd>
+        </dl>
+        <div class="tbl"><table>
+          <thead><tr><th>Factor</th><th>Measured per 100 g</th><th>Good \(g\)</th><th>Poor \(b\)</th><th>Source of anchors</th></tr></thead>
+          <tbody>
+            <tr><td>Energy</td><td>kcal</td><td class="n">125</td><td class="n">400</td><td>WCRF energy-density bands</td></tr>
+            <tr><td>Total fat</td><td>g</td><td class="n">3</td><td class="n">17.5</td><td>FSA traffic light</td></tr>
+            <tr><td>Saturated fat</td><td>g</td><td class="n">1.5</td><td class="n">5</td><td>FSA traffic light</td></tr>
+            <tr><td>Sugars</td><td>g</td><td class="n">5</td><td class="n">22.5</td><td>FSA traffic light</td></tr>
+            <tr><td>Sodium</td><td>mg</td><td class="n">120</td><td class="n">600</td><td>FSA (salt 0.3 / 1.5 g)</td></tr>
+            <tr><td>Cholesterol</td><td>mg</td><td class="n">20</td><td class="n">100</td><td>low-cholesterol claim level</td></tr>
+            <tr><td>Fibre</td><td>g</td><td class="n">6</td><td class="n">0</td><td>EU "high fibre" claim</td></tr>
+            <tr><td>Protein</td><td>% of energy \(= \min(100, 400\,p/E)\)</td><td class="n">20</td><td class="n">0</td><td>EU "high protein" claim</td></tr>
+            <tr><td>FSA score</td><td>HUMMUS normalised FSA score</td><td class="n">1</td><td class="n">0</td><td>HUMMUS dataset</td></tr>
+          </tbody>
+        </table></div>
+        <p class="muted" style="font-size:.92rem">Protein: \(p\) grams of protein give \(4p\) kcal, so \(4p/E \times 100\) is the share of energy from protein. Goal weights: lose weight (energy 3, fat 2, sugars 2, fibre 2, protein 1.5); gain weight (energy 2 reversed, protein 2, fat 0.5, FSA 0.5); build muscle (protein 4, energy 0.5, fat 0.5); heart-friendly (sat. fat 3, sodium 3, cholesterol 2, fibre 2); less sugar (sugars 4, fibre 1.5, energy 1.5); eat healthier (all 1).</p>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>\(x_h\) is the healthiness score in ranking (2.1) and the A–E grade on each card (A ≥ 0.80, B ≥ 0.65, C ≥ 0.50, D ≥ 0.35, else E). Changing the health goal in Profile changes \(\alpha\) and \(F\), so the same dish can score differently for two users.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>A weighted average keeps every factor visible: the breakdown can show exactly how much each nutrient pulled the score up or down. A single external index like Nutri-Score would hide that, and it cannot adapt to a goal. Changing only the weights per goal means "build muscle" and "lose weight" use the same nine facts but value them differently, which is easy to explain. Skipping missing nutrients (instead of treating them as 0 or average) avoids inventing data.</p></div>
+      </div>
+
+      <div class="card" id="e13">
+        <div class="card-head"><h3><span class="no">1.3</span>Sustainability (climate footprint)</h3><span class="src">ingest/build.py · features.sustainability</span></div>
+        <div class="m">\[ \text{CO}_2(i) = \frac{\sum_j m_j\, e_j}{\sum_j m_j}, \qquad x_s(i) = \operatorname{clip}_{[0,1]}\!\left(\frac{\ln 30 - \ln \text{CO}_2(i)}{\ln 30 - \ln 0.5}\right) \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(j\)</dt><dd>an ingredient of the recipe (water is left out)</dd>
+          <dt>\(m_j\)</dt><dd>its amount in grams, parsed from the ingredient line during ingest</dd>
+          <dt>\(e_j\)</dt><dd>kg CO₂e emitted per kg of that ingredient's food group (beef ≈ 60, pulses ≈ 1), from Poore &amp; Nemecek 2018 via Our World in Data</dd>
+          <dt>\(\text{CO}_2(i)\)</dt><dd>estimated kg CO₂e per kg of the finished dish: a mass-weighted average</dd>
+          <dt>0.5, 30</dt><dd>the anchors: 0.5 kg/kg or less scores 1, 30 kg/kg or more scores 0</dd>
+          <dt>\(\ln\)</dt><dd>natural logarithm</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>\(\text{CO}_2(i)\) is computed once at ingest and stored with a per-ingredient breakdown. The card shows it in kg CO₂e, and "How it's scored" lists which ingredients contribute most. \(x_s\) is the sustainability score used in ranking.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Per kg of dish (not per serving) makes recipes comparable regardless of portion size, which HUMMUS records inconsistently. Food-group factors are the most widely cited source that covers every ingredient. The log scale matters because footprints span two orders of magnitude: on a linear scale every beef dish would score 0 and every plant dish would be squeezed near 1. On a log scale, halving the footprint gains the same score anywhere on the range, which matches how people think about "cutting emissions by half". Water is excluded because it weighs a lot but emits nothing, and would make soups look misleadingly clean.</p></div>
+      </div>
+
+      <div class="card" id="e14">
+        <div class="card-head"><h3><span class="no">1.4</span>Convenience</h3><span class="src">features.convenience</span></div>
+        <div class="m">\[ x_t(i) = \operatorname{clip}_{[0,1]}\!\left(\frac{15 - N(i)}{15 - 3}\right) \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(N(i)\)</dt><dd>number of ingredients, counted from HUMMUS <code>ingredients_title</code></dd>
+          <dt>3, 15</dt><dd>3 or fewer ingredients score 1; 15 or more score 0</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>The convenience score in ranking. The card shows the ingredient count; the user's ingredient limit (strict or soft) and chat requests like "at most 8 ingredients" use \(N(i)\) directly.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>HUMMUS has no reliable preparation time, but every recipe lists its ingredients. The count is a transparent proxy for effort (shopping, preparation, steps). It is the same anchor formula as 1.1, so users only have to learn one idea. The anchors cover the bulk of the catalogue: few recipes have fewer than 3 or more than 15 ingredients.</p></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ 2 -->
+    <section id="ranking">
+      <div class="eyebrow">2 · <span class="src">ranker.py · engine.py · diversity.py · catalogue.py</span></div>
+      <h2>Ranking</h2>
+      <p>Before any formula runs, rules remove ineligible recipes: declared allergens (unknown allergen data counts as unsafe), diets, "never include" ingredients, a strict ingredient limit, and request-only filters such as the meal selector. Duplicates are removed. Only the remaining recipes are scored.</p>
+
+      <div class="card" id="e21">
+        <div class="card-head"><h3><span class="no">2.1</span>Utility: one number per recipe</h3><span class="src">ranker.effective_weights · ranker.utility</span></div>
+        <div class="m">\[ \beta_p = \tau, \qquad \beta_k = (1-\tau)\, w_k, \qquad U(i) = \beta_p\, P(i) + \sum_{k \in \{h,s,t\}} \beta_k\, x_k(i) \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(\tau = 0.25\)</dt><dd>the taste share: a fixed quarter of the utility always comes from taste</dd>
+          <dt>\(w_k\)</dt><dd>the user's stated weights from the three sliders (sum to 1)</dd>
+          <dt>\(\beta\)</dt><dd>the four final ranking weights; they also sum to 1</dd>
+          <dt>\(P(i)\)</dt><dd>taste match (3.4)</dd>
+          <dt>\(U(i)\)</dt><dd>utility: the recipe's overall fit for this user, between 0 and 1</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Recipes are sorted by \(U\) before the diversity step (2.4). Each card shows its utility, and the explanation lists each term \(\beta_k x_k\) so the user can see which value contributed most. Note that ranking always uses the <b>stated</b> weights \(w\), never the observed ones: learning informs the supervisor, it does not silently change the ranking.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>A weighted sum is the standard multi-criteria model (multi-attribute utility), and its key property here is controllability: if the user moves a slider, the effect on every recipe is predictable and explainable. Taste gets a fixed share instead of a slider for two reasons. The three sliders then mean exactly what the user set ("50 % health" really is half of the value part). And a dish the user would never eat cannot reach the top on numbers alone. 25 % was chosen so taste can break ties between similar dishes without overriding the user's stated values.</p></div>
+        <p class="ex"><b>Check.</b> \(w = (0.5, 0.3, 0.2)\), \(P = 0.8\), \(x = (0.9, 0.55, 0.85)\): \(U = 0.25 \cdot 0.8 + 0.75 \cdot (0.45 + 0.165 + 0.17) = 0.78875\). This is a test in <code>tests/test_reference.py</code>.</p>
+      </div>
+
+      <div class="card" id="e22">
+        <div class="card-head"><h3><span class="no">2.2</span>When a score is missing</h3><span class="src">ranker.utility (policy "renormalize")</span></div>
+        <div class="m">\[ \tilde\beta_k = \frac{\beta_k}{\sum_{k' \notin M(i)} \beta_{k'}} \ \ \text{for } k \notin M(i), \qquad \tilde\beta_k = 0 \ \ \text{for } k \in M(i) \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(M(i)\)</dt><dd>the criteria with no score for recipe \(i\) (for example, no nutrition data)</dd>
+          <dt>\(\tilde\beta_k\)</dt><dd>the weights actually used for this recipe; they still sum to 1</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>The recipe is ranked on the criteria it has, and its card says which criterion was missing. Two other policies exist for experiments: "zero" (missing counts as 0) and "exclude" (drop the recipe).</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Filling a gap with the average would invent a fact; filling it with 0 would punish recipes for poor data rather than poor food. Renormalising keeps the user's relative priorities among the known criteria and is disclosed, so nothing is hidden.</p></div>
+      </div>
+
+      <div class="card" id="e23">
+        <div class="card-head"><h3><span class="no">2.3</span>Candidate pool</h3><span class="src">engine._pool</span></div>
+        <div class="m">\[ C = \bigcup_{k \in \{p,h,s,t\}} \operatorname{top}_{15}(k) \ \cup\ \operatorname{top}_{60 - |\cdot|}(U) \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(\operatorname{top}_{15}(k)\)</dt><dd>the 15 best eligible recipes on criterion \(k\) (\(15 = \lceil 60/4 \rceil\))</dd>
+          <dt>\(C\)</dt><dd>the pool of at most 60 recipes passed to the diversity step; filled up by utility</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Only applies when more than 60 recipes are eligible (almost always with 9,605). It keeps the diversity step fast.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Cutting purely by utility could remove every recipe that is excellent on one criterion but average overall, so diversity would have nothing different to choose from. Taking the best on each criterion first guarantees the pool contains specialists of every kind.</p></div>
+      </div>
+
+      <div class="card" id="e24">
+        <div class="card-head"><h3><span class="no">2.4</span>Diversity: maximal marginal relevance</h3><span class="src">catalogue.vector · diversity.rerank</span></div>
+        <div class="m">\[ \operatorname{sim}(i,j) = \mathbf{v}_i \cdot \mathbf{v}_j, \qquad i^{*} = \arg\max_{i \in C \setminus R} \Big[ \lambda\, U(i) - (1-\lambda) \max_{j \in R} \operatorname{sim}(i,j) \Big], \quad \lambda = 1 - d \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(\mathbf{v}_i\)</dt><dd>a recipe's profile vector: cuisine 0.8, each ingredient its share of the dish's grams, each food group \(0.4/\sqrt{\#\text{groups}}\); seasonings left out; scaled to length 1</dd>
+          <dt>\(\operatorname{sim}(i,j)\)</dt><dd>cosine similarity, 0 (nothing in common) to 1 (identical profile)</dd>
+          <dt>\(R\)</dt><dd>recipes already selected for the list</dd>
+          <dt>\(d\)</dt><dd>the diversity slider on Discover (default 0.3)</dd>
+          <dt>\(\lambda\)</dt><dd>how much utility counts versus being different from what is already chosen</dd>
+          <dt>\(i^*\)</dt><dd>the next recipe added; repeated until five are chosen</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>The first pick is the highest-utility recipe. Each next pick balances utility against similarity to the picks so far. When a recipe moves up because of variety, its card says so and names the higher-utility recipe it displaced.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Without it, the top five are often near-duplicates (five lentil soups). MMR is a standard, deterministic re-ranking method with one intuitive control: \(d = 0\) gives pure utility order, higher \(d\) gives more variety. Mixing cuisine, ingredients and food groups in the vector makes "similar" mean what a cook would mean.</p></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ 3 -->
+    <section id="taste">
+      <div class="eyebrow">3 · <span class="src">learner.py (TasteModel) · preference.py</span></div>
+      <h2>Taste model</h2>
+      <p>The first learned model answers "does this user like this kind of food?". It keeps a count of likes and dislikes for every concept the user has met.</p>
+
+      <div class="card" id="e31">
+        <div class="card-head"><h3><span class="no">3.1</span>Taste of one concept</h3><span class="src">TasteModel.mean</span></div>
+        <div class="m">\[ \theta_c = \frac{1 + L^0_c + L_c}{2 + L^0_c + L_c + D^0_c + D_c} \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(c\)</dt><dd>a concept, e.g. <code>cuisine:Italian</code> or <code>ingredient:garlic</code></dd>
+          <dt>\(L^0_c, D^0_c\)</dt><dd>declared likes / dislikes from onboarding or a correction</dd>
+          <dt>\(L_c, D_c\)</dt><dd>observed likes / dislikes from feedback (3.2)</dd>
+          <dt>the 1 and 2</dt><dd>one imaginary like and one imaginary dislike, so a new concept starts at exactly 0.5</dd>
+          <dt>\(\theta_c\)</dt><dd>estimated chance the user likes dishes with this concept, 0 to 1</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>The Insights taste table shows \(\theta_c\) for each concept, with its likes and dislikes. It feeds the taste match (3.4) and the supervisor's taste-conflict check (5.3).</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>This is Laplace's rule of succession, which is the posterior mean of a Beta(1, 1) distribution after the observed likes and dislikes. In plain words: it is the like-ratio with one imaginary vote each way. That gives three useful properties. An unseen concept is neutral (0.5), not 0 or 1. One single like cannot jump a concept to 100 % (one like gives 2/3). And the more evidence there is, the closer it gets to the true ratio. It is also the simplest learner that can be explained with a fraction, which was the goal of simplifying the user model.</p></div>
+        <p class="ex"><b>Example.</b> Declared liking (2 likes) and no feedback: \(3/4 = 0.75\). After 4 "not my taste" rejections: \(3/8 = 0.375\).</p>
+      </div>
+
+      <div class="card" id="e32">
+        <div class="card-head"><h3><span class="no">3.2</span>Updating the counts</h3><span class="src">TasteModel.observe · Learner._feedback</span></div>
+        <div class="m">\[ \text{positive: } L_c \leftarrow L_c + a, \qquad \text{negative: } D_c \leftarrow D_c + a, \qquad \text{for every } c \in C(i) \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(C(i)\)</dt><dd>all concepts of the dish: its cuisine, its ingredients, its food groups</dd>
+          <dt>\(a\)</dt><dd>the strength of the signal (table)</dd>
+        </dl>
+        <div class="tbl"><table>
+          <thead><tr><th>User action</th><th>Counts as</th><th>\(a\)</th><th>Reasoning for the strength</th></tr></thead>
+          <tbody>
+            <tr><td>Like</td><td>like</td><td class="n">1.0</td><td>a direct statement of liking</td></tr>
+            <tr><td>I'll cook this, "it sounds tasty"</td><td>like</td><td class="n">1.0</td><td>a choice explicitly because of taste</td></tr>
+            <tr><td>I'll cook this (other or no reason)</td><td>like</td><td class="n">0.8</td><td>chosen, but maybe for health or ease</td></tr>
+            <tr><td>Save</td><td>like</td><td class="n">0.6</td><td>interest, not commitment</td></tr>
+            <tr><td>Dish picked at onboarding</td><td>like</td><td class="n">1.0</td><td>the user named it as liked</td></tr>
+            <tr><td>Not for me, "not my taste"</td><td>dislike</td><td class="n">1.0</td><td>a direct statement of disliking</td></tr>
+            <tr><td>Not for me, "had it recently"</td><td>dislike</td><td class="n">0.5</td><td>weak; the dish may still be liked</td></tr>
+            <tr><td>Not for me with a value reason</td><td colspan="3">no taste update; it updates the value model instead (4.3)</td></tr>
+          </tbody>
+        </table></div>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Every click on a card is stored as an event; replaying the events applies these updates. Insights lists, for each concept, which events changed it.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Adding the full strength to every concept (rather than splitting it by concept weight) means one rejected Italian dish moves "Italian" by a full vote. That makes the model react visibly and keeps the arithmetic shown on Insights simple (whole and half votes). Different strengths separate strong signals from weak ones without needing a learned model. A rejection with a value reason ("not healthy enough") is deliberately kept out of taste: the user said why they rejected it, and it was not the flavour.</p></div>
+      </div>
+
+      <div class="card" id="e33">
+        <div class="card-head"><h3><span class="no">3.3</span>Declared tastes and user corrections</h3><span class="src">TasteModel.declare · TasteModel.override</span></div>
+        <div class="m">\[ \text{declared: } (L^0_c, D^0_c) = (2, 0) \text{ or } (0, 2) \qquad \text{correction to } m: \ L^0_c = m(T+2) - 1, \ \ D^0_c = (T+2) - 2 - L^0_c, \ \ L_c = D_c = 0 \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(m\)</dt><dd>the value the user picks on Insights: Like 0.85, Neutral 0.5, Dislike 0.15 (kept within 0.05–0.95)</dd>
+          <dt>\(T = 6\)</dt><dd>how many observations a correction is worth</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Onboarding likes and soft dislikes start a concept at 0.75 or 0.25. The Like / Neutral / Dislike buttons on Insights set it exactly to \(m\) (substitute into 3.1 and it gives \(\theta_c = m\)), labelled "your correction".</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>A declaration is worth 2 votes: strong enough to matter from day one, weak enough that a few clear rejections can overturn it (which is what triggers the supervisor's check in 5.3). A correction is worth 6 votes because the user is explicitly overriding the model, so it should hold against a few contrary clicks but still not be permanent.</p></div>
+      </div>
+
+      <div class="card" id="e34">
+        <div class="card-head"><h3><span class="no">3.4</span>Taste match of a recipe</h3><span class="src">catalogue.concepts · preference.concept_preference</span></div>
+        <div class="m">\[ P_{\text{light}}(i) = \sum_{c \in C(i)} \pi_c(i)\, \theta_c, \qquad \sum_{c} \pi_c(i) = 1 \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(\pi_c(i)\)</dt><dd>how much concept \(c\) defines dish \(i\): cuisine 0.35 (skipped if "Other"), ingredients 0.45 split by their share of the dish's grams, food groups 0.20 split equally; seasonings left out; rescaled to sum 1</dd>
+          <dt>\(P_{\text{light}}(i)\)</dt><dd>taste match in the default (lightweight) mode</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>\(P\) is the taste term in utility (2.1). The card lists the concepts that contribute most, for example "you liked Italian" or "garlic is new to us".</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>A dish is mostly experienced through its main ingredients, so ingredients carry the largest share and are weighted by grams (a pinch of salt should not count like a kilo of potatoes). Cuisine captures style; food groups generalise to unseen ingredients (liking chicken says something about other poultry). A weighted average keeps \(P\) between 0 and 1, so it sits on the same scale as the other scores.</p></div>
+      </div>
+
+      <div class="card" id="e35">
+        <div class="card-head"><h3><span class="no">3.5</span>Extended mode: learning from similar dishes</h3><span class="src">preference.extended_preference</span></div>
+        <div class="m">\[ K(i) = \frac{\kappa \cdot 0.5 + \sum_r s_{ir}\, a_r\, y_r}{\kappa + \sum_r s_{ir}\, a_r}, \quad s_{ir} = \max(0, \operatorname{sim}(i,r))^{2}, \quad \gamma = \frac{\sum_r a_r}{\sum_r a_r + 4}, \quad P_{\text{ext}} = (1-\gamma) P_{\text{light}} + \gamma K \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(r\)</dt><dd>a recipe in the user's feedback history</dd>
+          <dt>\(y_r\)</dt><dd>1 if the feedback was positive, 0 if negative</dd>
+          <dt>\(a_r\)</dt><dd>its strength (3.2)</dd>
+          <dt>\(s_{ir}\)</dt><dd>similarity between the candidate and the past dish (2.4), squared so near-matches dominate</dd>
+          <dt>\(\kappa = 0.5\)</dt><dd>a small pull toward 0.5 so one weak match is not decisive</dd>
+          <dt>\(K(i)\)</dt><dd>a similarity-weighted average of past feedback</dd>
+          <dt>\(\gamma\)</dt><dd>how much to trust \(K\): 0 with no history, approaching 1 as feedback accumulates</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Only in "extended" computation mode (Discover). Everything else, including rules, scores and diversity, is identical in both modes.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Concept counts cannot capture "I liked that particular dish", only its parts. This kernel regression adds "dishes like the ones you liked" without training a model. \(\gamma\) blends it in gradually, so a new user relies on concepts and an experienced user benefits from history. It costs more to compute, which is why it is an option and not the default.</p></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ 4 -->
+    <section id="values">
+      <div class="eyebrow">4 · <span class="src">learner.py (ValueModel)</span></div>
+      <h2>Value model</h2>
+      <p>The second learned model answers "what does this user actually prioritise?". It keeps the observed weights \(o\), which start equal to the stated weights \(w\) and move with every informative event. They never change the ranking directly; they are compared with \(w\) by the supervisor and shown on Insights.</p>
+
+      <div class="card" id="e41">
+        <div class="card-head"><h3><span class="no">4.1</span>The update rule (used by 4.2–4.4)</h3><span class="src">ValueModel._apply</span></div>
+        <div class="m">\[ \hat o_k = o_k \, e^{\eta\, \delta_k}, \qquad o_k \leftarrow (1-\varepsilon)\, \frac{\hat o_k}{\sum_{k'} \hat o_{k'}} + \varepsilon\, w_k, \qquad n \leftarrow n + 1 \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(\delta_k\)</dt><dd>the evidence for value \(k\) from this event: positive means "the user acted as if \(k\) matters more", negative "less". Each event type defines \(\delta\) (4.2–4.4)</dd>
+          <dt>\(\eta = 1\)</dt><dd>learning rate: how far one event moves the weights</dd>
+          <dt>\(e^{\eta\delta_k}\)</dt><dd>the multiplier; \(\delta = 0\) leaves the weight unchanged</dd>
+          <dt>\(\hat o_k / \sum \hat o\)</dt><dd>rescaling so the three weights sum to 1 again</dd>
+          <dt>\(\varepsilon = 0.05\)</dt><dd>anchor: 5 % of the stated goal is mixed back in after every update</dd>
+          <dt>\(n\)</dt><dd>event counter, used for confidence and by the supervisor</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Every choice, reasoned rejection and answered question runs this rule. Insights shows each update as "+x / −x points" per value, with the event that caused it.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>This is the exponentiated-gradient (multiplicative weights) update, the standard way to learn weights that must stay positive and sum to 1. Multiplying, rather than adding, means a weight can never go negative, and a small weight changes in proportion to its size. The anchor \(\varepsilon\) is a safety rail: a run of unusual choices moves the estimate but can never push a stated priority to zero, and the model always remembers what the user said. \(\eta = 1\) was chosen so one clear choice moves a weight by roughly 5–10 points: visible on Insights, but not enough alone to trigger the supervisor.</p></div>
+      </div>
+
+      <div class="card" id="e42">
+        <div class="card-head"><h3><span class="no">4.2</span>Evidence from choosing a dish</h3><span class="src">ValueModel.observe_choice</span></div>
+        <div class="m">\[ \delta_k = x_k(i^{c}) - \bar x_k(S), \qquad \bar x_k(S) = \frac{1}{|S|} \sum_{j \in S} x_k(j), \qquad \delta_r \leftarrow \delta_r + \nu \ \text{ if the reason names } r \text{ and } \delta_r &gt; 0 \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(i^{c}\)</dt><dd>the dish the user clicked "I'll cook this" on</dd>
+          <dt>\(S\)</dt><dd>the five dishes on screen at that moment (stored with the event)</dd>
+          <dt>\(\bar x_k(S)\)</dt><dd>the average score on value \(k\) of what was on offer</dd>
+          <dt>\(r\)</dt><dd>the value named by the reason: "it is healthy" → \(h\), "climate-friendly" → \(s\), "easy to make" → \(t\)</dd>
+          <dt>\(\nu = 0.2\)</dt><dd>the bonus for stating a reason</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Applied on every "I'll cook this". If the reason contradicts the choice (the user says "healthy" but picked the least healthy dish), the bonus is not given and the event is flagged on Insights as inconsistent.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Choosing one dish is a comparison: what matters is how the chosen dish differs from the alternatives the user turned down, not its absolute scores. If every dish on screen was healthy, picking a healthy one says nothing about health. Comparing with the average of the five is the simplest version of this idea (it follows the logic of discrete-choice models, where only differences between options carry information). The reason bonus adds the user's own words as extra evidence, but only when the choice supports it.</p></div>
+        <p class="ex"><b>Example.</b> Stated \(w = (0.40, 0.40, 0.20)\). Chosen pasta \((0.55, 0.74, 0.92)\), average of five \((0.72, 0.63, 0.60)\), reason "easy": \(\delta = (-0.17, +0.11, +0.52)\). After 4.1: \(o \approx (0.31, 0.40, 0.29)\).</p>
+      </div>
+
+      <div class="card" id="e43">
+        <div class="card-head"><h3><span class="no">4.3</span>Evidence from a reasoned rejection</h3><span class="src">ValueModel.observe_rejection</span></div>
+        <div class="m">\[ \delta_r = \bar x_r(S) - x_r(i^{x}), \qquad \delta_k = 0 \ (k \ne r), \qquad \text{applied only if } \delta_r &gt; 0 \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(i^{x}\)</dt><dd>the rejected dish</dd>
+          <dt>\(r\)</dt><dd>the value in the reason: "not healthy enough" → \(h\), "not sustainable enough" → \(s\), "too many ingredients" → \(t\)</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Applied on "Not for me" with one of those three reasons. If the dish was not actually worse on that value than the average shown, nothing changes and the event is flagged.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>A rejection with a reason tells us about one value only, so only that value moves. The size depends on how much worse the dish was: rejecting a dish as "not healthy" when it was far below average is strong evidence that health matters; when it was barely below average it is weak evidence. Ignoring inconsistent reasons protects the model from accidental clicks.</p></div>
+      </div>
+
+      <div class="card" id="e44">
+        <div class="card-head"><h3><span class="no">4.4</span>Evidence from answering a trade-off question</h3><span class="src">ValueModel.observe_answer</span></div>
+        <div class="m">\[ \delta_a = +\nu, \qquad \delta_b = -\nu, \qquad \delta_{\text{third}} = 0 \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(a\)</dt><dd>the value the user said usually wins</dd>
+          <dt>\(b\)</dt><dd>the value it was compared against</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>When the supervisor asks "When convenience and healthiness pull in different directions, which usually wins for you?", the answer is applied with 4.1. It does not change the saved goal.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>A direct answer is explicit evidence about the two values in question, so it moves them in opposite directions by the same fixed step as a reason. Treating it as evidence rather than as a goal change keeps the user in control: the answer helps the model understand them, while changing the goal stays a separate, explicit action.</p></div>
+      </div>
+
+      <div class="card" id="e45">
+        <div class="card-head"><h3><span class="no">4.5</span>Saving a goal or accepting a proposal</h3><span class="src">ValueModel.observe_goal</span></div>
+        <div class="m">\[ w \leftarrow w', \qquad o \leftarrow \tfrac{1}{2}\,(o + w'), \qquad n \leftarrow 0 \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(w'\)</dt><dd>the new stated weights (from "Save as goal" or an accepted proposal)</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Creates a new goal version (old versions can be restored on Profile). Insights shows the gaps shrinking and "events since the goal was saved" back at 0.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Saving a goal is the user saying "this is what I want now", so the observed weights should move toward it. Moving only halfway keeps some memory of past behaviour: if the user keeps acting differently, the gap reappears quickly instead of starting from nothing. Resetting \(n\) means the supervisor waits for fresh evidence before questioning the new goal.</p></div>
+      </div>
+
+      <div class="card" id="e46">
+        <div class="card-head"><h3><span class="no">4.6</span>Gap, preference match and confidence</h3><span class="src">ValueModel.gap · match · confidence</span></div>
+        <div class="m">\[ \Delta_k = o_k - w_k, \qquad \text{match} = 1 - \tfrac{1}{2} \sum_{k} |w_k - o_k|, \qquad \text{confidence} = \frac{n}{n + 5} \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(\Delta_k\)</dt><dd>gap on value \(k\): positive means the user acts as if \(k\) matters more than they said</dd>
+          <dt>match</dt><dd>preference match, 0 to 1 (100 % = behaviour follows the goal exactly)</dd>
+          <dt>confidence</dt><dd>how much evidence the observed weights rest on: 0 events → 0 %, 5 → 50 %, 15 → 75 %</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>Insights shows match as the big ring, each \(\Delta_k\) next to the "You chose" and "You do" bars, and confidence as a tile. The supervisor uses \(\Delta\) and \(n\) in 5.1.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Match is one minus the total-variation distance between the two weight vectors: the share of "weight" that would have to move to turn one into the other. It is always between 0 and 1 and reads naturally as a percentage. Confidence uses the simple saturating form \(n/(n+5)\): it grows quickly at first and never claims certainty, and the constant 5 means half confidence after five informative events.</p></div>
+        <p class="ex"><b>Example.</b> \(w = (0.40, 0.40, 0.20)\), \(o = (0.31, 0.40, 0.29)\): match \(= 1 - \tfrac12(0.09 + 0 + 0.09) = 0.91\).</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 5 -->
+    <section id="policy">
+      <div class="eyebrow">5 · <span class="src">agent/policy.py</span></div>
+      <h2>Supervisor policy</h2>
+      <p>The supervisor runs after every feedback event, when the user presses "Review now", and during chat. It never edits the goal or a rule; it decides only whether to stay quiet, ask, or propose.</p>
+
+      <div class="card" id="e51">
+        <div class="card-head"><h3><span class="no">5.1</span>Stay quiet, ask, or propose</h3><span class="src">policy.review</span></div>
+        <div class="m">\[ k^{*} = \arg\max_k |\Delta_k|, \qquad \text{action} = \begin{cases} \text{propose} & |\Delta_{k^*}| \ge 0.15 \ \text{and}\ n \ge 6 \\ \text{ask} & |\Delta_{k^*}| \ge 0.10 \ \text{and}\ n \ge 3 \\ \text{stay quiet} & \text{otherwise} \end{cases} \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(k^*\)</dt><dd>the value with the largest gap</dd>
+          <dt>0.10, 0.15</dt><dd>gap thresholds in weight (10 and 15 percentage points)</dd>
+          <dt>3, 6</dt><dd>minimum events before asking / proposing</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>A question or proposal appears as a card in the assistant's Supervisor tab. Two extra rules: only one priority question is open at a time, and a topic the user answered or dismissed is not raised again for 6 feedback events. Each step of this decision is shown in the thinking timeline.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Two conditions, size and evidence, so the supervisor is not triggered by one unusual choice (small \(n\)) or by tiny, meaningless gaps. Asking needs less evidence than proposing because a question costs the user little and gathers information, while a proposal suggests changing their goal. The escalation (quiet, then ask, then propose) follows the project's principle that the agent manages learning but never decides for the user.</p></div>
+      </div>
+
+      <div class="card" id="e52">
+        <div class="card-head"><h3><span class="no">5.2</span>The question and the proposal</h3><span class="src">policy._resolve_conflict</span></div>
+        <div class="m">\[ j = \arg\max_{k \ne k^*,\ \operatorname{sign}\Delta_k \ne \operatorname{sign}\Delta_{k^*}} |\Delta_k| \qquad w'_{k^*} = \tfrac{1}{2}(w_{k^*} + o_{k^*}),\ \ w'_k = w_k \ (k \ne k^*),\ \ w' \leftarrow \frac{w'}{\sum_k w'_k} \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(j\)</dt><dd>the value to compare \(k^*\) against in the question: the one moving the other way the most (ties by stated weight)</dd>
+          <dt>\(w'\)</dt><dd>the proposed new goal</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>The question is "When \(k^*\) and \(j\) pull in different directions, which usually wins for you?". The proposal shows \(w'\) and a counterfactual: the top five under \(w'\) next to the current top five, so the user sees which recipes would enter or leave before deciding. Accept saves \(w'\) as a new goal version (4.5).</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>The question pairs the two values that are trading off against each other, which is exactly the trade-off the user's behaviour suggests. The proposal moves halfway, not all the way, because the observed weights are an estimate: a cautious step can be checked and repeated if the gap persists, while a full jump could overshoot. Showing the counterfactual makes the consequence of accepting concrete.</p></div>
+      </div>
+
+      <div class="card" id="e53">
+        <div class="card-head"><h3><span class="no">5.3</span>Taste conflict</h3><span class="src">policy._taste_conflicts</span></div>
+        <div class="m">\[ L^0_c &gt; 0 \ \ \text{and}\ \ \theta_c &lt; 0.40 \ \ \text{and}\ \ L_c + D_c \ge 2 \ \ \Rightarrow\ \ \text{ask "Do you still want } c \text{ as a preference?"} \]</div>
+        <div class="lbl">Symbols</div>
+        <dl class="sym">
+          <dt>\(L^0_c &gt; 0\)</dt><dd>the user declared this cuisine or ingredient as a liking</dd>
+          <dt>\(\theta_c &lt; 0.40\)</dt><dd>the learned taste has dropped clearly below neutral</dd>
+          <dt>\(L_c + D_c \ge 2\)</dt><dd>at least two votes of real feedback, so it is not one accidental click</dd>
+        </dl>
+        <div class="how"><div class="lbl">How the app uses it</div>
+          <p>If the user answers "No", the liking is removed from the profile (new profile version). If "Yes", nothing is removed and the topic cools down for 6 events.</p></div>
+        <div class="why"><div class="lbl">Why this formula</div>
+          <p>Tastes change, and a declared liking that keeps being rejected is probably outdated. With 2 declared likes, it takes four "not my taste" rejections to fall below 0.40 (3.1 example), so the question only appears after a consistent pattern. The system asks instead of silently deleting the preference, because only the user can change what they declared.</p></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ 6 -->
+    <section id="events">
+      <div class="eyebrow">6 · <span class="src">learner.py · Learner.apply</span></div>
+      <h2>Which equation each event runs</h2>
+      <p>The user model is never edited directly. Every action is stored in an append-only event log, and the model is the result of replaying that log in order. That is why every number on Insights can be traced to the events that produced it.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Event</th><th>Taste model</th><th>Value model</th><th>Saved versions</th></tr></thead>
+        <tbody>
+          <tr><td>Onboarding (<code>profile_created</code>)</td><td>declared counts (3.3), liked dishes (3.2)</td><td>\(o = w\), \(n = 0\)</td><td>profile v1, goal v1</td></tr>
+          <tr><td>Like, save</td><td>3.2</td><td>none</td><td>none</td></tr>
+          <tr><td>I'll cook this</td><td>3.2</td><td>4.1 with 4.2</td><td>none</td></tr>
+          <tr><td>Not for me: "not my taste", "had it recently"</td><td>3.2</td><td>none</td><td>none</td></tr>
+          <tr><td>Not for me with a value reason</td><td>none</td><td>4.1 with 4.3</td><td>none</td></tr>
+          <tr><td>Answer a trade-off question</td><td>none</td><td>4.1 with 4.4</td><td>none</td></tr>
+          <tr><td>Answer a taste question "No"</td><td>none</td><td>none</td><td>new profile version</td></tr>
+          <tr><td>Save as goal, accept a proposal</td><td>none</td><td>4.5</td><td>new goal version</td></tr>
+          <tr><td>Dismiss a question or proposal</td><td>none</td><td>none</td><td>none (topic cools down)</td></tr>
+          <tr><td>Edit profile</td><td>declare new concepts only (3.3)</td><td>none</td><td>new profile version</td></tr>
+          <tr><td>Correct a taste on Insights</td><td>3.3</td><td>none</td><td>none</td></tr>
+          <tr><td>Apply sliders, meal selector, chat filters</td><td>none</td><td>none</td><td>none (this list only)</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ============================================================ 7 -->
+    <section id="params">
+      <div class="eyebrow">7</div>
+        <h2>Parameters and why each value</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Symbol</th><th>Value</th><th>Role</th><th>Why this value</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>\(\tau\)</td><td class="n">0.25</td><td>taste share of utility</td><td>breaks ties without overriding the user's values</td><td><code>__init__.py</code></td></tr>
+            <tr><td>\(\eta\)</td><td class="n">1.0</td><td>value learning rate</td><td>one clear choice ≈ 5–10 points</td><td><code>learner.PARAMS</code></td></tr>
+            <tr><td>\(\nu\)</td><td class="n">0.2</td><td>reason bonus, answer step</td><td>explicit words count, but less than a strong choice</td><td><code>learner.PARAMS</code></td></tr>
+            <tr><td>\(\varepsilon\)</td><td class="n">0.05</td><td>anchor to stated goal</td><td>a priority can shrink but never vanish</td><td><code>learner.PARAMS</code></td></tr>
+            <tr><td>—</td><td class="n">5</td><td>confidence constant</td><td>50 % after five informative events</td><td><code>learner.PARAMS</code></td></tr>
+            <tr><td>\(L^0, D^0\)</td><td class="n">2</td><td>declared like / dislike</td><td>matters from day one, can be overturned</td><td><code>learner.PARAMS</code></td></tr>
+            <tr><td>\(T\)</td><td class="n">6</td><td>weight of a correction</td><td>holds against a few contrary clicks</td><td><code>TasteModel.override</code></td></tr>
+            <tr><td>\(\kappa, n_0\)</td><td class="n">0.5, 4</td><td>extended-mode prior, blend</td><td>history takes over after a handful of events</td><td><code>preference.py</code></td></tr>
+            <tr><td>\(d\)</td><td class="n">0.3</td><td>default diversity</td><td>avoids near-duplicates, keeps utility order mostly</td><td><code>engine.py</code></td></tr>
+            <tr><td>—</td><td class="n">0.10 / 3</td><td>ask: gap / events</td><td>a noticeable gap with some evidence</td><td><code>policy.THRESHOLDS</code></td></tr>
+            <tr><td>—</td><td class="n">0.15 / 6</td><td>propose: gap / events</td><td>a clear, repeated pattern</td><td><code>policy.THRESHOLDS</code></td></tr>
+            <tr><td>—</td><td class="n">0.40 / 2</td><td>taste conflict</td><td>clearly below neutral, not one click</td><td><code>policy.THRESHOLDS</code></td></tr>
+            <tr><td>—</td><td class="n">6</td><td>cooldown in feedback events</td><td>respects a "no" without forgetting the topic</td><td><code>policy.THRESHOLDS</code></td></tr>
+          </tbody>
+        </table></div>
+        <p class="muted">All values are exposed at <code>GET /api/system</code>. They are design choices for a transparent demo and should be calibrated with simulated or real users before an evaluation.</p>
+      </section>
+
+      <footer>Part III of the FoodRec Complete Guide, written from the code on branch <code>three-criteria-hummus</code> (FoodRec 0.3.0).</footer>
+    </main>
+  </div>
+
+    
+    <footer>Written from the code on branch <code>three-criteria-hummus</code> (FoodRec 0.3.0). Parameters are design choices that still need calibration with users.</footer>
+  </main>
+</div>
+<script>
+const K = ["h", "s", "t"];
+const NAME = { h: "Healthiness", s: "Sustainability", t: "Convenience" };
+const COL = { h: "var(--c-h)", s: "var(--c-s)", t: "var(--c-t)" };
+const STATED = { h: 0.4, s: 0.4, t: 0.2 };
+const DISHES = [
+  { name: "Lentil and spinach soup", h: 0.82, s: 0.88, t: 0.42 },
+  { name: "Quick tomato pasta", h: 0.55, s: 0.74, t: 0.92 },
+  { name: "Grilled salmon with greens", h: 0.86, s: 0.52, t: 0.58 },
+  { name: "Beef and bean chilli", h: 0.61, s: 0.18, t: 0.33 },
+  { name: "Chickpea salad wrap", h: 0.74, s: 0.81, t: 0.75 },
+];
+const CHOOSE = { "": "no reason", health: "it is healthy", climate: "it is climate-friendly", easy: "it is easy" };
+const REJECT = { not_healthy_enough: "not healthy enough", not_sustainable: "not sustainable", too_complicated: "too complicated" };
+const CR = { health: "h", climate: "s", easy: "t" }, RR = { not_healthy_enough: "h", not_sustainable: "s", too_complicated: "t" };
+let o, n, log;
+const mean = (k) => DISHES.reduce((a, d) => a + d[k], 0) / DISHES.length;
+const pct = (x) => Math.round(x * 100) + "%";
+
+function apply(d) {
+  const x = {}; let tot = 0;
+  for (const k of K) { x[k] = o[k] * Math.exp(d[k] || 0); tot += x[k]; }
+  for (const k of K) o[k] = 0.95 * x[k] / tot + 0.05 * STATED[k];
+  n++;
+}
+function choose(i, reason) {
+  const dish = DISHES[i], d = {};
+  for (const k of K) d[k] = dish[k] - mean(k);
+  const k = CR[reason];
+  let note = "";
+  if (k && d[k] > 0) d[k] += 0.2; else if (k) note = " (reason ignored: the dish is not better on it)";
+  apply(d);
+  say(`Chose <b>${dish.name}</b>${reason ? ` because ${CHOOSE[reason]}` : ""}${note}`);
+}
+function reject(i, reason) {
+  const dish = DISHES[i], k = RR[reason], d = mean(k) - dish[k];
+  if (d <= 0) { say(`Rejected <b>${dish.name}</b> as ${REJECT[reason]}, but it is not worse on that than the others, so nothing moves`); return render(); }
+  apply({ [k]: d });
+  say(`Rejected <b>${dish.name}</b>: ${REJECT[reason]}`);
+}
+function say(t) { log.unshift(t); render(); }
+
+function agent() {
+  let best = null;
+  for (const k of K) { const g = o[k] - STATED[k]; if (!best || Math.abs(g) > Math.abs(best.g)) best = { k, g }; }
+  const a = Math.abs(best.g), el = document.getElementById("agent");
+  const other = K.filter((k) => k !== best.k).sort((x, y) => (o[x] - STATED[x]) - (o[y] - STATED[y]))[0];
+  if (a >= 0.15 && n >= 6) {
+    const nw = (STATED[best.k] + o[best.k]) / 2;
+    el.className = "agent-box propose";
+    el.innerHTML = `<b>Supervisor proposes:</b> your choices weigh ${NAME[best.k].toLowerCase()} at ${pct(o[best.k])} but your goal says ${pct(STATED[best.k])}. Move it to ${pct(nw)}? It shows which recipes would change first; you accept or keep your goal.`;
+  } else if (a >= 0.10 && n >= 3) {
+    el.className = "agent-box ask";
+    el.innerHTML = `<b>Supervisor asks:</b> "When ${NAME[best.k].toLowerCase()} and ${NAME[other].toLowerCase()} pull in different directions, which usually wins for you?"`;
+  } else {
+    el.className = "agent-box";
+    el.innerHTML = `<b>Supervisor stays quiet.</b> Largest gap ${Math.round(a * 100)} points after ${n} event${n === 1 ? "" : "s"} (asks at 10 points after 3, proposes at 15 after 6).`;
+  }
+}
+
+function render() {
+  document.getElementById("bars").innerHTML = K.map((k) => {
+    const g = o[k] - STATED[k];
+    return `<div class="bar-row" style="--c:${COL[k]}"><span class="lab"><span class="sw"></span>${NAME[k]}</span>
+      <div class="track"><div class="obs" style="width:${o[k] * 100}%"></div><div class="st" style="left:calc(${STATED[k] * 100}% - 1px)"></div></div>
+      <span class="gap">${g >= 0 ? "+" : "−"}${Math.abs(Math.round(g * 100))} pts</span></div>`;
+  }).join("");
+  const match = 1 - 0.5 * K.reduce((a, k) => a + Math.abs(STATED[k] - o[k]), 0);
+  document.getElementById("m").textContent = pct(match);
+  document.getElementById("c").textContent = pct(n / (n + 5));
+  document.getElementById("n").textContent = n;
+  document.getElementById("log").innerHTML = log.length ? log.slice(0, 12).map((t) => `<div>${t}</div>`).join("") : "<div>No feedback yet.</div>";
+  agent();
+}
+
+function build() {
+  document.getElementById("dishes").innerHTML = DISHES.map((d, i) => `<tr>
+    <td>${d.name}</td><td class="n">${d.h.toFixed(2)}</td><td class="n">${d.s.toFixed(2)}</td><td class="n">${d.t.toFixed(2)}</td>
+    <td><div class="acts">
+      <select id="cr${i}" aria-label="Reason for choosing ${d.name}">${Object.entries(CHOOSE).map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+      <button class="go" type="button" data-c="${i}">Choose</button>
+      <select id="rr${i}" aria-label="Reason for rejecting ${d.name}">${Object.entries(REJECT).map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+      <button type="button" data-r="${i}">Reject</button>
+    </div></td></tr>`).join("");
+  document.getElementById("dishes").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.c) choose(+b.dataset.c, document.getElementById("cr" + b.dataset.c).value);
+    if (b.dataset.r) reject(+b.dataset.r, document.getElementById("rr" + b.dataset.r).value);
+  });
+}
+function reset() { o = { ...STATED }; n = 0; log = []; render(); }
+document.getElementById("reset").addEventListener("click", reset);
+build(); reset();
+</script>
+
+</body></html>

@@ -83,6 +83,7 @@ function userMenu(anchor) {
       { onclick: () => { close(); location.hash = "#/dishes"; } }) : null,
     can("configure") ? item("tool", "Config", mode === "demo" ? "Every setting, read-only in the demo" : "Model, dataset, criteria, roles, study",
       { href: "/config" }) : null,
+    item("info", "How FoodRec works", "The complete guide: concepts and every equation", { href: "/guide", target: "_blank", rel: "noopener" }),
   ].filter(Boolean);
   let account = null;
   let input = null;

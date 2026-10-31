@@ -255,6 +255,14 @@ def create_app(settings=None, llm=None):
     def index():
         return FileResponse(WEB / "index.html", headers={"Cache-Control": "no-cache"})
 
+    @api.get("/guide", include_in_schema=False)
+    def guide_page():
+        """The complete guide (concepts and every equation): docs/guide/index.html."""
+        path = ROOT / "docs" / "guide" / "index.html"
+        if not path.exists():
+            raise HTTPException(404, "the guide is not installed (docs/guide/index.html)")
+        return FileResponse(path, headers={"Cache-Control": "no-cache"})
+
     @api.get("/config", include_in_schema=False)
     def config_page():
         """The Config page, separate from the app (open it with `foodrec config open`)."""

@@ -26,6 +26,26 @@ accounts, and exports one standard record per user.
 * Sign-in for everyone, generated participant accounts, a standard **export** for analysis, and scripted
   **scenarios** for reproducible tests.
 
+## Author
+
+**AmirMohammad Nouri** · [GitHub](https://github.com/AmirMohammad-Nouri)
+
+## The complete guide
+
+**[FoodRec: how it works, how it learns, and the math](https://amirmohammad-nouri.github.io/agentic_recom_sys/guide/)**
+explains the system in depth, with diagrams and a live simulator:
+
+1. **How FoodRec works**: the components, from HUMMUS to the database, how five recipes are chosen, what one
+   click and one chat turn set off, and why nothing is lost.
+2. **The user and the user model**: onboarding, a session screen by screen, how taste and values are
+   learned, what every interaction changes, and when the supervisor speaks up.
+3. **Every equation, explained**: notation, criterion scores, ranking, the taste and value models, the
+   supervisor policy, which equation each event runs, and every parameter with the reason for its value.
+
+Read it online (link above), in the app (account menu → **How FoodRec works**, or
+`http://127.0.0.1:8000/guide`), or open [`docs/guide/index.html`](docs/guide/index.html) in a browser.
+This README covers installation and use; the guide covers the concepts and the mathematics.
+
 ---
 
 ## Contents
@@ -136,7 +156,7 @@ That is a complete installation. The next sections are optional.
 |---|---|
 | **Discover** | Five recipes ranked for you. Move the value sliders and **Apply** to try them on this list, or **Save as goal** to keep them as a new goal version. Choose a meal, react to dishes (Like, Save, *I'll cook this*, *Not for me* with a reason), and open *How it's scored* on any card. |
 | **Assistant** (right side, every page) | Ask in plain language: "something easy with lentils", "why is #2 first?", "compare #1 and #3", "what if I cared more about sustainability?". Every step the agent takes is shown live above the answer. The *Supervisor* tab shows its questions and proposals. |
-| **Account menu** (top right) | **My dishes**: saved for later, liked and cooked dishes. **Config** (administrator only). Sign out. |
+| **Account menu** (top right) | **My dishes**: saved for later, liked and cooked dishes. **Config** (administrator only). **How FoodRec works** (the complete guide). Sign out. |
 | **Insights** | What your choices reveal compared with your saved goal, with the evidence behind every change; taste beliefs you can correct. |
 | **Knowledge** | The knowledge graph explorer, your document library and a search tester. |
 | **Activity** | The full event log and every supervisor decision. |
@@ -360,65 +380,26 @@ User message ─▶ Supervisor agent: perceive → understand → plan → act (
 | Config and access | `appconfig.py`, `access.py`, `model_spec.py`, `study.py`, `reload.py` | config file, roles, criteria, accounts, reloading |
 | API and UI | `api.py`, `cli.py`, `web/` | FastAPI with streamed traces; a no-build ES-module front end |
 
-### Who decides what
+### In short
 
-| Decision | Made by | Can the model influence it? |
-|---|---|---|
-| Is a recipe eligible? | mandatory rules | no |
-| How is it scored and ranked? | engine (weighted utility, diversity, freshness) | no |
-| What does a message ask for? | model (JSON schema), validated; rules as fallback | yes, within fixed intents |
-| Which tools run, with which arguments? | a deterministic plan from validated fields | no |
-| Is one more lookup needed? | model, from an allowed list (limited per turn) | yes, bounded |
-| Do goal and behaviour drift apart? | policy: revealed − saved weight, fixed thresholds | no |
-| Change a saved goal or a rule? | **the user only** | no |
-| Which words the answer uses | model, validated against the evidence | yes, rejected if unsupported |
+* **Rules first.** Allergies, diets and "never include" ingredients filter recipes before anything is
+  scored; missing allergen data is never treated as safe, and rules are never relaxed automatically.
+* **Scores you can open.** Each criterion is a fixed formula from 0 to 1 (healthiness from nine nutrient
+  factors weighted by the health goal, sustainability from estimated CO₂e, convenience from the number
+  of ingredients, plus any criteria you configure).
+* **Utility.** `utility = taste_share · taste + (1 − taste_share) · Σ weight_k · score_k`; diversity,
+  freshness and the missing-data policy are applied and disclosed per recipe.
+* **Learning.** Taste is counted from likes and dislikes; the weights a user's choices reveal are tracked
+  next to the saved goal, which only the user changes.
+* **The supervisor** asks a question when the gap between the two reaches 0.10 after 3 events and proposes
+  a change at 0.15 after 6 events, one topic at a time and always with the evidence.
+* **The model** classifies messages and phrases answers; it never ranks, and its wording is checked
+  against the evidence.
 
-### Scores and utility
-
-Every recipe has a score from 0 to 1 per criterion, each a fixed formula you can open on the card:
-
-| Criterion | How it is computed |
-|---|---|
-| Healthiness | nine nutrient factors per 100 g (energy, fats, sugars, sodium, cholesterol, fibre, protein share, FSA score), weighted by the user's health goal |
-| Sustainability | kg CO₂e per kg of dish from ingredient amounts and food-group factors (Poore & Nemecek 2018), log scale |
-| Convenience | number of ingredients: 3 or fewer → 1, 15 or more → 0 |
-| Taste match | learned from likes and rejections; a fixed share of the utility, not a slider |
-
-`utility = taste_share · taste + (1 − taste_share) · Σ weight_k · score_k` (taste share 0.25 by default).
-Allergies, diets and "never include" ingredients filter recipes before ranking; missing allergen data is
-never treated as safe, and rules are never relaxed automatically. Missing scores are handled openly
-(the other weights are scaled up for that recipe and the card says so). Diversity keeps a list varied;
-fatigue and variety across lists keep the lists fresh over days. Criteria can be replaced or added in
-the config.
-
-### The supervisor's monitoring loop
-
-After every reaction, the supervisor compares the saved goal with the weights the user's choices reveal:
-
-* a gap of **0.10** after **3** events → a targeted question ("when convenience and healthiness pull in
-  different directions, which usually wins?"), recorded as evidence;
-* a gap of **0.15** after **6** events → a proposal to move the weight halfway, with a preview of which
-  recipes would change; *Update my goal*, *Only today*, or *Keep my goal*;
-* one question at a time, and a pause of 6 events on a topic the user just answered.
-
-"Keep my goal" keeps the goal and what was learned; the supervisor only speaks again if the choices drift
-further. Full specification: [docs/supervisor.md](docs/supervisor.md), [docs/user-model.md](docs/user-model.md).
-
-### Transparency
-
-| Question | Where it is answered |
-|---|---|
-| Why this recipe? | card → *How it's scored*: the factors, the footprint by ingredient, the ingredient count |
-| What drove the rank? | score × weight = contribution; utility rank vs. final rank; diversity and freshness effects |
-| Where does a belief come from? | Insights: every update with its event; assistant: "what do you know about me?" |
-| What would change? | live preview while moving sliders; "what if …?" in the assistant |
-| What changed? | banner after each change: recipes entered, left and moved, and the main driver |
-| How did the agent work? | the live trace in every answer; the Supervisor tab; Activity |
-
-The knowledge graph (`Recipe`, `Ingredient`, `Cuisine`, `User`, `Interaction`, `Goal`, `Decision` …) is a
-projection of the catalogue and the event log, queried through fixed templates (by time, place, meal,
-food, decision). Retrieval combines BM25 and vector search with reciprocal rank fusion; every hit shows
-both ranks. Details: [docs/architecture.md](docs/architecture.md), [docs/features.md](docs/features.md).
+Every formula, threshold and parameter, with the reason for each value, is in the
+[complete guide](#the-complete-guide). Specifications: [docs/supervisor.md](docs/supervisor.md),
+[docs/user-model.md](docs/user-model.md), [docs/features.md](docs/features.md),
+[docs/architecture.md](docs/architecture.md).
 
 ---
 
@@ -482,6 +463,7 @@ data/
   knowledge/                method notes the assistant cites
   examples/                 template for your own recipes
 docs/                       configuration, deployment, architecture, supervisor, user model, features
+  guide/index.html          the complete guide (concepts and every equation)
 tests/
 ```
 
