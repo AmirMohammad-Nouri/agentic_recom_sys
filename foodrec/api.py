@@ -10,6 +10,7 @@ import logging
 import os
 import queue
 import re
+import sys
 import threading
 import time
 import uuid
@@ -28,11 +29,11 @@ from .agent import Supervisor
 from .agent import policy
 from .agent.trace import Trace
 from .appconfig import (ASSIGNMENT, FIELDS, REGISTRATION, ROOT, SECTIONS, AppConfig, criteria_catalog,
-                        feature_catalog)
+                        feature_catalog, secure)
 from .config import load_settings
 from .export import export, to_json, to_zip
 from .model_spec import KINDS
-from .study import admin_link_token, check_password, generate, validate_study
+from .study import admin_link_token, check_password, credential_fp, generate, validate_study
 
 BOOT_ID = uuid.uuid4().hex[:12]  # changes on every (re)start; the Config page waits for a new one
 from .features import breakdown, health_grade
@@ -116,19 +117,33 @@ def create_app(settings=None, llm=None):
             raise HTTPException(403, f"not available for the role '{acc['role']}' ({', '.join(missing)})")
         return acc
 
+    # ---- who is asking: depends on server.mode -------------------------------------------
+    #   local  everyone signs in (the administrator account or a participant account)
+    #   demo   no sign-in; each browser is a visitor ("visitor-<12 hex>") who picks the admin or
+    #          the user view; the Config page is read-only and nothing can be administered
+    #   open   no sign-in; the browser names the user (X-User). Development and tests only.
+    VISITOR_RE = re.compile(r"^visitor-[0-9a-f]{12}$")
+
+    def mode():
+        return getattr(core.s, "server_mode", "open")
+
     def login_required():
-        return bool(core.cfg.study.get("login_required"))
+        return mode() == "local"
 
     def session_user(request):
         auth = request.headers.get("authorization") or ""
-        return core.sessions.user(auth[7:]) if auth.lower().startswith("bearer ") else None
+        return core.sessions.user(auth[7:], core.cfg) if auth.lower().startswith("bearer ") else None
 
     def who(request):
-        """The user making the request: the signed-in user, or (without required login) the
-        X-User header the browser sends."""
+        """The user making the request."""
+        if mode() == "demo":
+            uid = request.headers.get("x-user") or ""
+            return uid if VISITOR_RE.match(uid) else None
         return session_user(request) or (None if login_required() else request.headers.get("x-user"))
 
     def admin_token_ok(request):
+        if mode() == "demo":
+            return False  # nothing can be administered on a demo server
         tok = request.headers.get("x-admin-token")
         if not tok:
             return False
@@ -141,50 +156,97 @@ def create_app(settings=None, llm=None):
         uid = who(request)
         return need(uid, *features) if uid else None
 
-    def admin(request):
+    def admin(request, write=False):
         """The Config page and study administration: the admin token (FOODREC_ADMIN_TOKEN, or the
-        link printed by `foodrec config open`), or a signed-in user / X-User with 'configure'.
-        With FOODREC_ADMIN_TOKEN set, X-User alone is not trusted."""
+        link printed by `foodrec config open`) or a signed-in user whose role has 'configure'. In
+        demo mode the admin view may look (read-only) and nothing may be changed (`write`)."""
+        if mode() == "demo":
+            uid = who(request)
+            if not uid or not core.access(uid)["features"]["configure"]:
+                raise HTTPException(403, "switch to the admin view (account menu) to see the Config page")
+            if write:
+                raise HTTPException(403, "this is a demo: settings can't be changed here. Clone the project "
+                                         "to configure your own copy.")
+            return uid
         if admin_token_ok(request):
-            return
+            return None
         uid = session_user(request) or (None if (login_required() or os.environ.get("FOODREC_ADMIN_TOKEN"))
                                         else request.headers.get("x-user"))
         if not uid:
-            raise HTTPException(401, "sign in as an administrator, or open the link from `foodrec config open`")
+            raise HTTPException(401, "sign in as the administrator, or open the link from `foodrec config open`")
         if not core.access(uid)["features"]["configure"]:
-            raise HTTPException(403, "only a role with the 'configure' feature can do this")
+            raise HTTPException(403, "only the administrator can do this")
+        return uid
 
-    # With login required, every user-scoped call must come from that user (or an admin), and
-    # the other data endpoints need a signed-in user.
+    # ---- simple attempt limits (sign-in everywhere; visitors and chat in the demo) ------------
+    limits = {}
+
+    def over_limit(key, n, seconds):
+        now = time.time()
+        hits = [t for t in limits.get(key, []) if t > now - seconds]
+        if len(hits) >= n:
+            limits[key] = hits
+            return True
+        limits[key] = hits + [now]
+        return False
+
+    # Every user-scoped call must come from that user (or an admin); other data endpoints need a
+    # signed-in user (local) or a visitor id (demo).
     OPEN_API = ("/api/system", "/api/login", "/api/session", "/api/logout")
 
     @api.middleware("http")
     async def _require_login(request: Request, call_next):
         path = request.url.path
-        if path.startswith("/api/") and not path.startswith(OPEN_API) and not path.startswith("/api/config") \
-                and not path.startswith(("/api/admin", "/api/export")) and login_required() and not admin_token_ok(request):
+        guarded = path.startswith("/api/") and not path.startswith(OPEN_API) and \
+            not path.startswith(("/api/config", "/api/admin", "/api/export"))
+        m = re.match(r"^/api/users/([^/]+)/", path)
+        if guarded and login_required() and not admin_token_ok(request):
             uid = session_user(request)
             if not uid:
                 return JSONResponse({"error": "please sign in", "login_required": True}, status_code=401)
-            m = re.match(r"^/api/users/([^/]+)/", path)
             if m and unquote(m.group(1)) != uid and not core.access(uid)["features"]["configure"]:
                 return JSONResponse({"error": "you can only use your own account"}, status_code=403)
+        if guarded and mode() == "demo":
+            uid = who(request)
+            if not uid or (m and unquote(m.group(1)) != uid):
+                return JSONResponse({"error": "demo visitors can only use their own visitor id"}, status_code=403)
+            ip = request.client.host if request.client else "?"
+            if path.endswith("/onboard") and over_limit(("onboard", ip), 20, 3600):
+                return JSONResponse({"error": "too many new visitors from this address; try again later"}, status_code=429)
+            if path.endswith("/chat") and over_limit(("chat", uid), 30, 3600):
+                return JSONResponse({"error": "the demo allows 30 assistant messages per hour"}, status_code=429)
         return await call_next(request)
 
     # ---- sign-in ------------------------------------------------------------------------------
     @api.post("/api/login")
-    def login(body: dict = Body(...)):
+    def login(request: Request, body: dict = Body(...)):
+        if mode() == "demo":
+            raise HTTPException(400, "the demo has no sign-in")
         user, pw = (body.get("username") or "").strip(), body.get("password") or ""
+        ip = request.client.host if request.client else "?"
+        if over_limit(("login", ip), 10, 300):
+            raise HTTPException(429, "too many sign-in attempts; wait a few minutes")
         if not check_password(core.cfg, user, pw):
             raise HTTPException(401, "unknown username or wrong password")
         core.store.ensure_user(user)
-        return {"token": core.sessions.issue(user), "user_id": user, "access": core.access(user)}
+        return {"token": core.sessions.issue(user, credential_fp(core.cfg, user)), "user_id": user,
+                "access": core.access(user)}
 
     @api.get("/api/session")
     def session(request: Request):
-        uid = session_user(request)
-        return {"user_id": uid, "login_required": login_required(),
-                "participants": len(core.cfg.study.get("participants") or [])}
+        uid = who(request) if mode() == "demo" else session_user(request)
+        return {"user_id": uid, "mode": mode(), "login_required": login_required(),
+                "view": core.demo_views.get(uid, "user") if mode() == "demo" else None}
+
+    @api.post("/api/demo/view")
+    def demo_view(request: Request, body: dict = Body(...)):
+        """Demo only: see the app as the administrator or as a user."""
+        if mode() != "demo":
+            raise HTTPException(404, "only on a demo server")
+        uid = who(request)
+        if not uid:
+            raise HTTPException(400, "no visitor id")
+        return core.set_demo_view(uid, body.get("view"))
 
     # ---- web ----------------------------------------------------------------------------
     api.mount("/static", _RevalidatedStatic(directory=WEB), name="static")
@@ -202,7 +264,7 @@ def create_app(settings=None, llm=None):
     @api.get("/api/system")
     def system():
         return {**core.system(), "skills": sup.skills.catalog(), "thresholds": policy.THRESHOLDS,
-                "boot_id": BOOT_ID, "pid": os.getpid(), "login_required": login_required(),
+                "boot_id": BOOT_ID, "pid": os.getpid(), "login_required": login_required(), "mode": mode(),
                 "restarting": getattr(core, "restarting", False)}
 
     def _brief(r):
@@ -392,7 +454,7 @@ def create_app(settings=None, llm=None):
     @api.get("/api/users/{uid}/export")
     def export_own(uid: str, format: str = "json"):
         need(uid, "export_own")
-        return _download(export(core, [uid]), format, f"foodrec-{uid}")
+        return _download(export(core, [uid]), format, export_stem([uid]))
 
     # ---- supervisor chat --------------------------------------------------------------------------
     @api.get("/api/users/{uid}/messages")
@@ -486,12 +548,23 @@ def create_app(settings=None, llm=None):
                 return str(v)
         return v
 
+    def _no_hash(d):
+        """The config without the administrator's password hash (it is kept on save, see put_config)."""
+        d = json.loads(json.dumps(d))
+        adm = (d.get("access") or {}).get("admin")
+        if isinstance(adm, dict):
+            adm["password_set"] = bool(adm.pop("password_hash", None))
+            adm.pop("password", None)
+        return d
+
     def config_view():
         cfg = core.cfg
         st = core.llm.status() if hasattr(core.llm, "status") else {}
+        demo = mode() == "demo"
         return {
             "path": str(cfg.path) if cfg.path else None, "exists": bool(cfg.path and Path(cfg.path).exists()),
-            "version": cfg.version, "raw": cfg.raw, "effective": cfg.data, "errors": cfg.errors,
+            "version": cfg.version, "raw": _no_hash(cfg.raw), "effective": _no_hash(cfg.data), "errors": cfg.errors,
+            "mode": mode(), "read_only": demo,
             "sections": SECTIONS,
             "fields": [{**{k: v for k, v in f.items() if k != "attr"}, "running": _shown(getattr(core.s, f["attr"])),
                         "file_value": cfg.value(f["section"], f["key"]), "source": core.s.sources.get(f["attr"]),
@@ -506,9 +579,9 @@ def create_app(settings=None, llm=None):
                            "source": foodrec.MODEL_SPEC_SOURCE},
             "field_kinds": list(KINDS), "boot_id": BOOT_ID, "numeric_fields": core.numeric_fields(),
             # which key variables are set (never their values)
-            "api_keys": {**{n: True for n in os.environ if n.endswith(("_API_KEY", "_TOKEN"))},
-                         **{n: bool(os.environ.get(n)) for n in
-                            {core.s.llm_api_key_env or "", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"} if n}},
+            "api_keys": {} if demo else {**{n: True for n in os.environ if n.endswith(("_API_KEY", "_TOKEN"))},
+                                         **{n: bool(os.environ.get(n)) for n in
+                                            {core.s.llm_api_key_env or "", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"} if n}},
         }
 
     @api.get("/api/config")
@@ -524,8 +597,16 @@ def create_app(settings=None, llm=None):
     @api.put("/api/config")
     def put_config(request: Request, body: dict = Body(...)):
         """Write the config file and apply what can change without a restart."""
-        admin(request)
-        new = core.cfg.save(body.get("config") or {})
+        admin(request, write=True)
+        data = body.get("config") or {}
+        # the page never receives the password hash: keep it unless a new password was typed or the
+        # administrator was renamed
+        adm, cur = (data.get("access") or {}).get("admin"), core.cfg.admin_account()
+        if isinstance(adm, dict) and cur and not adm.get("password") and adm.get("username") == cur.get("username"):
+            adm["password_hash"] = cur.get("password_hash")
+        if isinstance(adm, dict):
+            adm.pop("password_set", None)
+        new = core.cfg.save(data)
         pending = core.apply_config(new)
         log.info("config saved to %s (%d setting(s) need a restart)", new.path, len(pending))
         w = getattr(core, "watcher", None)
@@ -538,7 +619,7 @@ def create_app(settings=None, llm=None):
     def set_secret(request: Request, body: dict = Body(...)):
         """Store an API key in .env (never in the config file) and use it at once.
         {"name": "OPENAI_API_KEY", "value": "sk-..."}; value null removes it."""
-        admin(request)
+        admin(request, write=True)
         from . import config as cfgmod
         out = cfgmod.set_dotenv(body.get("name"), body.get("value"), cfgmod.DOTENV)
         if hasattr(core.llm, "_status"):
@@ -566,7 +647,7 @@ def create_app(settings=None, llm=None):
 
     @api.post("/api/config/restart")
     def restart_now(request: Request):
-        admin(request)
+        admin(request, write=True)
         w = getattr(core, "watcher", None)
         if not w:
             raise HTTPException(409, "the app was not started with `foodrec serve`, so it cannot restart itself")
@@ -576,9 +657,11 @@ def create_app(settings=None, llm=None):
 
     @api.get("/api/admin/users")
     def admin_users(request: Request):
-        admin(request)
+        me = admin(request)
         out = []
         for u in core.store.user_rows():
+            if mode() == "demo" and u["user_id"] != me:
+                continue  # demo visitors never see each other
             acc = core.access(u["user_id"])
             out.append({**u, "role": acc["role"], "role_source": acc["source"]})
         return {"users": out, "roles": {k: v.get("label", k) for k, v in core.cfg.roles.items()},
@@ -587,13 +670,25 @@ def create_app(settings=None, llm=None):
 
     @api.put("/api/admin/users/{uid}/role")
     def admin_set_role(request: Request, uid: str, body: dict = Body(...)):
-        admin(request)
+        admin(request, write=True)
         return core.set_role(uid, body["role"])
 
     @api.get("/api/export")
     def export_all(request: Request, format: str = "json", users: str = None, raw: bool = True):
-        admin(request)
-        return _download(export(core, users.split(",") if users else None, include_raw=raw), format, "foodrec-export")
+        me = admin(request)
+        ids = users.split(",") if users else None
+        if mode() == "demo":
+            ids = [me]  # a demo visitor exports only their own data
+        doc = export(core, ids, include_raw=raw)
+        return _download(doc, format, export_stem([u["user_id"] for u in doc["users"]] if ids else None))
+
+    def export_stem(user_ids):
+        """File name of an export: the user's name (foodrec-p001), a few names joined
+        (foodrec-p001-p002-p003), the count for many (foodrec-12-users), or foodrec-all-users."""
+        if not user_ids:
+            return "foodrec-all-users"
+        safe = [re.sub(r"[^A-Za-z0-9_.-]+", "_", u)[:40] for u in user_ids]
+        return "foodrec-" + ("-".join(safe) if len(safe) <= 3 else f"{len(safe)}-users")
 
     def _download(doc, fmt, stem):
         stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -614,7 +709,14 @@ def main(host=None, port=None, open_page=None):
     from .reload import ConfigWatcher
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per Ollama call is noise
-    settings = load_settings()
+    cfg = AppConfig.load()
+    if cfg.path and secure(cfg.raw)[1]:
+        cfg = cfg.save(cfg.raw)
+        log.info("administrator password stored as a hash in %s", cfg.path)
+    settings = load_settings(config=cfg)
+    if settings.server_mode == "local" and not cfg.admin_ready():
+        sys.stderr.write(ADMIN_PASSWORD_HELP.format(path=cfg.path or "foodrec.config.json"))
+        raise SystemExit(2)
     app = create_app(settings)
     core = app.state.core
     if settings.config.path:
@@ -627,6 +729,16 @@ def main(host=None, port=None, open_page=None):
         threading.Thread(target=_open_when_ready, args=(_browser_host(host), port, open_page), daemon=True).start()
     log.info("Config page: http://%s:%d/config", _browser_host(host), port)
     uvicorn.run(app, host=host, port=port)
+
+
+ADMIN_PASSWORD_HELP = """
+FoodRec needs an administrator password before it starts (server.mode is "local").
+Set it once, either with
+    foodrec admin password
+or by writing it in {path}:
+    "access": {{ "admin": {{ "username": "admin", "password": "choose-a-password" }} }}
+The app replaces the password with a hash when it starts. Then sign in with that username.
+"""
 
 
 def _browser_host(host):

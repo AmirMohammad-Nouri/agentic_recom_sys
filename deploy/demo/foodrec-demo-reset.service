@@ -1,0 +1,9 @@
+# /etc/systemd/system/foodrec-demo-reset.service - wipes the demo data (run by the timer)
+[Unit]
+Description=Reset the FoodRec demo data
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl stop foodrec-demo
+ExecStart=/bin/rm -rf /opt/foodrec/data/demo/runtime
+ExecStart=/bin/systemctl start foodrec-demo

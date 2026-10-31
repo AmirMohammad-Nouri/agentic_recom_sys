@@ -56,6 +56,7 @@ class App:
         self.s = settings
         self.cfg = getattr(settings, "config", None) or AppConfig({})
         self.restart_pending = []
+        self.demo_views = {}  # demo mode: visitor id -> "admin" | "user"
         # what the restart-type settings were at start, as the file (not overrides) gave them
         self._started = self.resolved_settings(self.cfg)
         from .study import Sessions
@@ -127,8 +128,21 @@ class App:
 
     # ---- access roles and study registration ---------------------------------------------
     def access(self, user_id):
-        """Role, features and visible criteria of a user (see appconfig.AppConfig.access)."""
+        """Role, features and visible criteria of a user (see appconfig.AppConfig.access). In demo
+        mode the role is the view the visitor picked: the admin role or the full user role."""
+        if getattr(self.s, "server_mode", "open") == "demo":
+            from .appconfig import ADMIN_ROLE
+            if self.demo_views.get(user_id) == "admin" and ADMIN_ROLE in self.cfg.roles:
+                return self.cfg.access_for_role(ADMIN_ROLE, "demo view")
+            role = "full" if "full" in self.cfg.roles else self.cfg.data["access"].get("default_role")
+            return self.cfg.access_for_role(role, "demo view")
         return self.cfg.access(user_id, self.store.assigned_role(user_id))
+
+    def set_demo_view(self, user_id, view):
+        if view not in ("admin", "user"):
+            raise ValueError("view must be admin or user")
+        self.demo_views[user_id] = view
+        return self.access(user_id)
 
     def _is_admin(self, user_id):
         return self.access(user_id)["features"]["configure"]

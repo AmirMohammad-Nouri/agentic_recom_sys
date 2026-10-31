@@ -103,6 +103,11 @@ class ConfigWatcher(threading.Thread):
             core.config_problem = "; ".join(new.errors)
             log.warning("config file not applied: %s", core.config_problem)
             return "invalid"
+        from .appconfig import secure
+        if secure(new.raw)[1]:  # a password typed into the file: store only its hash
+            new = new.save(new.raw)
+            self._stamp = self._stat()
+            log.info("administrator password stored as a hash")
         core.config_problem = None
         if new.version == core.cfg.version and not core.restart_pending:
             return "unchanged"

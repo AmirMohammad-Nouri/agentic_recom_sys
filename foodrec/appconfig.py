@@ -122,6 +122,11 @@ FIELDS = [
     {"section": "server", "key": "host", "attr": "host", "env": "FOODREC_HOST", "type": "str", "apply": "restart",
      "label": "Host", "machine": True, "help": "127.0.0.1: this computer only. 0.0.0.0: reachable on the network "
                                               "(set FOODREC_ADMIN_TOKEN and require login then)."},
+    {"section": "server", "key": "mode", "attr": "server_mode", "env": "FOODREC_MODE", "type": "choice",
+     "options": ["local", "demo", "open"], "apply": "restart", "label": "Mode",
+     "help": "local: everyone signs in (the administrator account below, or a participant account). "
+             "demo: a public showcase; visitors switch between an admin and a user view, the Config page is "
+             "read-only and nothing can be administered. open: no sign-in at all (development and tests only)."},
     {"section": "server", "key": "port", "attr": "port", "env": "FOODREC_PORT", "type": "int", "min": 1, "max": 65535,
      "apply": "restart", "label": "Port", "machine": True},
     {"section": "server", "key": "auto_reload", "attr": "auto_reload", "env": "FOODREC_AUTO_RELOAD", "type": "bool",
@@ -199,11 +204,11 @@ def defaults():
     for f in FIELDS:
         # machine-specific settings (service addresses) are left to the environment by default
         out.setdefault(f["section"], {})[f["key"]] = None if f.get("machine") else _builtin_default(f)
-    out["access"] = {"default_role": "full", "roles": copy.deepcopy(DEFAULT_ROLES),
-                     "users": {"admin": "admin", "demo": "admin"}}
+    out["access"] = {"default_role": "full", "roles": copy.deepcopy(DEFAULT_ROLES), "users": {},
+                     # the administrator account; set "password" once, the app replaces it with a hash
+                     "admin": {"username": "admin", "password": None}}
     out["study"] = {"name": "", "description": "", "registration": "open", "max_users": None,
                     "assignment": "default", "assign_roles": ["full", "baseline"], "seed": 7,
-                    "login_required": False,
                     "population": {"size": 20, "prefix": "p", "digits": 3, "roles": {"full": 50, "baseline": 50},
                                    "shuffle": True, "seed": 7, "password_words": 2},
                     "participants": []}
@@ -222,7 +227,7 @@ _BUILTIN = {"llm_enabled": True, "ollama_url": "http://127.0.0.1:11434", "llm_mo
             "max_missing_share": 0.5, "min_nutrient_coverage": 0.6, "max_agent_steps": 3,
             "llm_provider": "ollama", "llm_base_url": "", "llm_api_key_env": "", "llm_effort": "low",
             "llm_max_tokens": 4096, "llm_fallbacks": True, "embed_provider": "ollama",
-            "host": "127.0.0.1", "port": 8000, "auto_reload": True,
+            "host": "127.0.0.1", "port": 8000, "auto_reload": True, "server_mode": "local",
             "hide_saved": True, "fatigue_per_view": 0.03, "fatigue_max": 0.12, "fatigue_half_life_days": 2.0,
             "cuisine_fatigue_per_slot": 0.01, "cuisine_fatigue_max": 0.06, "history_lists": 3,
             "discovery_slots": 0, "discovery_days": 7.0, "freshness_window_days": 14.0}
@@ -317,6 +322,18 @@ def validate(cfg):
     for uid, rn in (acc.get("users") or {}).items():
         if rn not in roles:
             errs.append(f"access.users.{uid}: role '{rn}' is not defined")
+    adm = acc.get("admin")
+    if adm is not None:
+        from .study import USERNAME_RE
+        if not isinstance(adm, dict) or not USERNAME_RE.match(str(adm.get("username") or "")):
+            errs.append("access.admin: needs a username (letters, digits, _ . -)")
+        elif ADMIN_ROLE not in roles or not role_features(roles[ADMIN_ROLE])["configure"]:
+            errs.append(f"access.admin: the role '{ADMIN_ROLE}' must exist and have the configure feature")
+        elif adm.get("password") is not None and (not isinstance(adm["password"], str) or len(adm["password"]) < 8):
+            errs.append("access.admin.password: at least 8 characters")
+        elif any(p.get("username") == adm.get("username") for p in (cfg.get("study") or {}).get("participants") or []
+                 if isinstance(p, dict)):
+            errs.append(f"study.participants: '{adm.get('username')}' is the administrator account")
     st = cfg.get("study") or {}
     if st.get("registration", "open") not in REGISTRATION:
         errs.append(f"study.registration: must be one of {', '.join(REGISTRATION)}")
@@ -398,10 +415,12 @@ class AppConfig:
         return cfg
 
     def save(self, data, path=None):
-        """Validate and write `data` to the config file. Returns the new AppConfig."""
+        """Validate and write `data` to the config file (a plaintext admin password is replaced
+        by its hash first). Returns the new AppConfig."""
         errs = validate(merge(defaults(), data))
         if errs:
             raise ValueError("; ".join(errs))
+        data, _ = secure(data)
         path = Path(path or self.path or DEFAULT_PATH)
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -430,8 +449,12 @@ class AppConfig:
         return next((p for p in self.study.get("participants") or [] if p.get("username") == username), None)
 
     def role_name(self, user_id, assigned=None):
-        """Entry in access.users > study participant > stored assignment > default role."""
+        """Administrator account > entry in access.users > study participant > stored assignment >
+        default role."""
         acc = self.data["access"]
+        adm = self.admin_account()
+        if adm and user_id == adm["username"] and ADMIN_ROLE in self.roles:
+            return ADMIN_ROLE, "administrator account"
         explicit = (acc.get("users") or {}).get(user_id)
         if explicit in self.roles:
             return explicit, "config"
@@ -443,8 +466,20 @@ class AppConfig:
         dr = acc.get("default_role")
         return (dr if dr in self.roles else next(iter(self.roles))), "default"
 
+    def admin_account(self):
+        """{"username", "password_hash"} of the administrator account, or None."""
+        adm = (self.data.get("access") or {}).get("admin")
+        return adm if isinstance(adm, dict) and adm.get("username") else None
+
+    def admin_ready(self):
+        adm = self.admin_account()
+        return bool(adm and (adm.get("password_hash") or adm.get("password")))
+
     def access(self, user_id, assigned=None):
         name, source = self.role_name(user_id, assigned)
+        return self.access_for_role(name, source)
+
+    def access_for_role(self, name, source):
         role = self.roles[name]
         feats = role_features(role)
         blocked = set(role.get("blocked_skills") or [])
@@ -458,8 +493,33 @@ class AppConfig:
                 "blocked_skills": sorted(blocked)}
 
     def sanitized(self):
-        """The effective config without anything secret (for exports and the API)."""
-        return copy.deepcopy(self.data)
+        """The effective config without anything secret (for exports): no password hash, and no
+        participant passwords."""
+        d = copy.deepcopy(self.data)
+        adm = (d.get("access") or {}).get("admin")
+        if isinstance(adm, dict):
+            adm.pop("password", None)
+            adm["password_set"] = bool(adm.pop("password_hash", None))
+        for p in (d.get("study") or {}).get("participants") or []:
+            if isinstance(p, dict) and "password" in p:
+                p["password"] = "***"
+        return d
+
+
+ADMIN_ROLE = "admin"
+
+
+def secure(data):
+    """Replace a plaintext access.admin.password with password_hash. Returns (data, changed)."""
+    adm = (data.get("access") or {}).get("admin")
+    if not isinstance(adm, dict) or not adm.get("password"):
+        return data, False
+    from .study import hash_password
+    data = copy.deepcopy(data)
+    adm = data["access"]["admin"]
+    adm["password_hash"] = hash_password(adm.pop("password"))
+    adm["password"] = None
+    return data, True
 
 
 def feature_catalog():

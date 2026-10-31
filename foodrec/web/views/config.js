@@ -3,7 +3,7 @@
 // Every section has a guide button (ⓘ) that opens a guide from /static/guides/<id>.md.
 // Saving writes the file; the server applies "live" settings at once and restarts itself
 // for the others (the page then waits for the new process and reloads).
-import { ago, api, clear, download, h, icon, sessionGet, sessionSet, toast } from "../lib.js";
+import { ago, api, clear, download, h, icon, safeSet, sessionGet, sessionSet, setDemoView, state, toast } from "../lib.js";
 import { markdown } from "../markdown.js";
 
 const TABS = [["settings", "Settings"], ["criteria", "Criteria & interactions"], ["roles", "Access roles"],
@@ -78,21 +78,44 @@ export function configView() {
       dirty = false;
       render();
     } catch (e) {
-      if (e.status === 401 || e.status === 403) return tokenForm(e.message);
+      if (e.status === 401 || e.status === 403) return accessForm(e.message);
       clear(body, h("div.empty", h("h3", "Config is not available"), h("p", e.message)));
     }
   }
 
-  function tokenForm(why) {
-    const inp = h("input", { type: "password", placeholder: "admin token", style: { width: "280px" } });
-    clear(body, h("section.card", h("div.card-body.stack",
-      h("h3", "Administrator access"),
+  // No access yet: in the demo, offer the admin view; otherwise the administrator signs in.
+  function accessForm(why) {
+    if (state.system?.mode === "demo") {
+      clear(body, h("section.card", h("div.card-body.stack",
+        h("h3", "This is the administrator's page"),
+        h("p.muted", "In the demo you can look at it from the admin view (read-only)."),
+        h("div.btn-row", h("button.btn.primary", { onclick: async () => { await setDemoView("admin"); load(); } }, "Switch to the admin view")))));
+      return;
+    }
+    const user = h("input", { type: "text", autocomplete: "username", placeholder: "Administrator username", style: { width: "260px" } });
+    const pw = h("input", { type: "password", autocomplete: "current-password", placeholder: "Password", style: { width: "260px" } });
+    const msg = h("div.small", { style: { color: "var(--danger)", minHeight: "18px" } });
+    const tok = h("input", { type: "password", placeholder: "FOODREC_ADMIN_TOKEN", style: { width: "260px" } });
+    clear(body, h("section.card", { style: { maxWidth: "520px" } }, h("div.card-body.stack",
+      h("h3", "Administrator sign-in"),
       h("p.muted", why),
-      h("p", "Open this page with ", h("span.mono", "foodrec config open"), " (its link signs you in), sign in to the app as a user with the configure feature, or enter FOODREC_ADMIN_TOKEN here. The token is kept for this browser tab only."),
-      h("div.row", inp, h("button.btn.primary", { onclick: () => { sessionSet("foodrec.admin_token", inp.value.trim()); load(); } }, "Continue")))));
+      h("form.stack", { onsubmit: async (e) => {
+        e.preventDefault();
+        try {
+          const out = await api("/api/login", { method: "POST", body: { username: user.value.trim(), password: pw.value } });
+          safeSet("foodrec.session", out.token);
+          safeSet("foodrec.user", out.user_id);
+          load();
+        } catch (err) { msg.textContent = err.message; }
+      } }, user, pw, msg, h("button.btn.primary", { type: "submit" }, "Sign in")),
+      h("details", h("summary.small.muted", "Other ways in"),
+        h("p.small", "On the computer that runs FoodRec, ", h("span.mono", "foodrec config open"), " opens this page already signed in. Or enter FOODREC_ADMIN_TOKEN (kept for this browser tab only):"),
+        h("div.row", tok, h("button.btn.sm", { onclick: () => { sessionSet("foodrec.admin_token", tok.value.trim()); load(); } }, "Continue"))))));
+    user.focus();
   }
 
-  const touch = () => { dirty = true; renderHead(); };
+  // the demo is read-only: edits stay in the page and are never saved
+  const touch = () => { if (view?.read_only) return; dirty = true; renderHead(); };
 
   async function save() {
     try {
@@ -115,10 +138,12 @@ export function configView() {
   }
 
   function renderHead() {
-    clear(head,
-      dirty ? h("span.tag.warn", "unsaved changes") : h("span.small.muted", `version ${view?.version || "–"}`),
-      h("button.btn", { disabled: !dirty, onclick: () => { draft = fromView(view); dirty = false; render(); } }, "Discard"),
-      h("button.btn.primary", { disabled: !dirty, onclick: save }, "Save to file"));
+    clear(head, view?.read_only
+      ? [h("span.tag.warn", { title: "Clone the project to configure your own copy" }, "Demo · read-only"),
+        h("button.btn", { onclick: () => { draft = fromView(view); render(); } }, "Reset the page")]
+      : [dirty ? h("span.tag.warn", "unsaved changes") : h("span.small.muted", `version ${view?.version || "–"}`),
+        h("button.btn", { disabled: !dirty, onclick: () => { draft = fromView(view); dirty = false; render(); } }, "Discard"),
+        h("button.btn.primary", { disabled: !dirty, onclick: save }, "Save to file")]);
     clear(tabsEl, TABS.map(([k, label]) => h("button" + (k === tab ? ".on" : ""), {
       onclick: () => { tab = k; sessionSet("foodrec.config_tab", k); render(); },
     }, label)));
@@ -132,9 +157,10 @@ export function configView() {
         view.exists ? "" : " (not created yet: saving creates it)",
         view.auto_reload ? " · edits to the file (here or by hand) are applied automatically" : " · automatic reload is off",
         view.admin_token ? " · protected by an admin token" : ""),
+      view.read_only ? h("div.change", h("b", "Demo: "), "this is the Config page as an administrator sees it. You can look at every setting, open the guides and try things (for example Generate participants), but nothing is saved here. To configure FoodRec, clone the project and run it on your computer.") : null,
       view.config_problem ? h("div.change.bad", h("b", "The file on disk was not applied: "), view.config_problem,
         h("div.small", "The app keeps running with the last valid configuration until the file is fixed.")) : null,
-      pending.length ? h("div.change", h("b", "Waiting for a restart: "), pending.map((p) => `${p.label} (running ${p.running}, saved ${p.saved})`).join("; "),
+      pending.length && !view.read_only ? h("div.change", h("b", "Waiting for a restart: "), pending.map((p) => `${p.label} (running ${p.running}, saved ${p.saved})`).join("; "),
         h("div", { style: { marginTop: "6px" } }, h("button.btn.sm", { onclick: async () => {
           try { const old = view.boot_id; await api("/api/config/restart", { method: "POST" }); waitForRestart(old); } catch (e) { toast(e.message, "err"); }
         } }, icon("reset"), "Restart now"))) : null,
@@ -189,6 +215,7 @@ export function configView() {
   // The key itself: written to .env (git-ignored) by the server and used at once; the config
   // file only names the variable.
   function apiKeyBox(varName) {
+    if (view.read_only) return h("div.hint", "In your own copy, the API key is pasted here and saved to .env (never to the config file).");
     const name = (varName || (provider() === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY")).trim();
     const isSet = !!view.api_keys?.[name];
     const key = h("input", { type: "password", autocomplete: "off", placeholder: isSet ? "•••••••• (set; type to replace)" : `paste the ${name} value`,
@@ -441,10 +468,7 @@ export function configView() {
       h("div.field", h("span.field-label", "Name"), h("input", { type: "text", value: st.name || "", onchange: (e) => setv(st, "name", e.target.value) }),
         h("span.hint", "Shown in the browser tab, on the sign-in page and on the registration message.")),
       h("div.field", h("span.field-label", "Description"), h("textarea", { rows: 2, value: st.description || "", onchange: (e) => setv(st, "description", e.target.value) })),
-      h("label.switch", h("input", { type: "checkbox", checked: !!st.login_required, onchange: (e) => setv(st, "login_required", e.target.checked, true) }),
-        h("b", "Participants sign in with a username and password")),
-      st.login_required && !st.participants.some((p) => acc.roles[p.role]?.features?.configure) ?
-        h("div.hint", "No participant account has an admin role: administrators open this page with ", h("span.mono", "foodrec config open"), " or FOODREC_ADMIN_TOKEN.") : null,
+      h("div.hint", "Everyone signs in (server mode \"local\"): participants with the accounts below, the administrator with the administrator account."),
       h("div.field", h("span.field-label", "Who may start"),
         h("select", { onchange: (e) => setv(st, "registration", e.target.value) },
           [["open", "Anyone with a new user id"], ["listed_only", "Only listed ids and participants"], ["closed", "Nobody new (registration closed)"]]
@@ -552,8 +576,27 @@ export function configView() {
     })();
     const newId = h("input", { type: "text", placeholder: "user id", style: { width: "160px" } });
     const newRole = h("select", roleNames.map((n) => h("option", { value: n, selected: n === acc.default_role }, label(n))));
+    // the administrator account: the password is stored as a hash when saved
+    acc.admin ||= { username: "admin" };
+    const adm = acc.admin;
+    const pw1 = h("input", { type: "password", autocomplete: "new-password", placeholder: "new password (8+ characters)", style: { width: "220px" } });
+    const pw2 = h("input", { type: "password", autocomplete: "new-password", placeholder: "again", style: { width: "220px" } });
+    const adminCard = card("Administrator account", "study",
+      h("div.field", h("span.field-label", "Username"),
+        h("input", { type: "text", value: adm.username || "", style: { width: "220px" }, onchange: (e) => setv(adm, "username", e.target.value.trim()) })),
+      h("div.small", h("span.dot." + (adm.password || adm.password_set ? "ok" : "warn")), " ",
+        adm.password ? "New password chosen; it is stored as a hash when you save." :
+        adm.password_set ? "A password is set (stored as a hash)." : "No password yet: the app does not start until one is set."),
+      view.read_only ? h("div.hint", "In your own copy you set the administrator's password here, or with: foodrec admin password") :
+        h("div.row.wrap", { style: { gap: "6px" } }, pw1, pw2, h("button.btn.sm", { onclick: () => {
+          if (pw1.value.length < 8) return toast("Use at least 8 characters", "err");
+          if (pw1.value !== pw2.value) return toast("The two passwords differ", "err");
+          adm.password = pw1.value; touch(); render(); toast("Save to file to store the new password");
+        } }, "Use this password")),
+      h("div.hint", "The administrator signs in with this account and is the only one who sees Config."));
     return h("div.stack",
       h("div.two-col", studyCard, popCard),
+      adminCard,
       partsCard,
       card("Users and fixed roles", "study",
         h("div.row.wrap", { style: { gap: "6px" } }, newId, newRole,
@@ -595,7 +638,7 @@ export function configView() {
           const errs = (await api("/api/config/validate", { method: "POST", body: { config: d } })).errors;
           clear(msg, errs.length ? h("ul", errs.map((x) => h("li", x))) : h("span.delta-up", "Valid"));
         } }, "Check"),
-        h("button.btn.primary", { onclick: () => { const d = parse(); if (d) { draft = d; dirty = true; save(); } } }, "Save this JSON"))));
+        view.read_only ? null : h("button.btn.primary", { onclick: () => { const d = parse(); if (d) { draft = d; dirty = true; save(); } } }, "Save this JSON"))));
   }
 
   window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });

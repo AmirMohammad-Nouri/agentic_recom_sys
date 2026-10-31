@@ -1,5 +1,5 @@
 // App shell: top bar, router, system status, onboarding gate.
-import { api, can, clear, h, icon, on, safeGet, safeSet, setCriteria, state, toast, track, userPath } from "./lib.js";
+import { api, can, clear, demoView, h, icon, on, safeGet, safeSet, setCriteria, setDemoView, startDemo, state, toast, track, userPath } from "./lib.js";
 import { mountDock } from "./dock.js";
 import { discoverView } from "./views/discover.js";
 import { dishesView } from "./views/dishes.js";
@@ -70,15 +70,33 @@ function systemPanel() {
   document.body.append(overlay);
 }
 
-// The account menu (the user button, top right): My dishes, and either switching the
-// pseudonymous user id or, when the study requires sign-in, who is signed in and sign out.
+// The account menu (the user button, top right): My dishes and, for administrators, Config;
+// then, by mode: signed-in user and Sign out (local), the Admin/User view switch (demo), or the
+// pseudonymous user id (open, development only).
 function userMenu(anchor) {
   const close = () => pop.remove();
-  const dishes = can("page_dishes") ? h("button.menu-item", { onclick: () => { close(); location.hash = "#/dishes"; } },
-    icon("bookmark"), h("span", h("b", "My dishes"), h("span.small.muted", { style: { display: "block" } }, "Saved for later, liked and cooked"))) : null;
+  const mode = state.system?.mode;
+  const item = (ic, title, sub, attrs) => h(attrs.href ? "a.menu-item" : "button.menu-item", attrs,
+    icon(ic), h("span", h("b", title), h("span.small.muted", { style: { display: "block" } }, sub)));
+  const top = [
+    can("page_dishes") ? item("bookmark", "My dishes", "Saved for later, liked and cooked",
+      { onclick: () => { close(); location.hash = "#/dishes"; } }) : null,
+    can("configure") ? item("tool", "Config", mode === "demo" ? "Every setting, read-only in the demo" : "Model, dataset, criteria, roles, study",
+      { href: "/config" }) : null,
+  ].filter(Boolean);
   let account = null;
   let input = null;
-  if (state.system?.login_required) {
+  if (mode === "demo") {
+    const view = demoView();
+    account = [h("div.menu-label", { style: { padding: "0 0 6px" } }, "See the app as"),
+      h("div.seg", { style: { width: "100%" } }, [["user", "User"], ["admin", "Admin"]].map(([v, t]) => h("button" + (v === view ? ".on" : ""), {
+        style: { flex: "1" },
+        onclick: async () => { if (v !== view) { await setDemoView(v); location.reload(); } },
+      }, t))),
+      h("div.hint", { style: { marginTop: "6px" } }, view === "admin"
+        ? "Admin view: everything a user sees, plus the Config page (read-only here)."
+        : "User view: what a participant with full access sees.")];
+  } else if (state.system?.login_required) {
     account = [h("div.menu-label", { style: { padding: "0 0 6px" } }, `Signed in as ${state.user}`),
       h("button.btn.sm", { onclick: () => { safeSet("foodrec.session", ""); location.reload(); } }, "Sign out")];
   } else if (can("switch_user")) {
@@ -91,18 +109,23 @@ function userMenu(anchor) {
   } else {
     account = h("div.menu-label", { style: { padding: "0" } }, `User ${state.user}`);
   }
-  if (!dishes && !account) return;
-  const pop = h("div.menu.account-menu", { style: { padding: "10px", width: "250px" } },
-    dishes, dishes ? h("div.divider", { style: { margin: "8px 0" } }) : null, account);
+  const pop = h("div.menu.account-menu", { style: { padding: "10px", width: "260px" } },
+    top, top.length ? h("div.divider", { style: { margin: "8px 0" } }) : null, account);
   document.querySelectorAll(".menu").forEach((m) => m.remove());
   document.body.append(pop);
   const r = anchor.getBoundingClientRect();
   pop.style.top = `${window.scrollY + r.bottom + 4}px`;
-  pop.style.left = `${Math.max(8, r.right - 250)}px`;
+  pop.style.left = `${Math.max(8, r.right - 260)}px`;
   input?.focus();
   setTimeout(() => document.addEventListener("click", function off(e) {
     if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("click", off); }
   }), 0);
+}
+
+function demoBanner() {
+  const b = h("div.demo-banner", h("b", "Demo"), ` · you see the app as ${demoView() === "admin" ? "the administrator" : "a user"} `,
+    "(switch in the account menu, top right) · data is reset regularly · to use FoodRec for real, clone the project and run it on your computer");
+  document.querySelector(".topbar").after(b);
 }
 
 function loginScreen(system) {
@@ -161,7 +184,11 @@ async function boot() {
   try {
     state.system = await api("/api/system");
     setCriteria(state.system.criteria_specs);
-    if (state.system.login_required) {
+    if (state.system.mode === "demo") {
+      await startDemo();
+      document.querySelector(".user-btn .uid").textContent = demoView() === "admin" ? "Admin view" : "User view";
+      demoBanner();
+    } else if (state.system.login_required) {
       const sess = await api("/api/session");
       if (!sess.user_id) { document.querySelector(".user-btn .uid").textContent = "sign in"; return loginScreen(state.system); }
       state.user = sess.user_id;
@@ -173,7 +200,7 @@ async function boot() {
     return;
   }
   renderStatus();
-  document.querySelector(".user-btn").title = "Account: My dishes" + (can("switch_user") && !state.system.login_required ? ", switch user" : "");
+  document.querySelector(".user-btn").title = "Account";
   if (state.system.study?.name) document.title = `${state.system.study.name} · FoodRec`;
   // The dock waits for onboarding: a study may assign a role without the assistant at that point.
   const dockToggle = document.querySelector(".dock-toggle");

@@ -23,7 +23,6 @@ In the JSON file:
 
 ```json
 "study": {
-  "login_required": true,
   "population": {"size": 40, "prefix": "p", "digits": 3,
                  "roles": {"full": 50, "baseline": 50},
                  "shuffle": true, "seed": 7, "password_words": 2},
@@ -31,4 +30,4 @@ In the JSON file:
 }
 ```
 
-**Security**: passwords are stored as written in the config file because you hand them out. They are access codes for a local study server, not protection for sensitive data. Keep the file private while it holds real credentials (don't commit it), and turn on sign-in plus `FOODREC_ADMIN_TOKEN` when the server is reachable from other computers.
+**Security**: passwords are stored as written in the config file because you hand them out. They are access codes for a local study server, not protection for sensitive data. Keep the file private while it holds real credentials (don't commit it). Participants always sign in (server mode `local`), and their passwords never appear in exports.

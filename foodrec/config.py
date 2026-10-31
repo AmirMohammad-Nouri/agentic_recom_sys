@@ -141,6 +141,8 @@ class Settings:
     host: str = field(default_factory=lambda: _env("FOODREC_HOST", "127.0.0.1"))
     port: int = field(default_factory=lambda: int(_env("FOODREC_PORT", 8000)))
     auto_reload: bool = field(default_factory=lambda: _flag("FOODREC_AUTO_RELOAD", True))
+    # local (everyone signs in) | demo (public showcase, read-only config) | open (no sign-in; dev/tests)
+    server_mode: str = field(default_factory=lambda: _env("FOODREC_MODE", "local"))
 
     # Where each setting came from: "default", "env", "config" or "override".
     sources: dict = field(default_factory=dict)

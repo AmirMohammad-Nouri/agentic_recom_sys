@@ -1,0 +1,6 @@
+# /etc/caddy/Caddyfile - HTTPS (automatic Let's Encrypt certificate) in front of FoodRec.
+# Replace the name with the DNS name that points at the VM's floating IP.
+foodrec-demo.example.org {
+	encode gzip
+	reverse_proxy 127.0.0.1:8000
+}

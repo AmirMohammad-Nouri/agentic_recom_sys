@@ -284,3 +284,22 @@ export function richText(text) {
   }
   return out;
 }
+
+// ---- demo mode (server.mode = "demo"): a visitor id per browser and the chosen view ------
+export function visitorId() {
+  let v = safeGet("foodrec.visitor");
+  if (!/^visitor-[0-9a-f]{12}$/.test(v || "")) {
+    v = "visitor-" + [...crypto.getRandomValues(new Uint8Array(6))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    safeSet("foodrec.visitor", v);
+  }
+  return v;
+}
+export const demoView = () => (safeGet("foodrec.view") === "admin" ? "admin" : "user");
+export async function startDemo() {
+  state.user = visitorId();
+  await api("/api/demo/view", { method: "POST", body: { view: demoView() } });
+}
+export async function setDemoView(view) {
+  safeSet("foodrec.view", view);
+  await api("/api/demo/view", { method: "POST", body: { view } });
+}

@@ -1,0 +1,16 @@
+# /etc/systemd/system/foodrec-demo.service
+[Unit]
+Description=FoodRec public demo
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+User=foodrec
+WorkingDirectory=/opt/foodrec
+Environment=FOODREC_CONFIG=/opt/foodrec/deploy/demo/demo.config.json
+ExecStart=/opt/foodrec/venv/bin/foodrec serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

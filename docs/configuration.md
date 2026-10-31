@@ -42,7 +42,7 @@ says so before loading anything; pick another port with `--port` or `server.port
 opens the browser at `/config`; if not, it starts the app and opens the page when it is ready
 (`--no-browser` prints the link only). The link carries this installation's admin token
 (`data/runtime/.admin_session`, readable only by you), so the page opens as administrator without
-choosing a user. The app itself has no link to the Config page. **Open the app** (top right of the Config
+choosing a user. In the app, only the administrator sees **Config** in the account menu. **Open the app** (top right of the Config
 page) replaces the Config page with the app in the same tab. After a restart caused by a config change,
 the app comes back as a plain server and no extra tab is opened.
 
@@ -209,10 +209,31 @@ endpoints for disabled features return 403, and the supervisor skips skills the 
 Stored request snapshots keep the full data plus an `access` record of what the user could see, so the
 export can report both.
 
-**Admin protection.** Without `FOODREC_ADMIN_TOKEN`, the server trusts the `X-User` header that the browser
-sends, so anyone who can reach the server can choose an admin id. That is fine on `127.0.0.1`. For any
-shared deployment, set `FOODREC_ADMIN_TOKEN` and turn on `study.login_required`; then only signed-in
-administrators, the token, or the `foodrec config open` link can change the configuration.
+**Who is the administrator.** In `local` mode (the default) the administrator is the account in
+`access.admin`; it signs in like everyone else and is the only one who sees Config. `FOODREC_ADMIN_TOKEN`
+and the `foodrec config open` link also open the Config page. See *Modes and sign-in* below.
+
+## Modes and sign-in
+
+`server.mode` decides who uses the app and how:
+
+| Mode | Who | Config page |
+|---|---|---|
+| `local` (default) | everyone signs in: the **administrator account** (`access.admin`) or a **participant account** (`study.participants`) | administrator only, from the account menu or `foodrec config open` |
+| `demo` | public showcase, no sign-in: each browser is a visitor and picks **User view** or **Admin view** in the account menu | admin view only, **read-only**: nothing can be saved, no API keys, no other visitors' data |
+| `open` | no sign-in; the browser names the user (switch in the account menu) | anyone whose role has `configure`; for development and automated tests only |
+
+**The administrator account.** The repository ships `"access": {"admin": {"username": "admin", "password":
+null}}`, and in `local` mode **the app does not start until a password is set**:
+
+```bash
+foodrec admin password            # asks twice, stores a hash
+```
+
+or write it once in the file (`"password": "choose-a-password"`); the app replaces it with
+`"password_hash"` when it starts or when the file changes. The Config page (Users & study →
+Administrator account) changes it the same way. Changing a password, or removing a participant, signs
+that person out at once. Sign-in attempts are limited to 10 per 5 minutes per address.
 
 ## Study settings and the study population
 
@@ -228,12 +249,11 @@ administrators, the token, or the `foodrec config open` link can change the conf
 percent per role, username prefix) and generate the accounts on the Config page (**Users & study → Create
 the study population**) or with `foodrec study generate --size 40 --role full=50 --role baseline=50
 --write`. Each account gets a readable password (`maple-river-42`); usernames, passwords and roles can be
-edited before saving, and regenerating keeps existing passwords. With `study.login_required` on,
-participants sign in with these accounts and can only use their own account:
+edited before saving, and regenerating keeps existing passwords. Participants sign in with these accounts
+and can only use their own account; they never see Config:
 
 ```json
-"study": {"login_required": true,
-          "population": {"size": 40, "prefix": "p", "digits": 3, "roles": {"full": 50, "baseline": 50},
+"study": {"population": {"size": 40, "prefix": "p", "digits": 3, "roles": {"full": 50, "baseline": 50},
                          "shuffle": true, "seed": 7, "password_words": 2},
           "participants": [{"username": "p001", "password": "maple-river-42", "role": "baseline"}, ...]}
 ```

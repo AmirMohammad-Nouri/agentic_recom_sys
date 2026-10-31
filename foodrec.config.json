@@ -35,20 +35,21 @@
     "default_diversity": 0.3,
     "default_mode": "lightweight",
     "max_missing_share": 0.5,
-    "min_nutrient_coverage": 0.6,
     "hide_saved": true,
     "fatigue_per_view": 0.03,
     "fatigue_max": 0.12,
-    "fatigue_half_life_days": 2.0,
+    "fatigue_half_life_days": 2,
     "cuisine_fatigue_per_slot": 0.01,
     "cuisine_fatigue_max": 0.06,
     "history_lists": 3,
     "discovery_slots": 0,
-    "discovery_days": 7.0,
-    "freshness_window_days": 14.0
+    "discovery_days": 7,
+    "freshness_window_days": 14,
+    "min_nutrient_coverage": 0.6
   },
   "server": {
     "host": null,
+    "mode": "local",
     "port": null,
     "auto_reload": true
   },
@@ -160,9 +161,12 @@
       }
     },
     "users": {
-      "admin": "admin",
-      "demo": "admin",
-      "p1": "full"
+      "p1": "full",
+      "p001": "baseline"
+    },
+    "admin": {
+      "username": "admin",
+      "password": null
     }
   },
   "study": {
@@ -176,9 +180,8 @@
       "baseline"
     ],
     "seed": 7,
-    "login_required": false,
     "population": {
-      "size": 20,
+      "size": 10,
       "prefix": "p",
       "digits": 3,
       "roles": {

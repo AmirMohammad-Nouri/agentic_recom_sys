@@ -1,0 +1,18 @@
+{
+  "$comment": "The public FoodRec demo: same code, this config. Visitors switch between a user and an admin view; the Config page is read-only and nothing can be administered. Used by foodrec-demo.service (see docs/deployment.md).",
+  "config_version": 1,
+  "server": {"mode": "demo", "host": "127.0.0.1", "port": 8000, "auto_reload": false},
+  "dataset": {"data_dir": "data/demo/runtime"},
+  "services": {"neo4j_uri": "", "qdrant": "memory"},
+  "llm": {"enabled": true, "provider": "ollama", "model": "qwen3.5:2b-q4_K_M", "embed_provider": "ollama"},
+  "ranking": {"discovery_slots": 1},
+  "study": {
+    "name": "FoodRec demo",
+    "description": "A public demo. Data is reset regularly.",
+    "population": {"size": 6, "prefix": "p", "digits": 3, "roles": {"full": 50, "baseline": 50},
+                   "shuffle": true, "seed": 7, "password_words": 2},
+    "participants": [
+      {"username": "p001", "password": "maple-river-42", "role": "full"},
+      {"username": "p002", "password": "cedar-oak-17", "role": "baseline"}]
+  }
+}

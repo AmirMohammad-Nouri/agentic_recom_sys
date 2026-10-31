@@ -225,7 +225,7 @@ def export(app, user_ids=None, include_raw=True, extra=None):
                               "recipes": len(app.catalogue)},
                 "llm": {"model": getattr(app.llm, "model", None), "enabled": app.s.llm_enabled,
                         "available": llm.get("available")},
-                "study": app.cfg.study, "config": app.cfg.sanitized()},
+                "study": app.cfg.sanitized()["study"], "config": app.cfg.sanitized()},
         "criteria": criteria_catalog(), "features": feature_catalog(),
         "users": [export_user(app, u, include_raw) for u in ids],
     }

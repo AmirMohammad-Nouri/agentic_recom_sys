@@ -152,7 +152,8 @@ def test_allocation_and_generation():
 
 def _study_client(tmp_path, login=True):
     cfg = defaults()
-    cfg["study"].update({"login_required": login, "participants": [
+    cfg["server"]["mode"] = "local" if login else "open"
+    cfg["study"].update({"participants": [
         {"username": "p01", "password": "maple-river-42", "role": "baseline"},
         {"username": "boss", "password": "cedar-oak-11", "role": "admin"}]})
     s = load_settings(config=AppConfig(cfg), data_dir=tmp_path, qdrant="memory", catalogue_path=FIXTURE)

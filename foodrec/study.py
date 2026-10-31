@@ -140,12 +140,24 @@ class Sessions:
     def _sig(self, body):
         return hmac.new(self.secret, body.encode(), hashlib.sha256).hexdigest()[:32]
 
-    def issue(self, username):
-        body = base64.urlsafe_b64encode(json.dumps({"u": username, "exp": int(time.time() + self.ttl)}).encode()).decode()
+    def issue(self, username, fingerprint=None):
+        """`fingerprint`: of the account's current password (credential_fp); a token stops
+        working when the password changes or the account is removed."""
+        body = base64.urlsafe_b64encode(json.dumps({"u": username, "f": fingerprint,
+                                                    "exp": int(time.time() + self.ttl)}).encode()).decode()
         return f"{body}.{self._sig(body)}"
 
-    def user(self, token):
-        """The username of a valid token, else None."""
+    def user(self, token, cfg=None):
+        """The username of a valid token, else None. With `cfg`, the token must also match the
+        account's current password (so changing it, or removing the account, signs out)."""
+        data = self._read(token)
+        if not data:
+            return None
+        if cfg is not None and data.get("f") != credential_fp(cfg, data["u"]):
+            return None
+        return data["u"]
+
+    def _read(self, token):
         try:
             body, sig = (token or "").rsplit(".", 1)
         except ValueError:
@@ -156,12 +168,47 @@ class Sessions:
             data = json.loads(base64.urlsafe_b64decode(body.encode()))
         except (ValueError, json.JSONDecodeError):
             return None
-        return data["u"] if data.get("exp", 0) > time.time() else None
+        return data if data.get("exp", 0) > time.time() and data.get("u") else None
+
+
+# ---- passwords ---------------------------------------------------------------------------------------
+PBKDF2_ITERATIONS = 200_000
+
+
+def hash_password(pw, salt=None, iterations=PBKDF2_ITERATIONS):
+    """'pbkdf2_sha256$<iterations>$<salt>$<hash>' (stdlib only)."""
+    salt = salt or secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), iterations)
+    return f"pbkdf2_sha256${iterations}${salt}${dk.hex()}"
+
+
+def verify_password(pw, stored):
+    try:
+        algo, iterations, salt, digest = stored.split("$")
+    except (AttributeError, ValueError):
+        return False
+    if algo != "pbkdf2_sha256" or not isinstance(pw, str):
+        return False
+    return hmac.compare_digest(hash_password(pw, salt, int(iterations)).split("$")[3], digest)
 
 
 def check_password(cfg, username, pw):
+    """The administrator account (access.admin, hashed) or a participant account."""
+    adm = cfg.admin_account()
+    if adm and username == adm.get("username"):
+        return verify_password(pw, adm.get("password_hash"))
     p = cfg.participant(username)
     return bool(p) and isinstance(pw, str) and hmac.compare_digest(str(p.get("password", "")).encode(), pw.encode())
+
+
+def credential_fp(cfg, username):
+    """A short fingerprint of the account's current password (None: no such account)."""
+    adm = cfg.admin_account()
+    if adm and username == adm.get("username"):
+        secret = adm.get("password_hash")
+    else:
+        secret = (cfg.participant(username) or {}).get("password")
+    return hashlib.sha256(secret.encode()).hexdigest()[:12] if secret else None
 
 
 def admin_link_token(data_dir):

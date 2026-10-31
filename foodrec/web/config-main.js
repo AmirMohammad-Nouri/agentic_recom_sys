@@ -1,7 +1,7 @@
 // The separate Config page (/config). `foodrec config open` adds #token=... to the link: that
 // token is this installation's admin token; it is kept for this browser tab and removed from
 // the address bar.
-import { api, clear, h, safeGet, safeSet, sessionSet, setCriteria, state } from "./lib.js";
+import { api, clear, h, safeGet, safeSet, sessionSet, setCriteria, startDemo, state } from "./lib.js";
 import { configView } from "./views/config.js";
 
 const m = location.hash.match(/token=([^&]+)/);
@@ -28,6 +28,11 @@ const pill = document.querySelector(".status-pill");
 try {
   state.system = await api("/api/system");
   setCriteria(state.system.criteria_specs);
+  if (state.system.mode === "demo") await startDemo();  // the visitor and their admin/user view
+  else if (state.system.login_required) {
+    const sess = await api("/api/session");
+    if (sess.user_id) state.user = sess.user_id;
+  }
   const llm = state.system.llm;
   clear(pill, h("span.dot." + (llm.available ? "ok" : "warn")), llm.available ? `${llm.provider} · ${llm.model}` : "model unavailable");
   clear(main, configView());

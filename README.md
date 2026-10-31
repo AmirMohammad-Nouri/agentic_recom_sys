@@ -50,10 +50,27 @@ what came back, and why it answered as it did.
 
 Requires Python 3.11+.
 
+> [!IMPORTANT]
+> **Set the administrator password before the first start.** FoodRec asks everyone to sign in. The
+> repository ships an administrator account (`admin`) without a password, and the app refuses to start
+> until you set one:
+>
+> ```bash
+> foodrec admin password        # asks twice and stores only a hash in foodrec.config.json
+> ```
+>
+> or write `"access": {"admin": {"username": "admin", "password": "your-password"}}` into
+> `foodrec.config.json`; the app replaces it with a hash when it starts. Sign in as `admin`: only the
+> administrator sees **Config** (account menu, top right). Participant accounts created there (Users &
+> study → Create the study population) sign in with their own usernames and passwords, get the role of
+> their account, and never see Config. See [docs/deployment.md](docs/deployment.md) for running it on a
+> server and for the public demo.
+
 ```bash
 python -m venv .venv && source .venv/bin/activate        # or: uv venv && source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest                                          # 108 tests, no services needed
+python -m pytest                                          # 128 tests, no services needed
+foodrec admin password                                    # once: the administrator's password
 foodrec                                                   # opens http://127.0.0.1:8000 (starts the app if needed)
 foodrec config open                                       # the Config page (model, dataset, criteria, roles, study)
 foodrec status / foodrec stop                             # is it running? stop it from any terminal
@@ -335,7 +352,7 @@ modules, no build step; the only external script is the pinned graph renderer (v
 * the **study**: who may register, how roles are assigned, and a generated study population with
   usernames and passwords (optional sign-in).
 
-The **Config page** (`foodrec config open`; a separate page, not linked from the app) edits the same
+The **Config page** (account menu → Config for the administrator, or `foodrec config open`) edits the same
 file, with a guide for every section; API keys typed there are written to `.env`, never to the config file. The running app watches the file: live settings apply at once, the others restart the app
 automatically, and an unchanged file changes nothing. `foodrec export` writes the standard per-user study
 output, and `foodrec scenario run` replays scripted JSON scenarios. All of this is described in
@@ -445,6 +462,7 @@ foodrec/
   web/        index.html config.html app.css app.js config-main.js lib.js dock.js trace.js components.js
               markdown.js views/*.js guides/*.md (the Config page guides and dataset templates)
 foodrec.config.json                                        the config file (Config page)
+deploy/demo/  demo.config.json, systemd units, Caddyfile: the public demo (docs/deployment.md)
 scenarios/    scripted scenario files (foodrec scenario run)
 data/
   examples/   my_recipes.json: the simple format for your own dataset

@@ -9,6 +9,7 @@
     foodrec scenario check scenarios/*.json   validate scenario files without running them
     foodrec export --out study.zip            export every user (JSON or a ZIP of CSV tables)
     foodrec config show | check | init | path
+    foodrec admin password                    set the administrator password (stored as a hash)
     foodrec study generate [--write]          create the study population from study.population
     foodrec study list                        participants with their role and password
     foodrec users                             list users with their role
@@ -188,6 +189,27 @@ def _stop(a):
             return 0
     print(f"Sent the stop signal to pid {pid}, but port {port} is still in use.")
     return 1
+
+
+def _admin(a):
+    """Set the administrator account's password (asked twice, stored as a hash)."""
+    import getpass
+
+    from .appconfig import DEFAULT_PATH, AppConfig, config_path
+    cfg = AppConfig.load()
+    name = a.username or (cfg.admin_account() or {}).get("username") or "admin"
+    pw = getpass.getpass(f"New password for the administrator '{name}': ")
+    if len(pw) < 8:
+        print("Use at least 8 characters.", file=sys.stderr)
+        return 1
+    if getpass.getpass("Again: ") != pw:
+        print("The two passwords differ.", file=sys.stderr)
+        return 1
+    data = json.loads(json.dumps(cfg.raw))
+    data.setdefault("access", {})["admin"] = {"username": name, "password": pw}
+    new = cfg.save(data, cfg.path or config_path() or DEFAULT_PATH)
+    print(f"Saved (as a hash) in {new.path}. Sign in as '{name}'. A running app picks this up by itself.")
+    return 0
 
 
 def _study(a):
@@ -377,6 +399,10 @@ def main(argv=None):
 
     sub.add_parser("users", help="list users and their roles")
 
+    ad = sub.add_parser("admin", help="the administrator account")
+    ad.add_argument("cmd", choices=["password"])
+    ad.add_argument("--username", help="administrator username (default: the current one, or admin)")
+
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     a = ap.parse_args(argv)
     if a.config and os.environ.get("FOODREC_CONFIG") != a.config:
@@ -393,7 +419,7 @@ def main(argv=None):
     if cmd == "config" and a.cmd == "open":
         return _open(a)
     return {"open": _open_app, "serve": _serve_cmd, "status": _status, "stop": _stop, "scenario": _scenario,
-            "export": _export, "config": _config, "users": _users, "study": _study}[cmd](a)
+            "export": _export, "config": _config, "users": _users, "study": _study, "admin": _admin}[cmd](a)
 
 
 if __name__ == "__main__":
