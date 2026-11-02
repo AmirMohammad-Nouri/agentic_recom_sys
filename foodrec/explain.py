@@ -29,13 +29,15 @@ def build_evidence(item, ranked, declared, support, bd):
 
     # ---- why it fits the user ---------------------------------------------------
     fit = []
+    seen_tastes = set()
     for code, label in item["constraint_labels"]:
         fit.append({"type": "constraint", "code": code, "text": f"meets your mandatory rule: {label}"})
     for s in support:
-        if s["mean"] >= 0.6 and s["evidence"] > 0:
-            fit.append({"type": "preference", "concept": s["concept"], "mean": s["mean"],
-                        "text": f"matches a taste you showed: {s['concept'].split(':', 1)[1]} "
-                                f"(belief {_f2(s['mean'])})"})
+        name = s["concept"].split(":", 1)[1]
+        if s["mean"] >= 0.6 and s["evidence"] > 0 and name not in seen_tastes:
+            seen_tastes.add(name)  # the same word can be a cuisine and an ingredient
+            fit.append({"type": "preference", "concept": s["concept"], "mean": s["mean"], "name": name,
+                        "text": f"matches a taste you showed: {name} (belief {_f2(s['mean'])})"})
     t = declared.get("max_ingredients")
     if t and not t.get("strict") and r["n_ingredients"] <= t["value"]:
         fit.append({"type": "soft_target",
@@ -130,6 +132,52 @@ def claims_allowed(ev):
     return out
 
 
+# ---- the sentence on the recipe card ----------------------------------------------------
+def _score_words(score):
+    return "very well" if score >= 0.75 else "well" if score >= 0.6 else "moderately" if score >= 0.4 else "modestly"
+
+
+def _driver(k, v):
+    if k == "p":
+        return "how well it matches your taste"
+    return f"its {CRITERION_LABELS[k].lower()}, which scores {_score_words(v['score'])}"
+
+
+def _join(parts):
+    return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
+def plain_reason(ev, visible=None):
+    """Why this dish was suggested, in everyday words, from the evidence record only. `visible`:
+    the criteria this user may see; nothing about the others is mentioned. Empty without a reason."""
+    vis = set(CRITERIA if visible is None else visible)
+    rk = ev.get("ranking") or {}
+    contrib = {k: v for k, v in (rk.get("contributions") or {}).items() if k in vis}
+    out = []
+    top = rk.get("top_contributor")
+    if top in contrib:
+        drivers = [_driver(top, contrib[top])]
+        # a close second also explains the dish; it is not noise
+        rest = sorted((k for k in contrib if k != top), key=lambda k: -contrib[k]["contribution"])
+        if rest and contrib[rest[0]]["contribution"] >= 0.8 * contrib[top]["contribution"]:
+            drivers.append(_driver(rest[0], contrib[rest[0]]))
+        s = f"This dish was suggested mainly because of {', and '.join(drivers)}."
+        if top != "p" and contrib[top]["weight"] >= max(v["weight"] for v in contrib.values()):
+            s += f" {CRITERION_LABELS[top]} also counts most in your priorities."
+        out.append(s)
+    tastes = [f["name"] for f in ev.get("fit") or [] if f.get("type") == "preference" and f.get("name")][:3]
+    if tastes and "p" in vis:
+        out.append(f"It matches tastes you have shown: {_join(tastes)}.")
+    d = rk.get("diversity") or {}
+    if d.get("promoted"):
+        out.append("It moved up the list to add variety.")
+    comp = [c for c in ev.get("compromises") or [] if c.get("criterion") in vis]
+    if comp:
+        out.append(f"Keep in mind: its {CRITERION_LABELS[comp[0]['criterion']].lower()} is lower than the other "
+                   "suggestions.")
+    return " ".join(out)
+
+
 # ---- template rendering (only evidence fields are used) ---------------------------
 def template_reasons(ev):
     fits = [f["text"] for f in ev["fit"]] or ["passes all your mandatory rules"]
@@ -139,14 +187,14 @@ def template_reasons(ev):
         k = rk["top_contributor"]
         v = rk["contributions"][k]
         ranked.append(f"{CRITERION_LABELS[k]} contributes most: weight {_pct(v['weight'])} x score "
-                      f"{_f2(v['score'])} = {_f2(v['contribution'])} of utility {_f2(rk['utility'])}")
+                      f"{_f2(v['score'])} = {_f2(v['contribution'])} of the similarity score {_f2(rk['utility'])}")
     d = rk["diversity"]
     if d["promoted"] and d["passed_over"]:
-        ranked.append(f"moved up from utility rank {rk['utility_rank']} to {rk['final_rank']} by the diversity "
-                      f"setting, because higher-utility {d['passed_over']['id']} is more similar to earlier picks "
+        ranked.append(f"moved up from similarity rank {rk['utility_rank']} to {rk['final_rank']} by the diversity "
+                      f"setting, because higher-scoring {d['passed_over']['id']} is more similar to earlier picks "
                       f"({_f2(d['passed_over']['similarity_to_selected'])})")
     elif d["demoted"]:
-        ranked.append(f"moved down from utility rank {rk['utility_rank']} to {rk['final_rank']} by the diversity setting")
+        ranked.append(f"moved down from similarity rank {rk['utility_rank']} to {rk['final_rank']} by the diversity setting")
     cmp_ = ev["comparison"]
     if cmp_:
         parts = []
@@ -156,6 +204,7 @@ def template_reasons(ev):
         if parts:
             ranked.append(f"compared with {cmp_['vs_title']} (rank {cmp_['vs_final_rank']}): " + ", ".join(parts))
     return {
+        "summary": plain_reason(ev),
         "fits": fits,
         "ranked_here": ranked,
         "compromises": [c["text"] for c in ev["compromises"]],

@@ -157,7 +157,7 @@ export function configView() {
         view.exists ? "" : " (not created yet: saving creates it)",
         view.auto_reload ? " · edits to the file (here or by hand) are applied automatically" : " · automatic reload is off",
         view.admin_token ? " · protected by an admin token" : ""),
-      view.read_only ? h("div.change", h("b", "Demo: "), "this is the Config page as an administrator sees it. You can look at every setting, open the guides and try things (for example Generate participants), but nothing is saved here. To configure FoodRec, clone the project and run it on your computer.") : null,
+      view.read_only ? h("div.change", h("b", "Demo: "), "this is the Config page as an administrator sees it. You can look at every setting, open the guides and try things, but nothing in the file changes here. The only exceptions are the settings under \"Try these yourself\" and the links you create: they count for your visit only. To configure FoodRec, clone the project and run it on your computer.") : null,
       view.config_problem ? h("div.change.bad", h("b", "The file on disk was not applied: "), view.config_problem,
         h("div.small", "The app keeps running with the last valid configuration until the file is fixed.")) : null,
       pending.length && !view.read_only ? h("div.change", h("b", "Waiting for a restart: "), pending.map((p) => `${p.label} (running ${p.running}, saved ${p.saved})`).join("; "),
@@ -238,11 +238,48 @@ export function configView() {
       h("div.hint", "Stored in the .env file of the repository (ignored by git), not in the config file. It applies at once; no restart."));
   }
 
+  // Demo: settings a visitor may try for themselves. They are stored for this visitor only.
+  function visitorCard() {
+    const saved = view.visitor_settings || {};
+    const fields = view.fields.filter((f) => f.visitor);
+    const values = {};
+    const row = (f) => {
+      const name = `${f.section}.${f.key}`;
+      const cur = saved[f.attr_name] ?? f.running;
+      values[name] = cur;
+      const input = f.type === "bool"
+        ? h("label.switch", h("input", { type: "checkbox", checked: !!cur, onchange: (e) => { values[name] = e.target.checked; } }), "on")
+        : h("input", { type: "number", value: cur, min: f.min, max: f.max, step: f.type === "int" ? 1 : "any", style: { width: "110px" },
+          onchange: (e) => { values[name] = num(e.target.value); } });
+      return h("div.cfg-field", h("div", h("b.small", f.label), f.help ? h("div.hint", f.help) : null), h("div", input));
+    };
+    return h("section.card",
+      h("div.card-head", h("h2", "Try these yourself"), h("span.grow"), h("span.small.muted", "Only for your visit, and for people who use your links")),
+      h("div.card-body.stack", fields.map(row),
+        h("div.btn-row",
+          h("button.btn.primary", { onclick: async () => {
+            try {
+              const out = await api("/api/demo/settings", { method: "PUT", body: { settings: values } });
+              view.visitor_settings = out.visitor_settings;
+              toast("Applied to your visit");
+            } catch (e) { toast(e.message, "err"); }
+          } }, "Apply to my visit"),
+          h("button.btn", { onclick: async () => {
+            try {
+              const out = await api("/api/demo/settings", { method: "PUT", body: { settings: Object.fromEntries(fields.map((f) => [`${f.section}.${f.key}`, null])) } });
+              view.visitor_settings = out.visitor_settings;
+              toast("Back to the demo's values");
+              render();
+            } catch (e) { toast(e.message, "err"); }
+          } }, "Back to the demo's values"))));
+  }
+
   function settingsTab() {
     const p = provider();
     const models = p === "anthropic" ? CLAUDE_MODELS : (view.installed_models || []);
     const llm = view.llm_status || {};
     return h("div.stack",
+      view.read_only ? visitorCard() : null,
       h("datalist", { id: "cfg-models" }, models.map((m) => h("option", { value: m }))),
       h("datalist", { id: "cfg-keys" }, ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY", "TOGETHER_API_KEY"].map((m) => h("option", { value: m }))),
       Object.entries(view.sections).map(([sec, label]) => h("section.card",
@@ -357,7 +394,7 @@ export function configView() {
         h("div.row.wrap", { style: { gap: "12px", alignItems: "center" } },
           h("label.field", h("span.field-label", "Taste share"),
             h("input", { type: "number", min: 0, max: 0.9, step: 0.05, value: cr.taste_share, style: { width: "90px" }, onchange: (e) => { cr.taste_share = num(e.target.value) ?? 0.25; touch(); } })),
-          h("div.hint", "Fixed share of the utility for learned taste; the criteria below share the rest by the user's weights.")),
+          h("div.hint", "Fixed share of the similarity score for learned taste; the criteria below share the rest by the user's weights.")),
         h("div.small.muted", "Default weights (the starting sliders): " + enabled.map((c) => `${c.label} ${Math.round(100 * (c.default_weight || 0) / totW)}%`).join(" · ")),
         (cr.items || []).map(criterionCard),
         h("div.btn-row", h("button.btn", { onclick: () => {
@@ -451,6 +488,18 @@ export function configView() {
     pop.roles ||= {};
     const roleNames = Object.keys(acc.roles);
     const label = (n) => acc.roles[n]?.label || n;
+    const demo = !!view.read_only;
+    if (demo) pop.access = "link";   // the demo has personal links only
+    const useLinks = pop.access === "link";
+    const flowOf = (p) => p.flow || (p.link ? "guided" : "free");
+    const popFlow = pop.flow || (useLinks ? "guided" : "free");
+    const FLOWS = [["guided", "Guided: meal cycles, a reaction to every dish"], ["free", "Free: the normal list"]];
+    const linkUrl = (token) => `${location.origin}/join/${token}`;
+    const copyLink = (token) => navigator.clipboard?.writeText(linkUrl(token)).then(() => toast("Link copied"), () => toast(linkUrl(token)));
+    // In your own copy a link only works once it is in the saved file (the demo stores links at once).
+    const linkSaved = (token) => demo || (view.effective.study?.participants || []).some((p) => p.link === token);
+    // a role that can configure the app can't get a link: whoever holds the link would be administrator
+    const popRoles = roleNames.filter((n) => !useLinks || !acc.roles[n].features?.configure);
     const usersBox = h("div", h("div.skeleton", { style: { height: "60px" } }));
     const setv = (o, k, v, re = false) => { o[k] = v; touch(); if (re) render(); };
 
@@ -468,7 +517,8 @@ export function configView() {
       h("div.field", h("span.field-label", "Name"), h("input", { type: "text", value: st.name || "", onchange: (e) => setv(st, "name", e.target.value) }),
         h("span.hint", "Shown in the browser tab, on the sign-in page and on the registration message.")),
       h("div.field", h("span.field-label", "Description"), h("textarea", { rows: 2, value: st.description || "", onchange: (e) => setv(st, "description", e.target.value) })),
-      h("div.hint", "Everyone signs in (server mode \"local\"): participants with the accounts below, the administrator with the administrator account."),
+      demo ? h("div.hint", "The demo has no sign-in: the people you invite open their personal link.") :
+        h("div.hint", "Everyone signs in (server mode \"local\"): participants with a username and password or a personal link, the administrator with the administrator account."),
       h("div.field", h("span.field-label", "Who may start"),
         h("select", { onchange: (e) => setv(st, "registration", e.target.value) },
           [["open", "Anyone with a new user id"], ["listed_only", "Only listed ids and participants"], ["closed", "Nobody new (registration closed)"]]
@@ -499,46 +549,84 @@ export function configView() {
     const popCard = card("Create the study population", "population",
       h("div.row.wrap", { style: { gap: "12px", alignItems: "flex-end" } },
         h("label.field", h("span.field-label", "Number of users"), h("input", { type: "number", min: 0, max: 10000, value: pop.size, style: { width: "110px" }, onchange: (e) => setv(pop, "size", Math.max(0, Math.round(+e.target.value || 0)), true) })),
-        h("label.field", h("span.field-label", "Username prefix"), h("input", { type: "text", value: pop.prefix, style: { width: "90px" }, onchange: (e) => setv(pop, "prefix", e.target.value.trim(), true) })),
+        demo ? null : h("label.field", h("span.field-label", "How people get in"),
+          h("select", { onchange: (e) => setv(pop, "access", e.target.value, true) },
+            [["password", "Username and password"], ["link", "Personal link only"]].map(([v, t]) => h("option", { value: v, selected: v === (pop.access || "password") }, t)))),
+        demo ? null : h("label.field", h("span.field-label", "Path users must follow"),
+          h("select", { onchange: (e) => setv(pop, "flow", e.target.value, true) },
+            FLOWS.map(([v, t]) => h("option", { value: v, selected: v === popFlow }, t)))),
+        h("label.field", h("span.field-label", useLinks ? "Name prefix" : "Username prefix"), h("input", { type: "text", value: pop.prefix, style: { width: "90px" }, onchange: (e) => setv(pop, "prefix", e.target.value.trim(), true) })),
         h("label.field", h("span.field-label", "Digits"), h("input", { type: "number", min: 1, max: 6, value: pop.digits, style: { width: "70px" }, onchange: (e) => setv(pop, "digits", Math.round(+e.target.value || 3), true) })),
-        h("label.field", h("span.field-label", "Words per password"), h("input", { type: "number", min: 1, max: 4, value: pop.password_words ?? 2, style: { width: "70px" }, onchange: (e) => setv(pop, "password_words", Math.round(+e.target.value || 2)) })),
+        useLinks ? null : h("label.field", h("span.field-label", "Words per password"), h("input", { type: "number", min: 1, max: 4, value: pop.password_words ?? 2, style: { width: "70px" }, onchange: (e) => setv(pop, "password_words", Math.round(+e.target.value || 2)) })),
         h("label.switch", h("input", { type: "checkbox", checked: pop.shuffle !== false, onchange: (e) => setv(pop, "shuffle", e.target.checked) }), "mix roles over usernames"),
         h("label.field", h("span.field-label", "Seed"), h("input", { type: "number", value: pop.seed ?? 7, style: { width: "80px" }, onchange: (e) => setv(pop, "seed", Math.round(+e.target.value || 0)) }))),
       h("table.t", h("thead", h("tr", h("th", "Role"), h("th.num", "Percent"), h("th.num", "Users"))),
-        h("tbody", roleNames.map((n) => h("tr", h("td", label(n), h("span.small.muted.mono", ` ${n}`)),
+        h("tbody", popRoles.map((n) => h("tr", h("td", label(n), h("span.small.muted.mono", ` ${n}`)),
           h("td.num", h("input", { type: "number", min: 0, max: 100, step: 1, value: pop.roles[n] ?? 0, style: { width: "80px" },
             onchange: (e) => { const v = +e.target.value || 0; if (v) pop.roles[n] = v; else delete pop.roles[n]; touch(); render(); } })),
           h("td.num", counts[n] ?? 0))),
         h("tr", h("td", h("b", "Total")), h("td.num" + (Math.abs(tot - 100) > 0.01 ? ".delta-down" : ""), h("b", `${tot}%`)), h("td.num", h("b", pop.size))))),
-      h("div.small.muted", `Usernames ${pop.prefix}${"1".padStart(pop.digits, "0")} … ${pop.prefix}${String(pop.size || 1).padStart(pop.digits, "0")}. Existing usernames keep their password.`),
+      h("div.small.muted", `${useLinks ? "Names" : "Usernames"} ${pop.prefix}${"1".padStart(pop.digits, "0")} … ${pop.prefix}${String(pop.size || 1).padStart(pop.digits, "0")}. ` +
+        (demo ? "Creating new links replaces your earlier ones." : useLinks ? "Existing names keep their link." : "Existing usernames keep their password.") +
+        (demo ? "" : ` The guided path uses the settings under Settings → Meal cycles.`)),
       h("div.btn-row",
         h("button.btn.primary", { disabled: Math.abs(tot - 100) > 0.01 || !pop.size, onclick: async () => {
-          if (st.participants.length && !confirm(`Replace the ${st.participants.length} participant(s) with ${pop.size} generated ones? Passwords of usernames that stay are kept.`)) return;
+          if (!demo && st.participants.length && !confirm(`Replace the ${st.participants.length} participant(s) with ${pop.size} generated ones? Those whose username stays keep their password or link.`)) return;
           try {
-            const res = await api("/api/config/population", { method: "POST", body: { population: pop, participants: st.participants } });
-            st.participants = res.participants;
-            touch(); render();
-            toast(`${res.participants.length} participants generated: ${Object.entries(res.counts).map(([r, n]) => `${label(r)} ${n}`).join(", ")}. Save to keep them.`);
+            const res = await api("/api/config/population", { method: "POST", body: { population: demo ? pop : { ...pop, flow: popFlow }, participants: st.participants } });
+            const summary = Object.entries(res.counts).map(([r, n]) => `${label(r)} ${n}`).join(", ");
+            if (demo) {
+              view.demo_links = res.participants;
+              toast(`${res.participants.length} links created: ${summary}. They work right away.`);
+            } else {
+              st.participants = res.participants;
+              touch();
+              toast(`${res.participants.length} participants generated: ${summary}. Save to keep them.`);
+            }
+            render();
           } catch (e) { toast(e.message, "err"); }
-        } }, "Generate participants"),
+        } }, useLinks ? "Create links" : "Generate participants"),
         Math.abs(tot - 100) > 0.01 ? h("span.small", { style: { color: "var(--danger)" } }, "The percentages must add up to 100.") : null));
 
     // participant accounts
-    const parts = st.participants;
+    const parts = demo ? (view.demo_links || []) : st.participants;
     const byRole = parts.reduce((a, p) => ({ ...a, [p.role]: (a[p.role] || 0) + 1 }), {});
+    const unsavedLinks = !demo && parts.some((p) => p.link && !linkSaved(p.link));
     const csv = () => {
-      const rows = [["username", "password", "role"], ...parts.map((p) => [p.username, p.password, p.role])];
+      if (unsavedLinks) return toast("Save to file first: these links don't work until they are saved", "err");
+      const rows = [["name", "password", "link", "role"], ...parts.map((p) => [p.username, p.password || "", p.link ? linkUrl(p.link) : "", p.role])];
       const blob = new Blob([rows.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n") + "\n"], { type: "text/csv" });
-      const a = h("a", { href: URL.createObjectURL(blob), download: `${(st.name || "study").replace(/\W+/g, "_")}_credentials.csv` });
+      const a = h("a", { href: URL.createObjectURL(blob), download: `${(st.name || "study").replace(/\W+/g, "_")}_${useLinks ? "links" : "credentials"}.csv` });
       document.body.append(a); a.click(); a.remove();
     };
-    const partsCard = card(`Participant accounts (${parts.length})`, "population",
+    const linkAction = async (token, action) => {
+      try {
+        view.demo_links = (await api("/api/demo/links", { method: "POST", body: { token, action } })).demo_links;
+        render();
+      } catch (e) { toast(e.message, "err"); }
+    };
+    const partsCard = demo ? card(`Personal links (${parts.length})`, "population",
+      parts.length ? h("div", { style: { maxHeight: "420px", overflow: "auto" } }, h("table.t", h("thead", h("tr", h("th", "Name"), h("th", "Role"), h("th", "Link"), h("th", "Status"), h("th", ""))),
+        h("tbody", parts.map((p) => h("tr", h("td.mono", p.username), h("td", label(p.role)),
+          h("td.mono.small.link-cell", linkUrl(p.link)),
+          h("td", p.active === false ? h("span.tag.warn", "Deactivated") : h("span.tag.accent", "Active")),
+          h("td", h("div.row", { style: { gap: "4px" } },
+            h("button.btn.sm", { onclick: () => copyLink(p.link) }, "Copy"),
+            h("button.btn.sm", { onclick: () => linkAction(p.link, p.active === false ? "activate" : "deactivate") }, p.active === false ? "Activate" : "Deactivate"),
+            h("button.btn.ghost.sm", { title: "Remove this link", onclick: () => { if (confirm(`Remove the link of ${p.username}? It stops working for good.`)) linkAction(p.link, "remove"); } }, icon("trash"))))))))) : h("div.small.muted", "No links yet. Create them above."),
+      parts.length ? h("div.btn-row", h("button.btn.sm", { onclick: csv }, "Download the links (CSV)")) : null,
+      h("div.hint", "Whoever opens a link uses the app as that person, with its role and your settings. A link works until you deactivate or remove it, but demo data is reset every night, and the links with it. For a real experiment, use your own copy.")) : card(`Participant accounts (${parts.length})`, "population",
+      unsavedLinks ? h("div.change", h("b", "These links don't work yet. "), "Click ", h("b", "Save to file"), " at the top of the page, then copy them.") : null,
       parts.length ? h("div.small.muted", Object.entries(byRole).map(([r, n]) => `${label(r)} ${n}`).join(" · ")) : h("div.small.muted", "No accounts yet. Generate them above or add one."),
-      parts.length ? h("div", { style: { maxHeight: "420px", overflow: "auto" } }, h("table.t", h("thead", h("tr", h("th", "Username"), h("th", "Password"), h("th", "Role"), h("th", "Note"), h("th", ""))),
+      parts.length ? h("div", { style: { maxHeight: "420px", overflow: "auto" } }, h("table.t", h("thead", h("tr", h("th", "Username"), h("th", "Password or link"), h("th", "Role"), h("th", "Path"), h("th", "Active"), h("th", "Note"), h("th", ""))),
         h("tbody", parts.map((p, i) => h("tr",
           h("td", h("input.mono", { type: "text", value: p.username, style: { width: "120px" }, onchange: (e) => setv(p, "username", e.target.value.trim()) })),
-          h("td", h("input.mono", { type: "text", value: p.password, style: { width: "170px" }, onchange: (e) => setv(p, "password", e.target.value) })),
+          p.link ? h("td", linkSaved(p.link) ? h("button.btn.sm", { title: linkUrl(p.link), onclick: () => copyLink(p.link) }, "Copy link")
+            : h("span.small.muted", { title: "This link works once it is saved" }, "Save first"))
+            : h("td", h("input.mono", { type: "text", value: p.password, style: { width: "170px" }, onchange: (e) => setv(p, "password", e.target.value) })),
           h("td", h("select", { onchange: (e) => setv(p, "role", e.target.value, true) }, roleNames.map((n) => h("option", { value: n, selected: n === p.role }, label(n))))),
+          h("td", h("select", { onchange: (e) => setv(p, "flow", e.target.value) }, [["guided", "Guided"], ["free", "Free"]].map(([v, t]) => h("option", { value: v, selected: v === flowOf(p) }, t)))),
+          h("td", h("input", { type: "checkbox", checked: p.active !== false, title: "Off: this person can't get in any more, and is signed out", onchange: (e) => { if (e.target.checked) delete p.active; else p.active = false; touch(); } })),
           h("td", h("input", { type: "text", value: p.note || "", placeholder: "optional", style: { width: "140px" }, onchange: (e) => { if (e.target.value) p.note = e.target.value; else delete p.note; touch(); } })),
           h("td", h("button.btn.ghost.sm", { title: "Remove", onclick: () => { parts.splice(i, 1); touch(); render(); } }, icon("trash")))))))) : null,
       h("div.btn-row",
@@ -547,11 +635,12 @@ export function configView() {
           let n = parts.length + 1; let name;
           do { name = `${pop.prefix || "p"}${String(n++).padStart(pop.digits || 3, "0")}`; } while (used.has(name));
           const w = ["amber", "basil", "cedar", "maple", "river", "willow", "olive", "pebble"];
-          parts.push({ username: name, password: `${w[Math.floor(Math.random() * w.length)]}-${w[Math.floor(Math.random() * w.length)]}-${10 + Math.floor(Math.random() * 90)}`, role: acc.default_role });
+          const token = [...crypto.getRandomValues(new Uint8Array(18))].map((b) => b.toString(16).padStart(2, "0")).join("");
+          parts.push({ username: name, ...(useLinks ? { link: token } : { password: `${w[Math.floor(Math.random() * w.length)]}-${w[Math.floor(Math.random() * w.length)]}-${10 + Math.floor(Math.random() * 90)}` }), role: acc.default_role });
           touch(); render();
         } }, icon("plus"), "Add an account"),
-        parts.length ? h("button.btn.sm", { onclick: csv }, "Download usernames and passwords (CSV)") : null),
-      h("div.hint", "Passwords are stored in the config file as written, because you hand them out: keep the file private while it holds real credentials."));
+        parts.length ? h("button.btn.sm", { onclick: csv }, useLinks ? "Download the links (CSV)" : "Download usernames and passwords (CSV)") : null),
+      h("div.hint", "Passwords and links are stored in the config file as written, because you hand them out. A link is enough to get in, so treat it like a password: keep the file private while it holds real ones. A link has no end date: to end it, clear Active or remove the account, then Save to file. It applies at once."));
 
     // fixed roles and users seen by the app
     (async () => {

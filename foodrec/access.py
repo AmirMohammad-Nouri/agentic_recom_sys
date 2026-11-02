@@ -9,23 +9,24 @@ export can report both.
 import copy
 
 from . import CRITERIA
+from .explain import plain_reason
 
 FOOD_DETAIL_KEYS = ("nutrition_per_100g", "nutrition_per_serving", "per_serving", "serving_grams", "kcal",
                     "co2e_kg_per_kg", "co2e_kg_per_serving", "fsa_score", "health_grade", "ingredients_detail",
                     "allergens", "allergens_complete", "diet", "raw")
-EMPTY_REASONS = {"fits": [], "ranked_here": [], "compromises": [], "gaps": []}
+EMPTY_REASONS = {"summary": "", "fits": [], "ranked_here": [], "compromises": [], "gaps": []}
 
 
 def snapshot(acc):
     """The part of an access record stored with a request: role and what was visible."""
     return {"role": acc["role"], "visible_criteria": list(acc["visible_criteria"]),
-            "features": dict(acc["features"])}
+            "features": dict(acc["features"]), "show_similarity": acc.get("show_similarity", True)}
 
 
 def full(acc):
     f = acc["features"]
     return all(f.get(k, True) for k in ("explanations", "score_breakdown", "utility", "food_details", "images")) \
-        and set(acc["visible_criteria"]) == set(CRITERIA)
+        and set(acc["visible_criteria"]) == set(CRITERIA) and acc.get("show_similarity", True)
 
 
 def _crit_filter(d, visible):
@@ -51,6 +52,13 @@ def redact_recipe(r, acc):
             rk["contributions"] = _crit_filter(rk.get("contributions"), vis)
             if rk.get("top_contributor") not in vis:
                 rk.pop("top_contributor", None)
+    if not acc.get("show_similarity", True):
+        # only the number goes: the bar and the reason do not reveal it
+        r.pop("utility", None)
+        rk.pop("utility", None)
+    if f["explanations"] and r.get("reasons"):
+        # hidden criteria must not appear in the sentence on the card
+        r["reasons"] = {**r["reasons"], "summary": plain_reason(ev, vis)}
     if not f["explanations"]:
         r["reasons"] = dict(EMPTY_REASONS)
         for k in ("fit", "compromises", "comparison", "uncertainty", "claims_allowed"):

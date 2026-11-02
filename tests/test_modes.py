@@ -137,3 +137,270 @@ def test_export_file_names_carry_the_user(tmp_path):
     assert name(c.get("/api/export", headers=admin)).startswith("foodrec-all-users-")
     own = c.get("/api/users/p02/export", headers=_login(c, "p02", "cedar-oak-11"))
     assert name(own).startswith("foodrec-p02-") and name(own).endswith(".json")
+
+
+# ---- supervisor thresholds ---------------------------------------------------------------------------------
+def test_supervisor_thresholds_come_from_the_config(tmp_path):
+    from foodrec.agent import policy
+    from foodrec.agent.trace import Trace
+    cfg = defaults()
+    cfg["supervisor"].update({"ask_gap": 0.9, "propose_gap": 0.95})
+    path = tmp_path / "c.json"
+    conf = AppConfig({}, path).save(cfg, path)
+    s = load_settings(config=conf, data_dir=tmp_path / "d", qdrant="memory", catalogue_path=FIXTURE, server_mode="open")
+    c = TestClient(create_app(s, llm=OfflineLLM()))
+    core = c.app.state.core
+    assert policy.thresholds(core, "u")["ask_gap"] == 0.9
+    assert c.get("/api/users/u/state", headers={"X-User": "u"}).json()["thresholds"]["propose_gap"] == 0.95
+    # the same behaviour that raises a question at the default gap stays quiet at 0.9
+    core.onboard("u", {}, {"h": .1, "s": .8, "t": .1})
+    for _ in range(4):
+        res = core.recommend("u", {})
+        for r in res["results"]:
+            core.feedback("u", res["request_id"], r["recipe_id"], "choose", "health")
+    assert not policy.review(core, "u", Trace())["decisions"]
+    core.s.ask_gap, core.s.propose_gap = 0.10, 0.15                                 # the control: same choices, default gaps
+    assert policy.review(core, "u", Trace())["decisions"]
+    assert AppConfig({"supervisor": {"ask_gap": 0.3, "propose_gap": 0.2}}).errors   # a proposal can't need less
+
+
+# ---- personal links ----------------------------------------------------------------------------------------
+def test_local_links_sign_in_without_a_password(tmp_path):
+    from foodrec.study import generate
+    parts, _ = generate({"size": 2, "prefix": "p", "digits": 2, "roles": {"baseline": 100}, "access": "link"})
+    assert all("password" not in p and len(p["link"]) >= 16 for p in parts)
+    c, path = _client(tmp_path, "local", participants=parts)
+    # no password exists, so an empty one must not get in
+    assert c.post("/api/login", json={"username": "p01", "password": ""}).status_code == 401
+    assert c.post("/api/join", json={"token": "wrong-token-wrong-token"}).status_code == 404
+    out = c.post("/api/join", json={"token": parts[0]["link"]}).json()
+    hd = {"Authorization": f"Bearer {out['token']}"}
+    assert out["user_id"] == "p01"
+    assert c.get("/api/users/p01/state", headers=hd).json()["access"]["role"] == "baseline"
+    assert c.get("/api/users/p02/state", headers=hd).status_code == 403
+    assert c.get("/join/abc").status_code == 200
+    assert parts[0]["link"] not in json.dumps(AppConfig.load(path).sanitized())
+
+
+def test_links_cannot_carry_the_admin_role():
+    from foodrec.appconfig import DEFAULT_ROLES
+    from foodrec.study import validate_study
+    bad = {"population": {"access": "link", "roles": {"admin": 100}}}
+    assert validate_study(bad, DEFAULT_ROLES)
+    assert validate_study({"participants": [{"username": "x", "link": "a" * 20, "role": "admin"}]}, DEFAULT_ROLES)
+
+
+def test_demo_population_is_links_for_this_visitor_only(tmp_path):
+    c, path = _client(tmp_path, "demo")
+    h = {"X-User": VISITOR}
+    c.post("/api/demo/view", headers=h, json={"view": "admin"})
+    before = path.read_text()
+    pop = {"size": 4, "prefix": "q", "digits": 2, "roles": {"full": 50, "baseline": 50}}
+    res = c.post("/api/config/population", headers=h, json={"population": pop}).json()
+    assert len(res["participants"]) == 4 and all("password" not in p and p["link"] for p in res["participants"])
+    assert path.read_text() == before
+    assert c.post("/api/config/population", headers=h, json={"population": {**pop, "size": 51}}).status_code == 400
+    assert c.post("/api/config/population", headers=h, json={"population": {**pop, "roles": {"admin": 100}}}).status_code == 400
+    assert c.get("/api/config", headers=h).json()["demo_links"][0]["username"] == "q01"
+    # a person with a link is a participant: their role, no admin view
+    base = next(p for p in res["participants"] if p["role"] == "baseline")
+    uid = c.post("/api/join", json={"token": base["link"]}).json()["user_id"]
+    them = {"X-User": uid}
+    assert c.get(f"/api/users/{uid}/state", headers=them).json()["access"]["role"] == "baseline"
+    assert c.post("/api/demo/view", headers=them, json={"view": "admin"}).status_code == 403
+    assert c.get("/api/config", headers=them).status_code == 403
+    # generating again replaces the earlier links
+    c.post("/api/config/population", headers=h, json={"population": pop})
+    assert c.post("/api/join", json={"token": base["link"]}).status_code == 404
+
+
+def test_demo_visitor_settings_touch_only_that_visitor(tmp_path):
+    c, path = _client(tmp_path, "demo")
+    h, other = {"X-User": VISITOR}, {"X-User": "visitor-ffffffffffff"}
+    assert c.put("/api/demo/settings", headers=h, json={"settings": {"supervisor.ask_gap": 0.2}}).status_code == 403  # user view
+    c.post("/api/demo/view", headers=h, json={"view": "admin"})
+    before = path.read_text()
+    ok = c.put("/api/demo/settings", headers=h, json={"settings": {"supervisor.ask_gap": 0.12, "ranking.show_similarity_score": False,
+                                                                    "cycle.recommendations": 2}})
+    assert ok.status_code == 200 and path.read_text() == before
+    assert c.get(f"/api/users/{VISITOR}/state", headers=h).json()["thresholds"]["ask_gap"] == 0.12
+    assert c.get("/api/users/visitor-ffffffffffff/state", headers=other).json()["thresholds"]["ask_gap"] == 0.10
+    for bad in ({"llm.model": "x"}, {"supervisor.ask_gap": 5}, {"supervisor.propose_gap": 0.01}):
+        assert c.put("/api/demo/settings", headers=h, json={"settings": bad}).status_code == 400
+    # the score is hidden on the visitor's cards, the explanation stays
+    c.post(f"/api/users/{VISITOR}/onboard", headers=h, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    c.post("/api/demo/view", headers=h, json={"view": "user"})
+    r = c.post(f"/api/users/{VISITOR}/recommend", headers=h, json={}).json()["results"][0]
+    assert "utility" not in r and r["reasons"]["summary"] and r["evidence"]["ranking"]["contributions"]
+
+
+# ---- meal cycles -------------------------------------------------------------------------------------------
+def _cycle_client(tmp_path, mode="open", **cycle):
+    cfg = defaults()
+    cfg["server"]["mode"] = mode
+    cfg["cycle"].update({"enabled": True, "meals": "lunch,dinner", "recommendations": 2, "days": 2, **cycle})
+    path = tmp_path / "c.json"
+    conf = AppConfig({}, path).save(cfg, path)
+    s = load_settings(config=conf, data_dir=tmp_path / "d", qdrant="memory", catalogue_path=FIXTURE, server_mode=mode)
+    return TestClient(create_app(s, llm=OfflineLLM()))
+
+
+def test_cycle_walks_meals_and_days_and_needs_every_reaction(tmp_path):
+    c = _cycle_client(tmp_path)
+    h = {"X-User": "u"}
+    c.post("/api/users/u/onboard", headers=h, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    st = c.get("/api/users/u/cycle", headers=h).json()
+    assert st["total"] == 2 * 2 * 2 and (st["day"], st["meal"]) == (1, "lunch")
+    assert c.get("/api/users/u/cycle", headers=h).json()["result"]["request_id"] == st["result"]["request_id"]  # stable
+    seen = []
+    while not st["finished"]:
+        seen.append((st["day"], st["meal"]))
+        rows = st["result"]["results"]
+        assert len(rows) == 2 and not st["complete"]
+        assert c.post("/api/users/u/cycle/next", headers=h).status_code == 400          # reactions missing
+        c.post("/api/users/u/feedback", headers=h, json={"request_id": st["result"]["request_id"], "recipe_id": rows[0]["recipe_id"], "type": "like"})
+        c.post("/api/users/u/feedback", headers=h, json={"request_id": st["result"]["request_id"], "recipe_id": rows[1]["recipe_id"], "type": "reject"})
+        assert c.get("/api/users/u/cycle", headers=h).json()["complete"]
+        st = c.post("/api/users/u/cycle/next", headers=h).json()
+    assert seen == [(1, "lunch"), (1, "dinner"), (2, "lunch"), (2, "dinner")]
+    assert st["answered_total"] == st["total"] == 8
+    st = c.post("/api/users/u/cycle/restart", headers=h).json()
+    assert (st["round"], st["day"], st["meal"], st["answered_total"]) == (2, 1, "lunch", 0)
+    doc = json.loads(c.get("/api/users/u/export", headers=h).text)
+    assert len(doc["users"][0]["meal_cycle"]["reactions"]) == 8
+
+
+def test_a_repeated_like_still_counts_as_a_reaction(tmp_path):
+    c = _cycle_client(tmp_path, recommendations=1)
+    h = {"X-User": "u"}
+    c.post("/api/users/u/onboard", headers=h, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    st = c.get("/api/users/u/cycle", headers=h).json()
+    rid = st["result"]["results"][0]["recipe_id"]
+    c.post("/api/users/u/feedback", headers=h, json={"recipe_id": rid, "type": "like"})   # liked earlier, elsewhere
+    assert not c.get("/api/users/u/cycle", headers=h).json()["complete"]
+    out = c.post("/api/users/u/feedback", headers=h, json={"request_id": st["result"]["request_id"], "recipe_id": rid, "type": "like"}).json()
+    assert out["duplicate"] and c.get("/api/users/u/cycle", headers=h).json()["complete"]
+
+
+def test_demo_cycle_is_always_breakfast_lunch_dinner(tmp_path):
+    c = _cycle_client(tmp_path, mode="demo", meals="snack", enabled=False)
+    h = {"X-User": VISITOR}
+    c.post(f"/api/users/{VISITOR}/onboard", headers=h, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    st = c.get(f"/api/users/{VISITOR}/cycle", headers=h).json()
+    assert st["enabled"] and st["meals"] == ["breakfast", "lunch", "dinner"] and st["meal"] == "breakfast"
+    assert list(c.get("/api/system").json()["options"]["meal_contexts"]) == ["breakfast", "lunch", "dinner"]
+
+
+def test_cycle_is_off_by_default_and_checks_meal_names(tmp_path):
+    assert AppConfig({"cycle": {"meals": "lunch,brunch"}}).errors
+    c, _ = _client(tmp_path, "open")
+    assert not c.get("/api/users/u/state", headers={"X-User": "u"}).json()["cycle"]["enabled"]
+
+
+# ---- the sentence on the card ------------------------------------------------------------------------------
+def test_plain_reason_is_readable_and_respects_hidden_criteria():
+    from foodrec.explain import plain_reason
+    ev = {"fit": [{"type": "preference", "name": "milk"}],
+          "compromises": [{"criterion": "s", "score": .57, "list_median": .76}],
+          "ranking": {"top_contributor": "h", "diversity": {"promoted": False},
+                      "contributions": {"h": {"weight": .4, "score": .8, "contribution": .32},
+                                        "s": {"weight": .3, "score": .57, "contribution": .17},
+                                        "p": {"weight": .25, "score": .5, "contribution": .125}}}}
+    text = plain_reason(ev)
+    assert text.startswith("This dish was suggested mainly because of its healthiness, which scores very well.")
+    assert "milk" in text and "sustainability is lower" in text
+    assert not any(ch.isdigit() for ch in text)
+    hidden = plain_reason(ev, ["p"])
+    assert "ealthiness" not in hidden and "ustainability" not in hidden and "milk" in hidden
+
+
+# ---- links last until the administrator ends them; the path is chosen per account --------------------------
+def test_link_lasts_until_deactivated_or_removed(tmp_path):
+    from foodrec.study import LINK_SESSION_SECONDS
+    p = {"username": "p01", "link": "x" * 24, "role": "full"}
+    c, path = _client(tmp_path, "local", participants=[p])
+    core = c.app.state.core
+    out = c.post("/api/join", json={"token": p["link"]}).json()
+    hd = {"Authorization": f"Bearer {out['token']}"}
+    assert core.sessions._read(out["token"])["exp"] > __import__("time").time() + LINK_SESSION_SECONDS - 60
+    assert c.get("/api/users/p01/state", headers=hd).status_code == 200
+    assert c.post("/api/join", json={"token": p["link"]}).status_code == 200               # reusable
+
+    def save(participants):
+        data = json.loads(path.read_text())
+        data["study"]["participants"] = participants
+        core.apply_config(core.cfg.save(data))
+    save([{**p, "active": False}])
+    assert c.get("/api/users/p01/state", headers=hd).status_code == 401                    # signed out at once
+    assert c.post("/api/join", json={"token": p["link"]}).status_code == 403
+    save([p])
+    assert c.get("/api/users/p01/state", headers=hd).status_code == 200                    # active again
+    save([])
+    assert c.get("/api/users/p01/state", headers=hd).status_code == 401
+    assert c.post("/api/join", json={"token": p["link"]}).status_code == 404
+
+
+def test_deactivated_password_account_cannot_sign_in(tmp_path):
+    c, _ = _client(tmp_path, "local", participants=[{"username": "p01", "password": "maple-river-42", "role": "full", "active": False}])
+    assert c.post("/api/login", json={"username": "p01", "password": "maple-river-42"}).status_code == 401
+
+
+def test_the_path_is_chosen_per_account(tmp_path):
+    from foodrec.study import generate, validate_study
+    c, _ = _client(tmp_path, "local", participants=[
+        {"username": "plain", "link": "a" * 24, "role": "full"},                           # a link without a choice
+        {"username": "free", "link": "b" * 24, "role": "full", "flow": "free"},
+        {"username": "pw", "password": "maple-river-42", "role": "full"},                  # a password without a choice
+        {"username": "pwg", "password": "cedar-oak-11", "role": "full", "flow": "guided"}])
+    core = c.app.state.core
+    assert not core.s.cycle_enabled
+    assert {u: core.cycle_config(u)["enabled"] for u in ("plain", "free", "pw", "pwg")} == \
+        {"plain": True, "free": False, "pw": False, "pwg": True}
+    core.s.cycle_enabled = True
+    assert core.cycle_config("pw")["enabled"] and not core.cycle_config("free")["enabled"]
+    parts, _ = generate({"size": 1, "prefix": "p", "digits": 1, "roles": {"full": 100}, "access": "link", "flow": "free"},
+                        [{"username": "p1", "link": "k" * 24, "active": False}])
+    assert parts[0]["flow"] == "free" and parts[0]["link"] == "k" * 24 and parts[0]["active"] is False
+    assert validate_study({"participants": [{"username": "x", "link": "a" * 20, "role": "full", "flow": "maybe"}]}, {"full": {}})
+
+
+def test_demo_owner_can_deactivate_and_remove_a_link(tmp_path):
+    c, _ = _client(tmp_path, "demo")
+    h = {"X-User": VISITOR}
+    c.post("/api/demo/view", headers=h, json={"view": "admin"})
+    links = c.post("/api/config/population", headers=h, json={"population": {"size": 2, "prefix": "q", "digits": 1, "roles": {"full": 100}}}).json()["participants"]
+    tok = links[0]["link"]
+    uid = c.post("/api/join", json={"token": tok}).json()["user_id"]
+    them = {"X-User": uid}
+    assert c.get(f"/api/users/{uid}/state", headers=them).status_code == 200
+    assert c.post("/api/demo/links", headers={"X-User": "visitor-ffffffffffff"}, json={"token": tok, "action": "deactivate"}).status_code == 403
+    assert c.post("/api/demo/links", headers=h, json={"token": tok, "action": "deactivate"}).status_code == 200
+    assert c.get(f"/api/users/{uid}/state", headers=them).status_code == 403                # also with the id kept in the browser
+    assert c.post("/api/join", json={"token": tok}).status_code == 403
+    assert c.post("/api/demo/links", headers=h, json={"token": tok, "action": "activate"}).status_code == 200
+    assert c.get(f"/api/users/{uid}/state", headers=them).status_code == 200
+    left = c.post("/api/demo/links", headers=h, json={"token": tok, "action": "remove"}).json()["demo_links"]
+    assert len(left) == 1 and c.post("/api/join", json={"token": tok}).status_code == 404
+    assert c.get(f"/api/users/{uid}/state", headers=them).status_code == 403                # not a new visitor either
+
+
+def test_demo_user_view_is_guided_and_admin_view_is_free(tmp_path):
+    c = _cycle_client(tmp_path, mode="demo", enabled=False)
+    h = {"X-User": VISITOR}
+    c.post(f"/api/users/{VISITOR}/onboard", headers=h, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    assert c.get(f"/api/users/{VISITOR}/state", headers=h).json()["cycle"]["enabled"]
+    assert c.post(f"/api/users/{VISITOR}/cycle/next", headers=h).status_code == 400        # a reaction to every dish first
+    c.post("/api/demo/view", headers=h, json={"view": "admin"})
+    assert not c.get(f"/api/users/{VISITOR}/state", headers=h).json()["cycle"]["enabled"]
+    c.post("/api/demo/view", headers=h, json={"view": "user"})
+    assert c.get(f"/api/users/{VISITOR}/state", headers=h).json()["cycle"]["enabled"]
+
+
+def test_tour_is_remembered_per_user_not_per_browser(tmp_path):
+    c = _cycle_client(tmp_path)
+    for user in ("a", "b"):
+        c.post(f"/api/users/{user}/onboard", headers={"X-User": user}, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    seen = lambda u: c.get(f"/api/users/{u}/state", headers={"X-User": u}).json()["tour_seen"]  # noqa: E731
+    assert not seen("a") and not seen("b")
+    assert c.post("/api/users/a/ui-events", headers={"X-User": "a"}, json={"kind": "tour_closed", "result": "skipped"}).status_code == 200
+    assert seen("a") and not seen("b")

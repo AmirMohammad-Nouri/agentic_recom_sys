@@ -1,6 +1,8 @@
 // Profile form (shared with onboarding), profile page with version history, and Activity.
-import { api, clear, CRIT_META, emit, f2, grade, h, human, icon, state, toast, userPath, VALUES, weightBar, when, ago } from "../lib.js";
+import { api, can, clear, CRIT_META, f2, h, human, icon, state, toast, userPath, VALUES, weightBar, when } from "../lib.js";
 import { decisionCard } from "../components.js";
+import { knowledgeView } from "./knowledge.js";
+import { valuesPanel } from "./values.js";
 
 function chipSet(options, selected, { label = (x) => human(x), strict = false } = {}) {
   const sel = new Set(selected);
@@ -97,49 +99,81 @@ export function profileForm(declared = {}) {
   };
 }
 
+// Profile: one place for what the app knows about you, in tabs (#/profile/<tab>).
 export function profileView() {
   const st = state.user_state;
-  const form = profileForm(st.profile.declared);
-  const history = h("div");
-  const goals = h("div");
+  const TABS = [
+    can("page_profile") ? ["preferences", "Preferences", "shield"] : null,
+    can("weight_controls") ? ["values", "Values & diversity", "target"] : null,
+    can("page_knowledge") ? ["knowledge", "Knowledge", "graph"] : null,
+    can("page_profile") ? ["history", "History", "clock"] : null,
+  ].filter(Boolean);
+  const asked = location.hash.split("/")[2];
+  const tab = TABS.some(([k]) => k === asked) ? asked : TABS[0]?.[0];
 
-  async function save() {
-    try {
-      const out = await api(userPath("/profile"), { method: "PUT", body: { declared: form.value() } });
-      state.user_state = await api(userPath("/state"));
-      state.lastResult = null;
-      toast(`Saved profile v${out.profile_version}`);
-      load();
-    } catch (e) { toast(e.message, "err"); }
+  function preferencesTab() {
+    const form = profileForm(st.profile.declared);
+    async function save() {
+      try {
+        const out = await api(userPath("/profile"), { method: "PUT", body: { declared: form.value() } });
+        state.user_state = await api(userPath("/state"));
+        state.lastResult = null;
+        toast(`Saved profile v${out.profile_version}`);
+      } catch (e) { toast(e.message, "err"); }
+    }
+    return h("div.stack",
+      h("div.two-col",
+        h("div.stack",
+          h("section.card", h("div.card-head", h("h2", "Safety rules")), h("div.card-body", form.sections.safety)),
+          VALUES.includes("h") ? h("section.card", h("div.card-head", h("h2", "Health goal")), h("div.card-body", form.sections.goal)) : null),
+        h("div.stack",
+          h("section.card", h("div.card-head", h("h2", "Taste")), h("div.card-body", form.sections.taste)),
+          h("section.card", h("div.card-head", h("h2", "Ingredient limit")), h("div.card-body", form.sections.limits)))),
+      h("div.profile-save", h("span.small.muted", "Every save creates a new version; nothing is overwritten."),
+        h("button.btn.primary", { onclick: save }, "Save changes")));
   }
-  async function load() {
-    const [ph, gh] = await Promise.all([api(userPath("/profile/history")), api(userPath("/goal/history"))]);
-    clear(history, h("table.t", h("thead", h("tr", h("th", "Version"), h("th", "When"), h("th", "Source"), h("th", "Rules"))),
-      h("tbody", ph.map((p) => h("tr", h("td", "v" + p.version), h("td", when(p.created_at)), h("td", human(p.source)),
-        h("td.small", [...p.declared.allergens.map((a) => "allergy " + a), ...p.declared.diets.map(human),
-          ...p.declared.disliked_ingredients.filter((d) => d.strict).map((d) => "never " + d.name)].join(", ") || "–"))))));
-    clear(goals, gh.map((g) => h("div.hit",
-      h("div.row.between", h("div", h("b", `v${g.version} · ${g.name}`), h("div.small.muted", `${human(g.source)} · ${when(g.created_at)} · ${g.mode} · diversity ${f2(g.diversity)}`)),
-        g.version !== gh[0].version ? h("button.btn.sm", { onclick: async () => {
-          await api(userPath("/goal/revert"), { method: "POST", body: { version: g.version } });
-          state.user_state = await api(userPath("/state")); state.lastResult = null; toast(`Restored v${g.version} as a new version`); load();
-        } }, icon("undo"), "Restore") : h("span.tag.accent", "current")),
-      h("div", { style: { marginTop: "6px" } }, weightBar(g.weights, VALUES)),
-      h("div.small.muted", { style: { marginTop: "4px" } }, VALUES.map((k) => `${CRIT_META[k].label} ${f2(g.weights[k])}`).join(" · ")))));
+
+  function historyTab() {
+    const history = h("div");
+    const goals = h("div");
+    async function load() {
+      const [ph, gh] = await Promise.all([api(userPath("/profile/history")), api(userPath("/goal/history"))]);
+      clear(history, h("table.t", h("thead", h("tr", h("th", "Version"), h("th", "When"), h("th", "Source"), h("th", "Rules"))),
+        h("tbody", ph.map((p) => h("tr", h("td", "v" + p.version), h("td", when(p.created_at)), h("td", human(p.source)),
+          h("td.small", [...p.declared.allergens.map((a) => "allergy " + a), ...p.declared.diets.map(human),
+            ...p.declared.disliked_ingredients.filter((d) => d.strict).map((d) => "never " + d.name)].join(", ") || "–"))))));
+      clear(goals, gh.map((g) => h("div.hit",
+        h("div.row.between", h("div", h("b", `v${g.version} · ${g.name}`), h("div.small.muted", `${human(g.source)} · ${when(g.created_at)} · ${g.mode} · diversity ${f2(g.diversity)}`)),
+          g.version !== gh[0].version ? (can("weight_controls") ? h("button.btn.sm", { onclick: async () => {
+            await api(userPath("/goal/revert"), { method: "POST", body: { version: g.version } });
+            state.user_state = await api(userPath("/state")); state.lastResult = null; toast(`Restored v${g.version} as a new version`); load();
+          } }, icon("undo"), "Restore") : null) : h("span.tag.accent", "current")),
+        h("div", { style: { marginTop: "6px" } }, weightBar(g.weights, VALUES)),
+        h("div.small.muted", { style: { marginTop: "4px" } }, VALUES.map((k) => `${CRIT_META[k].label} ${f2(g.weights[k])}`).join(" · ")))));
+    }
+    load();
+    return h("div.two-col",
+      h("section.card", h("div.card-head", h("h2", "Goal versions")), h("div.card-body", goals)),
+      h("section.card", h("div.card-head", h("h2", "Profile versions")), h("div.card-body", history)));
   }
-  load();
-  return h("div",
-    h("div.page-head", h("div", h("h1", "Profile"), h("p", "Your rules and preferences. Every save creates a new version; nothing is overwritten.")),
-      h("button.btn.primary", { onclick: save }, "Save new version")),
-    h("div.two-col",
-      h("div.stack",
-        h("section.card", h("div.card-head", h("h2", "Safety rules")), h("div.card-body", form.sections.safety)),
-        h("section.card", h("div.card-head", h("h2", "Taste")), h("div.card-body", form.sections.taste)),
-        VALUES.includes("h") ? h("section.card", h("div.card-head", h("h2", "Health goal")), h("div.card-body", form.sections.goal)) : null,
-        h("section.card", h("div.card-head", h("h2", "Ingredient limit")), h("div.card-body", form.sections.limits))),
-      h("div.stack",
-        h("section.card", h("div.card-head", h("h2", "Goal versions")), h("div.card-body", goals)),
-        h("section.card", h("div.card-head", h("h2", "Profile versions")), h("div.card-body", history)))));
+
+  const content = { preferences: preferencesTab, values: valuesPanel, knowledge: () => knowledgeView({ embedded: true }), history: historyTab }[tab]?.()
+    ?? h("div.empty", "Nothing to show for this account.");
+  const rules = st.constraints?.length || 0;
+  const name = state.system?.mode === "demo" ? "Your profile" : state.user;
+  const el = h("div.profile",
+    h("section.card.profile-head",
+      h("div.profile-avatar", icon("user")),
+      h("div.grow", h("h1", name), h("p.small.muted", st.access?.label || "")),
+      h("div.profile-facts",
+        st.goal ? h("div.fact", h("b", `v${st.goal.version}`), h("span.small.muted", "goal")) : null,
+        st.profile ? h("div.fact", h("b", `v${st.profile.version}`), h("span.small.muted", "profile")) : null,
+        h("div.fact", h("b", String(rules)), h("span.small.muted", rules === 1 ? "active rule" : "active rules")))),
+    h("nav.profile-tabs", { "aria-label": "Profile sections" }, TABS.map(([k, label, ic]) =>
+      h("a" + (k === tab ? ".on" : ""), { href: `#/profile/${k}` }, icon(ic), label))),
+    content);
+  el.cleanup = content.cleanup;
+  return el;
 }
 
 const EVENT_TEXT = {

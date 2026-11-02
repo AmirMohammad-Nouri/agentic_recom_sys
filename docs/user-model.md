@@ -171,9 +171,9 @@ onboarding ──▶ rules + stated weights w + health goal + taste counts
 | Maximum missing value weight | 0.5 | `FOODREC_MAX_MISSING_SHARE` |
 | Confidence constant | 5 | `PARAMS["conf_k"]` |
 | Declared like / dislike | 2 counts | `PARAMS["declared_count"]` |
-| Ask / propose gap | 0.10 / 0.15 | `agent/policy.py: THRESHOLDS` |
-| Ask / propose minimum events | 3 / 6 | `THRESHOLDS` |
-| Cooldown | 6 events | `THRESHOLDS["cooldown_events"]` |
+| Ask / propose gap | 0.10 / 0.15 | Config: `supervisor.ask_gap`, `propose_gap` |
+| Ask / propose minimum events | 3 / 6 | Config: `supervisor.ask_min_events`, `propose_min_events` |
+| Cooldown | 6 events | Config: `supervisor.cooldown_events` |
 
 These are design choices, not fitted values. They are exposed at `GET /api/system` and should
 be calibrated with simulated or real users before an evaluation.

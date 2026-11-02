@@ -33,7 +33,7 @@ from .appconfig import (ASSIGNMENT, FIELDS, REGISTRATION, ROOT, SECTIONS, AppCon
 from .config import load_settings
 from .export import export, to_json, to_zip
 from .model_spec import KINDS
-from .study import admin_link_token, check_password, credential_fp, generate, validate_study
+from .study import LINK_SESSION_SECONDS, admin_link_token, check_password, credential_fp, generate, validate_study
 
 BOOT_ID = uuid.uuid4().hex[:12]  # changes on every (re)start; the Config page waits for a new one
 from .features import breakdown, health_grade
@@ -80,12 +80,12 @@ def pipeline_trace(res):
          "detail": f"Healthiness for the goal '{cfg['health_goal'].replace('_', ' ')}', sustainability from CO2e, "
                    f"convenience from ingredient count; taste scorer: {res['pipeline']['preference_scorer']}; "
                    f"cache {tel['cache']}; no language-model call.", "duration_ms": st.get("scoring", {}).get("wall_ms")},
-        {"kind": "reason", "title": "Weighted utility", "source": "engine",
-         "detail": "U = " + " + ".join(f"{cfg['weights_applied'][k]:.2f}*{CRITERION_LABELS[k]}" for k in cfg["weights_applied"])
+        {"kind": "reason", "title": "Similarity score", "source": "engine",
+         "detail": "Score = " + " + ".join(f"{cfg['weights_applied'][k]:.2f}*{CRITERION_LABELS[k]}" for k in cfg["weights_applied"])
                    + f" (taste share {round(100 * cfg['taste_share'])}%). {cfg['weights_message']}"},
         {"kind": "tool", "title": f"Diversity rerank (d = {cfg['diversity']:.2f})", "source": "engine",
          "detail": f"{sum(1 for r in res['results'] if r['evidence']['ranking']['diversity']['promoted'])} recipe(s) promoted "
-                   f"for variety; utility rank and final rank are both recorded.",
+                   f"for variety; similarity rank and final rank are both recorded.",
          "duration_ms": st.get("rerank", {}).get("wall_ms")},
         {"kind": "answer", "title": "Evidence records built", "source": "engine",
          "detail": f"One evidence record per recipe; reasons are templates filled from it. Total {tel['total_wall_ms']:.1f} ms."},
@@ -192,13 +192,15 @@ def create_app(settings=None, llm=None):
 
     # Every user-scoped call must come from that user (or an admin); other data endpoints need a
     # signed-in user (local) or a visitor id (demo).
-    OPEN_API = ("/api/system", "/api/login", "/api/session", "/api/logout")
+    OPEN_API = ("/api/system", "/api/login", "/api/join", "/api/session", "/api/logout")
 
     @api.middleware("http")
     async def _require_login(request: Request, call_next):
         path = request.url.path
         guarded = path.startswith("/api/") and not path.startswith(OPEN_API) and \
             not path.startswith(("/api/config", "/api/admin", "/api/export"))
+        if mode() == "demo" and path == "/api/session":
+            guarded = False
         m = re.match(r"^/api/users/([^/]+)/", path)
         if guarded and login_required() and not admin_token_ok(request):
             uid = session_user(request)
@@ -210,6 +212,9 @@ def create_app(settings=None, llm=None):
             uid = who(request)
             if not uid or (m and unquote(m.group(1)) != uid):
                 return JSONResponse({"error": "demo visitors can only use their own visitor id"}, status_code=403)
+            link = core.store.demo_link(user_id=uid)
+            if link and link["status"] != "active":
+                return JSONResponse({"error": "this link has been deactivated"}, status_code=403)
             ip = request.client.host if request.client else "?"
             if path.endswith("/onboard") and over_limit(("onboard", ip), 20, 3600):
                 return JSONResponse({"error": "too many new visitors from this address; try again later"}, status_code=429)
@@ -231,6 +236,35 @@ def create_app(settings=None, llm=None):
         core.store.ensure_user(user)
         return {"token": core.sessions.issue(user, credential_fp(core.cfg, user)), "user_id": user,
                 "access": core.access(user)}
+
+    @api.post("/api/join")
+    def join(request: Request, body: dict = Body(...)):
+        """Open a personal link (/join/<token>): the link itself is the way in."""
+        token = body.get("token") or ""
+        ip = request.client.host if request.client else "?"
+        if over_limit(("join", ip), 60, 300):
+            raise HTTPException(429, "too many attempts; wait a few minutes")
+        if mode() == "demo":
+            link = core.store.demo_link(token=token) if token else None
+            if not link or link["status"] == "removed":
+                raise HTTPException(404, "this link is not valid (any more)")
+            if link["status"] != "active":
+                raise HTTPException(403, "this link has been deactivated")
+            core.store.ensure_user(link["user_id"])
+            return {"user_id": link["user_id"], "mode": "demo"}
+        p = core.cfg.participant_by_link(token)
+        if not p:
+            raise HTTPException(404, "this link is not valid (any more)")
+        if p.get("active") is False:
+            raise HTTPException(403, "this link has been deactivated")
+        core.store.ensure_user(p["username"])
+        return {"token": core.sessions.issue(p["username"], credential_fp(core.cfg, p["username"]), ttl=LINK_SESSION_SECONDS),
+                "user_id": p["username"], "mode": mode()}
+
+    @api.get("/join/{token}", include_in_schema=False)
+    def join_page(token: str):
+        """The app; it reads the token from the address and signs the person in."""
+        return FileResponse(WEB / "index.html", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
     @api.get("/api/session")
     def session(request: Request):
@@ -271,7 +305,7 @@ def create_app(settings=None, llm=None):
     # ---- system -------------------------------------------------------------------------
     @api.get("/api/system")
     def system():
-        return {**core.system(), "skills": sup.skills.catalog(), "thresholds": policy.THRESHOLDS,
+        return {**core.system(), "skills": sup.skills.catalog(), "thresholds": {k: getattr(core.s, k, d) for k, d in policy.THRESHOLDS.items()},
                 "boot_id": BOOT_ID, "pid": os.getpid(), "login_required": login_required(), "mode": mode(),
                 "restarting": getattr(core, "restarting", False)}
 
@@ -354,6 +388,26 @@ def create_app(settings=None, llm=None):
         res = core.recommend(uid, ov, origin="ui")
         res["pipeline_trace"] = pipeline_trace(res)
         return redact_result(res, acc)
+
+    # ---- meal cycles ------------------------------------------------------------------------------
+    def _cycle_view(uid, st):
+        if st.get("result"):
+            st = {**st, "result": redact_result(st["result"], core.access(uid))}
+        return st
+
+    @api.get("/api/users/{uid}/cycle")
+    def cycle(uid: str):
+        if not core.store.profile(uid):
+            raise HTTPException(409, "complete onboarding first")
+        return _cycle_view(uid, core.cycle_state(uid))
+
+    @api.post("/api/users/{uid}/cycle/next")
+    def cycle_next(uid: str):
+        return _cycle_view(uid, core.cycle_next(uid))
+
+    @api.post("/api/users/{uid}/cycle/restart")
+    def cycle_restart(uid: str):
+        return _cycle_view(uid, core.cycle_restart(uid))
 
     @api.post("/api/users/{uid}/preview")
     def preview(uid: str, body: dict = Body(...)):
@@ -565,7 +619,7 @@ def create_app(settings=None, llm=None):
             adm.pop("password", None)
         return d
 
-    def config_view():
+    def config_view(request):
         cfg = core.cfg
         st = core.llm.status() if hasattr(core.llm, "status") else {}
         demo = mode() == "demo"
@@ -573,8 +627,11 @@ def create_app(settings=None, llm=None):
             "path": str(cfg.path) if cfg.path else None, "exists": bool(cfg.path and Path(cfg.path).exists()),
             "version": cfg.version, "raw": _no_hash(cfg.raw), "effective": _no_hash(cfg.data), "errors": cfg.errors,
             "mode": mode(), "read_only": demo,
+            "visitor_settings": core.store.visitor_settings(who(request)) if demo and who(request) else None,
+            "demo_links": [{"username": x["label"], "link": x["token"], "role": x["role"], "active": x["status"] == "active"}
+                           for x in core.store.demo_links(who(request))] if demo and who(request) else None,
             "sections": SECTIONS,
-            "fields": [{**{k: v for k, v in f.items() if k != "attr"}, "running": _shown(getattr(core.s, f["attr"])),
+            "fields": [{**{k: v for k, v in f.items() if k != "attr"}, "attr_name": f["attr"], "running": _shown(getattr(core.s, f["attr"])),
                         "file_value": cfg.value(f["section"], f["key"]), "source": core.s.sources.get(f["attr"]),
                         "env_set": bool(f.get("env") and os.environ.get(f["env"]))} for f in FIELDS],
             "features": feature_catalog(), "criteria": criteria_catalog(),
@@ -595,7 +652,7 @@ def create_app(settings=None, llm=None):
     @api.get("/api/config")
     def get_config(request: Request):
         admin(request)
-        return config_view()
+        return config_view(request)
 
     @api.post("/api/config/validate")
     def validate_config(request: Request, body: dict = Body(...)):
@@ -621,7 +678,7 @@ def create_app(settings=None, llm=None):
         restarting = bool(pending and core.s.auto_reload and w)
         if restarting:
             w.check()  # the watcher would see the new file within a second anyway
-        return {**config_view(), "restarting": restarting}
+        return {**config_view(request), "restarting": restarting}
 
     @api.post("/api/config/secret")
     def set_secret(request: Request, body: dict = Body(...)):
@@ -644,14 +701,45 @@ def create_app(settings=None, llm=None):
 
     @api.post("/api/config/population")
     def generate_population(request: Request, body: dict = Body(...)):
-        """Participants for a population spec (nothing is saved; the page saves the result)."""
-        admin(request)
+        """Participants for a population spec (nothing is saved; the page saves the result). In the
+        demo: personal links only, stored for this visitor (see App.demo_population)."""
+        me = admin(request)
         pop = body.get("population") or {}
+        if mode() == "demo":
+            pop = {**pop, "access": "link"}
         errs = validate_study({"population": pop}, core.cfg.roles)
         if errs:
             raise HTTPException(400, "; ".join(errs))
+        if mode() == "demo":
+            if int(pop.get("size") or 0) > 50:
+                raise HTTPException(400, "the demo creates at most 50 links at a time")
+            if over_limit(("population", me), 20, 3600):
+                raise HTTPException(429, "the demo allows 20 generated populations per hour")
+            return core.demo_population(me, pop)
         parts, counts = generate(pop, body.get("participants"))
         return {"participants": parts, "counts": counts}
+
+    @api.post("/api/demo/links")
+    def demo_link_action(request: Request, body: dict = Body(...)):
+        """Demo: deactivate, activate or remove one of this visitor's links."""
+        if mode() != "demo":
+            raise HTTPException(404, "only on a demo server")
+        me = admin(request)
+        status = {"deactivate": "inactive", "activate": "active", "remove": "removed"}.get(body.get("action"))
+        if not status:
+            raise HTTPException(400, "action must be deactivate, activate or remove")
+        if not core.store.set_demo_link_status(me, body.get("token") or "", status):
+            raise HTTPException(404, "unknown link")
+        return {"demo_links": [{"username": x["label"], "link": x["token"], "role": x["role"], "active": x["status"] == "active"}
+                               for x in core.store.demo_links(me)]}
+
+    @api.put("/api/demo/settings")
+    def demo_settings(request: Request, body: dict = Body(...)):
+        """Demo: settings a visitor tries for themselves; other visitors and the file are untouched."""
+        if mode() != "demo":
+            raise HTTPException(404, "only on a demo server")
+        me = admin(request)
+        return {"visitor_settings": core.save_visitor_settings(me, body.get("settings") or {})}
 
     @api.post("/api/config/restart")
     def restart_now(request: Request):

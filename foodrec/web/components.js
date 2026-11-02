@@ -1,5 +1,5 @@
 // Reusable UI pieces: recipe card, decision card, change summary, comparison table.
-import { api, ask, can, co2, CRIT, CRIT_META, clear, emit, f2, grade, h, human, icon, menu, pct, state, toast, track, userPath, VALUES, visibleCriteria, weightBar, ago } from "./lib.js";
+import { api, can, co2, CRIT, CRIT_META, clear, emit, f2, grade, h, human, icon, menu, pct, state, toast, track, userPath, VALUES, visibleCriteria, weightBar, ago } from "./lib.js";
 
 // Feedback reasons come from the configured interactions (foodrec.config.json "interactions").
 const reasons = (kind) => (state.system?.interactions?.[`${kind}_reasons`] || []).filter((r) => r.show !== false);
@@ -14,6 +14,7 @@ export async function sendFeedback(r, requestId, type, reason, scope = "lasting"
       method: "POST",
       body: { request_id: requestId, recipe_id: r.recipe_id, type, reason, scope, context: state.context || {} },
     });
+    emit("answered", { request_id: requestId, recipe_id: r.recipe_id, type });
     if (out.duplicate) { toast(type === "save" || type === "like" ? `Already in My dishes (${type === "save" ? "Saved" : "Liked"})` : "Already recorded for this list"); return out; }
     emit("review", { ...out.review, recipe: r.title, type, reason, scope, ts: Date.now() / 1000 });
     if (out.review.decisions.length) toast("The supervisor has a question for you");
@@ -51,26 +52,27 @@ export function scoreChips(r) {
 
 // What a card shows depends on the user's access role (Config page); the server has already
 // removed the fields the role may not see, so every part below also checks that its data exists.
-export function recipeCard(r, { requestId, compareWith = [] } = {}) {
+export function recipeCard(r, { requestId, compareWith = [], answered = null } = {}) {
   const ev = r.evidence || {};
   const rk = ev.ranking || {};
-  const top = rk.top_contributor;
-  const dv = rk.diversity || {};
-  const status = h("span.done");
+  const status = h("span.done", answered ? [icon("check"), ` ${human(answered === "choose" ? "chosen" : answered + "d")}`] : null);
   const detailBox = h("div.hidden");
   const explain = can("explanations");
   const details = can("food_details");
   const showUtility = can("utility") && r.utility != null;
 
+  // the bar under a dish: what its values (not taste) contribute
+  const barKeys = visibleCriteria(VALUES);
   const contribW = {};
   const contribs = rk.contributions || {};
-  const total = Object.values(contribs).reduce((a, c) => a + c.contribution, 0) || 1;
-  for (const k of CRIT) contribW[k] = (contribs[k]?.contribution || 0) / total;
+  const total = barKeys.reduce((a, k) => a + (contribs[k]?.contribution || 0), 0) || 1;
+  for (const k of barKeys) contribW[k] = (contribs[k]?.contribution || 0) / total;
 
   const act = async (type, reason, scope = "lasting") => {
     try {
       const out = await sendFeedback(r, requestId, type, reason, scope);
-      if (out.duplicate) return;
+      card.classList.add("answered");
+      if (out.duplicate) { clear(status, icon("check"), " already recorded"); return; }
       clear(status, icon("check"), ` ${human(type === "choose" ? "chosen" : type + "d")}${reason ? " · " + human(reason) : ""}${scope === "today" ? " · today only" : ""}`);
       if (type === "save" && can("page_dishes")) toast(state.system?.hide_saved ? "Saved to My dishes; it waits there instead of in Discover" : "Saved to My dishes");
     } catch { /* toast already shown */ }
@@ -83,7 +85,7 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
       { text: "Only today", run: () => act(type, reason, "today") }]), 0);
   };
 
-  return h("article.recipe",
+  const card = h("article.recipe" + (answered ? ".answered" : ""),
     h("div.rank-col", h("div.rank", r.final_rank), thumb(r)),
     h("div",
       h("div.row.between", { style: { alignItems: "flex-start" } },
@@ -92,25 +94,20 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
           h("div.meta",
             h("span.m", r.cuisine === "Other" ? human(r.meal) : `${r.cuisine} · ${human(r.meal)}`),
             details ? [
-              h("span.m", { title: "Health grade" }, grade(r.health_grade)),
               h("span.m", icon("list"), `${r.n_ingredients} ingredients`),
               h("span.m", icon("flame"), r.kcal == null ? "kcal unknown" : `${Math.round(r.kcal)} kcal`),
               h("span.m", icon("leaf"), co2(r.co2e_kg_per_kg))] : null)),
-        showUtility ? h("div.util", h("div", f2(r.utility)), h("div.small.muted", "utility")) : null),
+        h("div.card-side",
+          details && r.health_grade !== undefined ? grade(r.health_grade) : null,
+          showUtility ? h("div.util", { title: "How well this dish matches your priorities and taste, from 0 to 1" }, h("div", f2(r.utility)), h("div.small.muted", "similarity score")) : null)),
       scoreChips(r),
-      showUtility && rk.contributions ? h("div.contrib", { title: "Share of the utility contributed by each criterion" }, weightBar(contribW, visibleCriteria())) : null,
-      explain ? h("div.reason",
-        top && contribs[top] ? [h("b", CRIT_META[top].long), ` contributes most (${f2(contribs[top].contribution)} of ${f2(r.utility)}). `] : null,
-        dv.promoted ? h("span.tag.info", { title: r.reasons.ranked_here.find((x) => x.includes("diversity")) || "" },
-          `moved up from utility rank ${rk.utility_rank} for variety`) : null,
-        dv.demoted ? h("span.tag", `utility rank ${rk.utility_rank}`) : null) : null,
-      explain && personalFits(r).length ? h("ul.reason-list.fit", personalFits(r).slice(0, 2).map((x) => h("li", x))) : null,
-      explain && r.reasons?.compromises?.length ? h("ul.reason-list.comp", r.reasons.compromises.slice(0, 1).map((x) => h("li", x))) : null,
+      can("utility") && rk.contributions && barKeys.length ? h("div.contrib", { title: "How much each value contributes to this dish's score" }, weightBar(contribW, barKeys)) : null,
+      explain && r.reasons?.summary ? h("p.reason", r.reasons.summary) : null,
       (r.missing_info?.length || (explain && r.repetition) || r.freshness?.new_cuisine || (explain && r.freshness?.exposure_penalty)) ? h("div.row.wrap", { style: { marginTop: "4px", gap: "4px" } },
         r.freshness?.new_cuisine ? h("span.tag.accent", { title: `No ${r.cuisine} dish was in your recent lists` }, `New for you: ${r.cuisine}`) : null,
-        explain && r.freshness?.exposure_penalty ? h("span.tag", { title: `Shown ${r.freshness.times_shown} time(s) recently without a reaction; it gives way a little (−${f2(r.freshness.exposure_penalty)}) so other dishes get a turn` },
+        explain && r.freshness?.exposure_penalty ? h("span.tag", { title: `Shown ${r.freshness.times_shown} time(s) recently without a reaction; it gives way a little so other dishes get a turn` },
           `Shown ${r.freshness.times_shown}× recently`) : null,
-        explain && r.repetition ? h("span.tag.warn", { title: `Temporary penalty; utility ${f2(r.repetition.utility_before_penalty)} before it` },
+        explain && r.repetition ? h("span.tag.warn", { title: `Temporary penalty; similarity score ${f2(r.repetition.utility_before_penalty)} before it` },
           `Had it ${ago(r.repetition.last_eaten_ts)} · -${f2(r.repetition.penalty)}`) : null,
         (r.missing_info || []).map((m) => h("span.tag.warn", { title: m.text }, m.criterion ? `Missing data: ${CRIT_META[m.criterion].long.toLowerCase()}` : "Weights adjusted for missing data"))) : null,
       h("div.recipe-actions",
@@ -123,8 +120,6 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
             ...REJECT().map(([k, t]) => ({ text: t, run: () => askScope(b, "reject", k) }))]); } }, icon("x"), "Not for me")] : null,
         h("span.grow"),
         status,
-        can("assistant") && explain ? h("button.btn.sm.ghost", { onclick: () => ask(`Why is #${r.final_rank} ${r.title} recommended?`), title: "Ask the assistant about this recipe" },
-          icon("spark"), "Ask") : null,
         hasDetails(r) ? h("button.btn.sm.ghost.details-btn", {
           onclick: (e) => {
             detailBox.classList.toggle("hidden");
@@ -135,6 +130,7 @@ export function recipeCard(r, { requestId, compareWith = [] } = {}) {
           },
         }, icon("info"), detailsLabel()) : null),
       detailBox));
+  return card;
 }
 
 // ---- score breakdown: how each of the three scores was calculated ------------------------
@@ -210,11 +206,11 @@ function recipeDetails(r, compareWith) {
   });
   const rs = r.reasons || {};
   return h("div.details",
-    can("utility") && r.utility != null && rows.length ? h("div",
+    can("utility") && rk.contributions && rows.length ? h("div",
       h("div.section-label", "Why it ranked here"),
       h("table.t", h("thead", h("tr", h("th", "Criterion"), h("th.num", "Score"), h("th.num", "Weight"), h("th.num", "Contribution"), h("th", ""))), h("tbody", rows)),
       h("div.small.muted", { style: { marginTop: "6px" } },
-        `Utility ${f2(r.utility)} = Σ weight × score (taste keeps a fixed share). Utility rank ${rk.utility_rank}, final rank ${rk.final_rank}.`,
+        `${r.utility != null ? `Similarity score ${f2(r.utility)}` : "Similarity score"} = Σ weight × score (taste keeps a fixed share). Similarity rank ${rk.utility_rank}, final rank ${rk.final_rank}.`,
         rk.diversity?.max_similarity_to_earlier ? ` Similarity to earlier picks ${f2(rk.diversity.max_similarity_to_earlier)}.` : "")) : null,
     can("score_breakdown") && r.breakdown ? h("div", h("div.section-label", "How each score is calculated"), scoreBreakdown(r.breakdown)) : null,
     explain && rs.ranked_here?.length ? h("div", h("div.section-label", "Ranking notes"), h("ul.reason-list", rs.ranked_here.map((x) => h("li", x)))) : null,
@@ -235,7 +231,7 @@ export function compareTable(a, b) {
       const d = x == null || y == null ? null : x - y;
       return h("tr", h("td", CRIT_META[k].long), h("td.num", f2(x)), h("td.num", f2(y)),
         h("td.num" + (d > 0.04 ? ".delta-up" : d < -0.04 ? ".delta-down" : ""), d == null ? "–" : (d > 0 ? "+" : "") + f2(d)));
-    }), showU ? h("tr", h("td", h("b", "Utility")), h("td.num", h("b", f2(a.utility))), h("td.num", h("b", f2(b.utility))),
+    }), showU ? h("tr", h("td", h("b", "Similarity score")), h("td.num", h("b", f2(a.utility))), h("td.num", h("b", f2(b.utility))),
       h("td.num", (a.utility - b.utility > 0 ? "+" : "") + f2(a.utility - b.utility))) : null));
 }
 

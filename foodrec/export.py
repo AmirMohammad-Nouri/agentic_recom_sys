@@ -187,6 +187,8 @@ def export_user(app, user_id, include_raw=True):
     }
     out = {
         "user_id": user_id, "created": _iso(store.user_created(user_id)), "onboarded": prof is not None,
+        "meal_cycle": {"steps": [{**s, "time": _iso(s["created_at"])} for s in store.cycle_steps(user_id)],
+                       "reactions": store.cycle_answers(user_id)},
         "access": {k: acc[k] for k in ("role", "label", "source", "features", "visible_criteria", "blocked_skills")},
         "preferences": {
             "declared": (prof or {}).get("declared"), "profile_version": (prof or {}).get("version"),

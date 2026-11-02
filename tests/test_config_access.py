@@ -70,7 +70,7 @@ def test_baseline_result_is_redacted(onboarded):
     out = redact_result(res, acc_b)
     r = out["results"][0]
     assert r["scores"] == {} and "utility" not in r and "breakdown" not in r
-    assert r["reasons"] == {"fits": [], "ranked_here": [], "compromises": [], "gaps": []}
+    assert r["reasons"] == {"summary": "", "fits": [], "ranked_here": [], "compromises": [], "gaps": []}
     assert "ranking_table" not in out and out["narrative"] is None
     assert r["ingredients_detail"]                      # baseline still sees food details
     full = redact_result(res, acc)

@@ -158,13 +158,12 @@ That is a complete installation. The next sections are optional.
 
 | Where | What you can do |
 |---|---|
-| **Discover** | Five recipes ranked for you. Move the value sliders and **Apply** to try them on this list, or **Save as goal** to keep them as a new goal version. Choose a meal, react to dishes (Like, Save, *I'll cook this*, *Not for me* with a reason), and open *How it's scored* on any card. |
+| **Discover** | The recipes ranked for you, and nothing else. Each card shows the health grade (A to E), the similarity score and, in plain words, why the dish was suggested. Choose a meal, react to dishes (Like, Save, *I'll cook this*, *Not for me* with a reason), and open *How it's scored* on any card. With [meal cycles](foodrec/web/guides/cycle.md) on, you go through the meals of each day and react to every dish. |
 | **Assistant** (right side, every page) | Ask in plain language: "something easy with lentils", "why is #2 first?", "compare #1 and #3", "what if I cared more about sustainability?". Every step the agent takes is shown live above the answer. The *Supervisor* tab shows its questions and proposals. |
 | **Account menu** (top right) | **My dishes**: saved for later, liked and cooked dishes. **Config** (administrator only). **How FoodRec works** (the complete guide). Sign out. |
 | **Insights** | What your choices reveal compared with your saved goal, with the evidence behind every change; taste beliefs you can correct. |
-| **Knowledge** | The knowledge graph explorer, your document library and a search tester. |
 | **Activity** | The full event log and every supervisor decision. |
-| **Profile** | Rules and preferences, profile versions, and goal versions you can restore. |
+| **Profile** | In tabs: **Preferences** (rules and tastes), **Values & diversity** (how much each value counts, saved as goal versions), **Knowledge** (the knowledge graph, your document library and a search tester) and **History** (profile versions and goal versions you can restore). |
 
 **Guided tour.** Account menu → **Show the tour** walks through these parts with short, skippable hints
 (on the public demo it starts by itself). The hints are in `foodrec/web/tour.json` and can be edited.
@@ -231,15 +230,16 @@ Click the status pill for the live state of every component.
    `baseline` and `admin`.
 2. **Create the participants** (Config → **Users & study → Create the study population**). Enter the
    number of users and the percentage per role (for example 40 users, 50 % `full`, 50 % `baseline`) and
-   click **Generate participants**. Each account gets a username (`p001` …) and a readable password;
-   both can be edited. **Save to file**, then **Download usernames and passwords (CSV)** to hand them out.
+   choose how people get in, and click **Generate participants**. With *Username and password*, each
+   account gets a username (`p001` …) and a readable password; with *Personal link only*, each person gets
+   a link and types nothing. **Save to file**, then download the CSV to hand them out.
    Command line: `foodrec study generate --size 40 --role full=50 --role baseline=50 --write`.
-3. **Participants sign in** with their account, complete the onboarding, and see the app as their role
+3. **Participants sign in** with their account or open their personal link, complete the onboarding, and see the app as their role
    allows. They never see Config and can only use their own account.
 4. **Export the data** (Config → **Export**, or `foodrec export --out study.zip`). Each user's record holds
    their role and what they could see, preferences and their history, the scores of every list shown
    (all and visible), every interaction, supervisor decisions, the conversation with the agent's steps,
-   interface events and a summary. The ZIP adds flat CSV tables. Passwords are never exported.
+   interface events and a summary. The ZIP adds flat CSV tables. Passwords and links are never exported.
 5. **Test before you run it** with scripted scenarios (`scenarios/*.json`):
    ```bash
    foodrec scenario run scenarios/study_access_roles.json
@@ -249,7 +249,7 @@ Click the status pill for the live state of every component.
    if an expectation does not hold.
 
 > [!WARNING]
-> Participant passwords are stored readable in `foodrec.config.json`, because you hand them out. Do not
+> Participant passwords and links are stored readable in `foodrec.config.json`, because you hand them out. Do not
 > commit that file once it holds real accounts (`git status` shows it as modified; leave it out of
 > `git add`).
 
@@ -298,7 +298,7 @@ environment and are never written to the file. Full reference:
 | `foodrec status` / `foodrec stop` | is it running? stop it, from any terminal |
 | `foodrec admin password` | set or change the administrator password |
 | `foodrec study generate --size N --role R=P … [--write]` | create participant accounts |
-| `foodrec study list` | participants with role and password |
+| `foodrec study list` | participants with role and password or link |
 | `foodrec users` | users in the database and their roles |
 | `foodrec export --out study.zip [--users p001,p002]` | the standard export (JSON or ZIP) |
 | `foodrec scenario run FILE… [--set k=v] [--matrix k=v1,v2]` | run scripted scenarios |
@@ -394,7 +394,7 @@ User message ─▶ Supervisor agent: perceive → understand → plan → act (
 * **Scores you can open.** Each criterion is a fixed formula from 0 to 1 (healthiness from nine nutrient
   factors weighted by the health goal, sustainability from estimated CO₂e, convenience from the number
   of ingredients, plus any criteria you configure).
-* **Utility.** `utility = taste_share · taste + (1 − taste_share) · Σ weight_k · score_k`; diversity,
+* **Utility** (shown to users as the *similarity score*). `utility = taste_share · taste + (1 − taste_share) · Σ weight_k · score_k`; diversity,
   freshness and the missing-data policy are applied and disclosed per recipe.
 * **Learning.** Taste is counted from likes and dislikes; the weights a user's choices reveal are tracked
   next to the saved goal, which only the user changes.

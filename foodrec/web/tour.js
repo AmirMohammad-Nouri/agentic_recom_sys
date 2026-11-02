@@ -1,9 +1,8 @@
 // Guided tour: hint bubbles that point at parts of the app (steps in tour.json). It starts by
-// itself on the demo (once per browser, after onboarding) and from the account menu anywhere.
-// Back / Next / Skip; skipped and finished tours are remembered. The page stays usable.
-import { demoView, emit, h, safeGet, safeSet, state } from "./lib.js";
+// itself at each user's first login (after onboarding), and from the account menu at any time.
+// Back / Next / Skip; the server remembers that the user closed it. The page stays usable.
+import { can, demoView, emit, h, state, track } from "./lib.js";
 
-const KEY = "foodrec.tour";
 let steps = null;
 let current = -1;
 let bubble = null;
@@ -15,10 +14,12 @@ async function load() {
     steps = (await res.json()).steps || [];
   }
   const view = state.system?.mode === "demo" ? demoView() : null;
-  return steps.filter((s) => !s.views || (view && s.views.includes(view)));
+  const cycle = !!state.user_state?.cycle?.enabled;
+  return steps.filter((s) => (!s.views || (view && s.views.includes(view))) && (s.cycle === undefined || s.cycle === cycle) &&
+    (!s.feature || can(s.feature)));
 }
 
-function waitFor(selector, ms = 2500) {
+function waitFor(selector, ms = 5000) {
   return new Promise((resolve) => {
     const t0 = Date.now();
     (function poll() {
@@ -35,12 +36,15 @@ function clearMark() {
   marked = null;
 }
 
-function close(remember) {
+function close(result) {
   clearMark();
   bubble?.remove();
   bubble = null;
   current = -1;
-  if (remember) safeSet(KEY, remember);
+  if (result && state.user_state && !state.user_state.tour_seen) {
+    state.user_state.tour_seen = true;
+    track("tour_closed", { result });
+  }
 }
 
 function place(el) {
@@ -97,9 +101,9 @@ async function show(list, i, dir = 1) {
   setTimeout(() => bubble && place(el), el ? 350 : 0);  // after scrolling
 }
 
-/** Start the tour; `auto`: only if this browser has not finished or skipped it yet. */
+/** Start the tour; `auto`: only if this user has not finished or skipped it yet. */
 export async function startTour({ auto = false } = {}) {
-  if (auto && safeGet(KEY)) return;
+  if (auto && state.user_state?.tour_seen) return;
   if (bubble) return;
   const list = await load();
   if (list.length) show(list, 0);

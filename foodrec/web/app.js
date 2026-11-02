@@ -5,7 +5,6 @@ import { startTour } from "./tour.js";
 import { discoverView } from "./views/discover.js";
 import { dishesView } from "./views/dishes.js";
 import { insightsView } from "./views/insights.js";
-import { knowledgeView } from "./views/knowledge.js";
 import { activityView, onboarding, profileView } from "./views/profile.js";
 
 // `feature`: the access-role feature a page needs (see the Config page, Access roles).
@@ -13,12 +12,17 @@ const ROUTES = {
   discover: { label: "Discover", view: discoverView, icon: "bowl" },
   dishes: { label: "My dishes", view: dishesView, icon: "bookmark", feature: "page_dishes", menu: true },  // in the account menu
   insights: { label: "Insights", view: insightsView, icon: "info", feature: "page_insights" },
-  knowledge: { label: "Knowledge", view: knowledgeView, icon: "graph", feature: "page_knowledge" },
   activity: { label: "Activity", view: activityView, icon: "clock", feature: "page_activity" },
-  profile: { label: "Profile", view: profileView, icon: "user", feature: "page_profile" },
+  profile: { label: "Profile", view: profileView, icon: "user", anyOf: ["page_profile", "weight_controls", "page_knowledge"] },
+};
+// Pages that moved: old addresses keep working.
+const MOVED = { knowledge: "profile/knowledge" };
+const hashRoute = () => {
+  const path = location.hash.replace("#/", "") || "discover";
+  return MOVED[path] || path;
 };
 // The Config page is a separate page (/config), opened with `foodrec config open`; the app has no link to it.
-const allowed = (k) => ROUTES[k] && (!ROUTES[k].feature || can(ROUTES[k].feature));
+const allowed = (k) => ROUTES[k] && (!ROUTES[k].feature || can(ROUTES[k].feature)) && (!ROUTES[k].anyOf || ROUTES[k].anyOf.some(can));
 
 const main = document.querySelector("main");
 const nav = document.querySelector(".nav");
@@ -32,7 +36,7 @@ function applyTheme(t) {
 applyTheme(safeGet("foodrec.theme"));
 
 function renderNav() {
-  const route = location.hash.replace("#/", "") || "discover";
+  const route = hashRoute().split("/")[0];
   const open = state.user_state?.open_decisions?.length || 0;
   clear(nav, Object.entries(ROUTES).filter(([k, r]) => allowed(k) && !r.menu).map(([k, r]) => h("a" + (k === route ? ".active" : ""), { href: `#/${k}`, title: r.label },
     icon(r.icon), h("span.label", r.label), k === "discover" && open ? h("span.count", { title: `${open} open question(s)` }, open) : null)));
@@ -89,7 +93,9 @@ function userMenu(anchor) {
   ].filter(Boolean);
   let account = null;
   let input = null;
-  if (mode === "demo") {
+  if (joinedByLink()) {
+    account = h("div.menu-label", { style: { padding: "0" } }, "You joined with a personal link");
+  } else if (mode === "demo") {
     const view = demoView();
     account = [h("div.menu-label", { style: { padding: "0 0 6px" } }, "See the app as"),
       h("div.seg", { style: { width: "100%" } }, [["user", "User"], ["admin", "Admin"]].map(([v, t]) => h("button" + (v === view ? ".on" : ""), {
@@ -125,9 +131,13 @@ function userMenu(anchor) {
   }), 0);
 }
 
+const joinedByLink = () => !!state.user && safeGet("foodrec.joined") === state.user;
+
 function demoBanner() {
-  const b = h("div.demo-banner", h("b", "Demo"), ` · you see the app as ${demoView() === "admin" ? "the administrator" : "a user"} `,
-    "(switch in the account menu, top right) · data is reset regularly · to use FoodRec for real, clone the project and run it on your computer");
+  const b = h("div.demo-banner", h("b", "Demo"), joinedByLink()
+    ? " · you joined with a personal link · data is reset regularly"
+    : [` · you see the app as ${demoView() === "admin" ? "the administrator" : "a user"} `,
+      "(switch in the account menu, top right) · data is reset regularly · to use FoodRec for real, clone the project and run it on your computer"]);
   document.querySelector(".topbar").after(b);
 }
 
@@ -141,6 +151,7 @@ function loginScreen(system) {
       const out = await api("/api/login", { method: "POST", body: { username: user.value.trim(), password: pw.value } });
       safeSet("foodrec.session", out.token);
       safeSet("foodrec.user", out.user_id);
+      safeSet("foodrec.joined", "");
       location.reload();
     } catch (err) { msg.textContent = err.message; }
   }
@@ -153,7 +164,8 @@ function loginScreen(system) {
 }
 
 async function route() {
-  let key = location.hash.replace("#/", "") || "discover";
+  if (MOVED[location.hash.replace("#/", "")]) location.replace(`#/${hashRoute()}`);
+  let key = hashRoute().split("/")[0];
   if (!allowed(key)) key = "discover";
   const r = ROUTES[key];
   current?.cleanup?.();
@@ -170,7 +182,29 @@ async function route() {
   }
 }
 
+// A personal link (/join/<token>) is the way in: exchange it, then forget it from the address bar.
+async function joinFromLink() {
+  const m = location.pathname.match(/^\/join\/([^/]+)$/);
+  if (!m) return true;
+  try {
+    const out = await api("/api/join", { method: "POST", body: { token: decodeURIComponent(m[1]) } });
+    if (out.token) safeSet("foodrec.session", out.token);
+    if (out.mode === "demo") { safeSet("foodrec.visitor", out.user_id); safeSet("foodrec.view", "user"); }
+    safeSet("foodrec.joined", out.user_id);
+    safeSet("foodrec.user", out.user_id);
+    state.user = out.user_id;
+    history.replaceState(null, "", "/");
+    return true;
+  } catch (e) {
+    history.replaceState(null, "", "/");
+    clear(main, h("div.empty", { style: { paddingTop: "80px" } }, h("h3", "This link does not work"), h("p", e.message),
+      h("p.muted", "Ask the person who sent it for a new one.")));
+    return false;
+  }
+}
+
 async function boot() {
+  if (!await joinFromLink()) return;
   document.querySelector(".theme-btn").addEventListener("click", () => {
     const dark = document.documentElement.dataset.theme === "dark" ||
       (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -193,13 +227,21 @@ async function boot() {
       demoBanner();
     } else if (state.system.login_required) {
       const sess = await api("/api/session");
+      if (!sess.user_id && safeGet("foodrec.joined")) {
+        // the session of a personal link ended: the administrator removed or deactivated it
+        document.querySelector(".user-btn .uid").textContent = "";
+        clear(main, h("div.empty", { style: { paddingTop: "80px" } }, h("h3", "Your access has ended"),
+          h("p", "The link you used was deactivated or removed. Ask the person who sent it."),
+          h("button.btn", { onclick: () => { safeSet("foodrec.joined", ""); location.reload(); } }, "Sign in with an account instead")));
+        return;
+      }
       if (!sess.user_id) { document.querySelector(".user-btn .uid").textContent = "sign in"; return loginScreen(state.system); }
       state.user = sess.user_id;
       document.querySelector(".user-btn .uid").textContent = state.user;
     }
     state.user_state = await api(userPath("/state"));
   } catch (e) {
-    clear(main, h("div.empty", h("h3", "The server is not reachable"), h("p", e.message)));
+    clear(main, h("div.empty", { style: { paddingTop: "80px" } }, h("h3", e.status === 403 ? "Your access has ended" : "The server is not reachable"), h("p", e.message)));
     return;
   }
   renderStatus();
@@ -233,12 +275,12 @@ async function boot() {
       track("session_start", { role: state.user_state.access?.role });
       startDock();
       route();
-      if (state.system.mode === "demo") setTimeout(() => startTour({ auto: true }), 900);
+      setTimeout(() => startTour({ auto: true }), 900);
     });
   } else {
     track("session_start", { role: state.user_state.access?.role });
     route();
-    if (state.system.mode === "demo") setTimeout(() => startTour({ auto: true }), 900);
+    setTimeout(() => startTour({ auto: true }), 900);
   }
 }
 

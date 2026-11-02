@@ -77,7 +77,8 @@ the file: `NEO4J_PASSWORD` and `FOODREC_ADMIN_TOKEN` are read from the environme
 | `ranking` | `top_k`, `default_diversity`, `default_mode`, `max_missing_share` | at once | |
 | `ranking` | `min_nutrient_coverage` | after restart | |
 | `ranking` | `hide_saved`, `fatigue_per_view`, `fatigue_max`, `fatigue_half_life_days`, `cuisine_fatigue_per_slot`, `cuisine_fatigue_max`, `history_lists`, `discovery_slots`, `discovery_days`, `freshness_window_days` | at once | *Fresh lists* below |
-| `supervisor` | `max_agent_steps` | at once | |
+| `supervisor` | `max_agent_steps`, `ask_gap`, `ask_min_events`, `propose_gap`, `propose_min_events`, `taste_conflict_mean`, `taste_min_evidence`, `cooldown_events` | at once | when the supervisor asks or proposes |
+| `cycle` | `enabled`, `meals`, `recommendations`, `days` | at once | meal cycles on Discover |
 
 The Config page marks each setting **live** or **restart**. After saving, it lists the changes that are still
 waiting for a restart.

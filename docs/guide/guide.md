@@ -1118,12 +1118,12 @@ The user model is never edited directly. Every action is stored in an append-onl
 | $`T`$ | 6 | weight of a correction | holds against a few contrary clicks | `TasteModel.override` |
 | $`\kappa, n_0`$ | 0.5, 4 | extended-mode prior, blend | history takes over after a handful of events | `preference.py` |
 | $`d`$ | 0.3 | default diversity | avoids near-duplicates, keeps utility order mostly | `engine.py` |
-| — | 0.10 / 3 | ask: gap / events | a noticeable gap with some evidence | `policy.THRESHOLDS` |
-| — | 0.15 / 6 | propose: gap / events | a clear, repeated pattern | `policy.THRESHOLDS` |
-| — | 0.40 / 2 | taste conflict | clearly below neutral, not one click | `policy.THRESHOLDS` |
-| — | 6 | cooldown in feedback events | respects a "no" without forgetting the topic | `policy.THRESHOLDS` |
+| — | 0.10 / 3 | ask: gap / events | a noticeable gap with some evidence | Config: `supervisor` |
+| — | 0.15 / 6 | propose: gap / events | a clear, repeated pattern | Config: `supervisor` |
+| — | 0.40 / 2 | taste conflict | clearly below neutral, not one click | Config: `supervisor` |
+| — | 6 | cooldown in feedback events | respects a "no" without forgetting the topic | Config: `supervisor` |
 
-All values are exposed at `GET /api/system`. They are design choices for a transparent demo and should be calibrated with simulated or real users before an evaluation.
+All values are exposed at `GET /api/system`. The supervisor's thresholds can be set on the Config page. They are design choices for a transparent demo and should be calibrated with simulated or real users before an evaluation.
 
 Part III of the FoodRec Complete Guide, written from the code on branch `three-criteria-hummus` (FoodRec 0.3.0).
 

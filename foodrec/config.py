@@ -120,6 +120,21 @@ class Settings:
 
     # Supervisor policy limits.
     max_agent_steps: int = field(default_factory=lambda: int(_env("FOODREC_MAX_STEPS", 3)))
+    # When the supervisor asks or proposes (agent/policy.py)
+    ask_gap: float = 0.10
+    ask_min_events: int = 3
+    propose_gap: float = 0.15
+    propose_min_events: int = 6
+    taste_conflict_mean: float = 0.40
+    taste_min_evidence: float = 2.0
+    cooldown_events: int = 6
+    # What recipe cards show
+    show_similarity_score: bool = True
+    # Meal cycles (service.py "Meal cycles"): meals x recommendations x days reactions
+    cycle_enabled: bool = False
+    cycle_meals: str = "breakfast,lunch,dinner"
+    cycle_recommendations: int = 5
+    cycle_days: int = 3
 
     # List size and the starting goal of new users.
     top_k: int = field(default_factory=lambda: int(_env("FOODREC_TOP_K", 5)))

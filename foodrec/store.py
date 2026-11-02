@@ -100,6 +100,39 @@ CREATE TABLE IF NOT EXISTS role_assignments (
     method TEXT NOT NULL,
     assigned_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS cycle_steps (
+    user_id TEXT NOT NULL,
+    round INTEGER NOT NULL,
+    day INTEGER NOT NULL,
+    meal_index INTEGER NOT NULL,
+    meal TEXT NOT NULL,
+    request_id TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    done_at REAL,
+    PRIMARY KEY (user_id, round, day, meal_index)
+);
+CREATE TABLE IF NOT EXISTS cycle_answers (
+    user_id TEXT NOT NULL,
+    request_id TEXT NOT NULL,
+    recipe_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    ts REAL NOT NULL,
+    PRIMARY KEY (user_id, request_id, recipe_id)
+);
+CREATE TABLE IF NOT EXISTS visitor_settings (
+    user_id TEXT PRIMARY KEY,
+    data_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS demo_links (
+    token TEXT PRIMARY KEY,
+    user_id TEXT UNIQUE NOT NULL,
+    label TEXT NOT NULL,
+    role TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active'
+);
+CREATE INDEX IF NOT EXISTS demo_links_owner ON demo_links(owner);
 CREATE TABLE IF NOT EXISTS documents (
     doc_id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -122,6 +155,8 @@ class Store:
         with self._conn() as c:
             c.execute("PRAGMA journal_mode=WAL")
             c.executescript(SCHEMA)
+            if "status" not in {r["name"] for r in c.execute("PRAGMA table_info(demo_links)")}:
+                c.execute("ALTER TABLE demo_links ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
 
     def _conn(self):
         c = sqlite3.connect(self.path, timeout=10)
@@ -421,6 +456,74 @@ class Store:
             c.execute("DELETE FROM messages WHERE user_id=?", (user_id,))
 
     # ---- user-added knowledge documents -------------------------------------------
+    # ---- meal cycles -------------------------------------------------------------------------
+    def cycle_steps(self, user_id, round_=None):
+        q, args = "SELECT * FROM cycle_steps WHERE user_id=?", [user_id]
+        if round_ is not None:
+            q += " AND round=?"
+            args.append(round_)
+        with self._conn() as c:
+            rows = c.execute(q + " ORDER BY round, day, meal_index", args).fetchall()
+        return [dict(r) for r in rows]
+
+    def add_cycle_step(self, user_id, round_, day, meal_index, meal, request_id):
+        with self._conn() as c:
+            c.execute("INSERT INTO cycle_steps VALUES (?,?,?,?,?,?,?,NULL)",
+                      (user_id, round_, day, meal_index, meal, request_id, clock.now()))
+
+    def finish_cycle_step(self, user_id, round_, day, meal_index):
+        with self._conn() as c:
+            c.execute("UPDATE cycle_steps SET done_at=? WHERE user_id=? AND round=? AND day=? AND meal_index=?",
+                      (clock.now(), user_id, round_, day, meal_index))
+
+    def add_cycle_answer(self, user_id, request_id, recipe_id, type_):
+        with self._conn() as c:
+            c.execute("INSERT OR IGNORE INTO cycle_answers VALUES (?,?,?,?,?)",
+                      (user_id, request_id, recipe_id, type_, clock.now()))
+
+    def cycle_answers(self, user_id, request_id=None):
+        q, args = "SELECT * FROM cycle_answers WHERE user_id=?", [user_id]
+        if request_id:
+            q += " AND request_id=?"
+            args.append(request_id)
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(q + " ORDER BY ts", args).fetchall()]
+
+    # ---- demo: a visitor's own settings and access links ---------------------------------------
+    def visitor_settings(self, user_id):
+        with self._conn() as c:
+            r = c.execute("SELECT data_json FROM visitor_settings WHERE user_id=?", (user_id,)).fetchone()
+        return json.loads(r["data_json"]) if r else {}
+
+    def save_visitor_settings(self, user_id, data):
+        with self._conn() as c:
+            c.execute("INSERT OR REPLACE INTO visitor_settings VALUES (?,?)", (user_id, json.dumps(data)))
+
+    def replace_demo_links(self, owner, links):
+        """A visitor's new population: the visitor's earlier links stop working."""
+        with self._conn() as c:
+            # kept as "removed", not deleted: the people behind them must not carry on as new visitors
+            c.execute("UPDATE demo_links SET status='removed' WHERE owner=?", (owner,))
+            c.executemany("INSERT INTO demo_links (token, user_id, label, role, owner, created_at) VALUES (?,?,?,?,?,?)",
+                          [(x["token"], x["user_id"], x["label"], x["role"], owner, clock.now()) for x in links])
+
+    def demo_links(self, owner):
+        with self._conn() as c:
+            return [dict(r) for r in c.execute("SELECT * FROM demo_links WHERE owner=? AND status!='removed' ORDER BY label",
+                                               (owner,))]
+
+    def set_demo_link_status(self, owner, token, status):
+        """Only the visitor who created a link can change it. True if it was changed."""
+        with self._conn() as c:
+            return c.execute("UPDATE demo_links SET status=? WHERE token=? AND owner=? AND status!='removed'",
+                             (status, token, owner)).rowcount > 0
+
+    def demo_link(self, token=None, user_id=None):
+        col, val = ("token", token) if token else ("user_id", user_id)
+        with self._conn() as c:
+            r = c.execute(f"SELECT * FROM demo_links WHERE {col}=?", (val,)).fetchone()
+        return dict(r) if r else None
+
     def add_document(self, title, text, source="user"):
         doc_id = new_id("doc")
         with self._conn() as c:

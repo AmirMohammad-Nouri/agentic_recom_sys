@@ -17,13 +17,14 @@ Every switch is **enforced by the server**: hidden fields are removed from the A
 | Agent trace | answers without the step-by-step trace |
 | AI explanations | no why-reasons, fit or compromise lines; explaining chat skills refused |
 | Score breakdown | no factor tables and formulas |
-| Utility score | no utility number or contribution bar |
+| Similarity score | no similarity score or contribution bar. To hide only the number for everyone, use `ranking.show_similarity_score`. |
 | Food details | no nutrition, kcal, CO₂e, grade, ingredient list |
 | Recipe images | no thumbnails |
 | Feedback buttons | no like / save / cook / reject |
 | Supervisor questions | the supervisor never asks or proposes |
 | Priority controls | no sliders, goal saving or what-if previews: the saved goal is always used |
-| My dishes (account menu) / Insights / Knowledge / Activity / Profile | that page is hidden |
+| My dishes (account menu) / Insights / Activity | that page is hidden |
+| Knowledge / Profile | that part of the Profile page is hidden (Knowledge, and Preferences with History) |
 | Download own data | no personal export |
 | Switch user | the user id cannot be changed in the top bar |
 | Configuration | this page, all exports, study administration |

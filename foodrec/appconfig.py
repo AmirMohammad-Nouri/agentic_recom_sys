@@ -135,10 +135,55 @@ FIELDS = [
     # supervisor
     {"section": "supervisor", "key": "max_agent_steps", "attr": "max_agent_steps", "env": "FOODREC_MAX_STEPS",
      "type": "int", "min": 1, "max": 8, "apply": "live", "label": "Max. skill calls per chat turn"},
+    {"section": "supervisor", "key": "ask_gap", "attr": "ask_gap", "env": None, "type": "float", "min": 0.01, "max": 1,
+     "apply": "live", "visitor": True, "label": "Question: gap",
+     "help": "Ask a question when the user's choices differ this much from the saved weight of a value "
+             "(0.10 = 10 points). Lower: the supervisor speaks up sooner."},
+    {"section": "supervisor", "key": "ask_min_events", "attr": "ask_min_events", "env": None, "type": "int", "min": 1,
+     "max": 100, "apply": "live", "visitor": True, "label": "Question: minimum feedback",
+     "help": "Informative feedback events needed before a question may be asked."},
+    {"section": "supervisor", "key": "propose_gap", "attr": "propose_gap", "env": None, "type": "float", "min": 0.01,
+     "max": 1, "apply": "live", "visitor": True, "label": "Proposal: gap",
+     "help": "Propose changing the goal at this gap. Not lower than the question gap."},
+    {"section": "supervisor", "key": "propose_min_events", "attr": "propose_min_events", "env": None, "type": "int",
+     "min": 1, "max": 100, "apply": "live", "visitor": True, "label": "Proposal: minimum feedback",
+     "help": "Informative feedback events needed before a proposal. Not lower than for a question."},
+    {"section": "supervisor", "key": "taste_conflict_mean", "attr": "taste_conflict_mean", "env": None, "type": "float",
+     "min": 0, "max": 1, "apply": "live", "visitor": True, "label": "Taste question: belief below",
+     "help": "Ask whether a declared liking still holds when the learned belief falls below this."},
+    {"section": "supervisor", "key": "taste_min_evidence", "attr": "taste_min_evidence", "env": None, "type": "float",
+     "min": 0, "max": 100, "apply": "live", "visitor": True, "label": "Taste question: minimum evidence",
+     "help": "Observed evidence needed before that taste question."},
+    {"section": "supervisor", "key": "cooldown_events", "attr": "cooldown_events", "env": None, "type": "int", "min": 0,
+     "max": 100, "apply": "live", "visitor": True, "label": "Pause after an answer (feedback events)",
+     "help": "After the user answers or dismisses a topic, wait this many feedback events before raising it again."},
+    # what recipe cards show
+    {"section": "ranking", "key": "show_similarity_score", "attr": "show_similarity_score", "env": None, "type": "bool",
+     "apply": "live", "visitor": True, "label": "Show the similarity score",
+     "help": "The number on each recipe card: how well the dish matches the user's priorities and taste. Off hides "
+             "the number for everyone; a role can also hide it (Access roles)."},
+    # meal cycles
+    {"section": "cycle", "key": "enabled", "attr": "cycle_enabled", "env": None, "type": "bool", "apply": "live",
+     "label": "Use meal cycles", "help": "Discover walks the user through the meals below, day by day. The user reacts "
+                                         "to every dish before moving on. In the demo: always on in the user view, off "
+                                         "in the admin view."},
+    {"section": "cycle", "key": "meals", "attr": "cycle_meals", "env": None, "type": "str", "apply": "live",
+     "label": "Meals, in order", "help": "Comma-separated, from: breakfast, lunch, dinner, snack, dessert, drink. "
+                                         "The demo always uses breakfast, lunch, dinner."},
+    {"section": "cycle", "key": "recommendations", "attr": "cycle_recommendations", "env": None, "type": "int", "min": 1,
+     "max": 20, "apply": "live", "visitor": True, "label": "Recommendations per meal (r)",
+     "help": "How many dishes each meal shows."},
+    {"section": "cycle", "key": "days", "attr": "cycle_days", "env": None, "type": "int", "min": 1, "max": 60,
+     "apply": "live", "visitor": True, "label": "Days (n)",
+     "help": "Days in a cycle. In total the user reacts to meals x r x n dishes. A day ends when its last meal is "
+             "done; the next one starts at once, not on the next calendar day."},
 ]
 SECTIONS = {"llm": "Language model", "dataset": "Dataset and storage", "services": "Knowledge services",
             "server": "Web server",
-            "ranking": "Ranking", "supervisor": "Supervisor"}
+            "ranking": "Ranking", "supervisor": "Supervisor", "cycle": "Meal cycles"}
+# Discover's meal keys (service.MEAL_CONTEXTS maps them to catalogue meal types)
+MEALS = ("breakfast", "lunch", "dinner", "snack", "dessert", "drink")
+DEMO_CYCLE_MEALS = ("breakfast", "lunch", "dinner")
 
 # ---- access control ---------------------------------------------------------------------------
 # What a role may see or do. A feature missing from a role counts as allowed, except `configure`.
@@ -148,7 +193,7 @@ FEATURES = {
     "explanations": ("AI explanations", "Why-reasons on recipe cards and explaining answers in chat (why, compare, "
                      "what the system believes)."),
     "score_breakdown": ("Score breakdown", "\"How it's scored\": factor tables and formulas."),
-    "utility": ("Utility score", "The overall utility number and the contribution bar."),
+    "utility": ("Similarity score", "The similarity score of each dish and the bar of what contributed to it."),
     "food_details": ("Food details", "Nutrition, kcal, CO2e, health grade and the ingredient list."),
     "images": ("Recipe images", "Thumbnails on recipe cards."),
     "feedback": ("Feedback buttons", "Like, save, I'll cook this, not for me."),
@@ -210,7 +255,7 @@ def defaults():
     out["study"] = {"name": "", "description": "", "registration": "open", "max_users": None,
                     "assignment": "default", "assign_roles": ["full", "baseline"], "seed": 7,
                     "population": {"size": 20, "prefix": "p", "digits": 3, "roles": {"full": 50, "baseline": 50},
-                                   "shuffle": True, "seed": 7, "password_words": 2},
+                                   "shuffle": True, "seed": 7, "password_words": 2, "access": "password"},
                     "participants": []}
     from .model_spec import DEFAULT_CRITERIA, DEFAULT_INTERACTIONS
     out["criteria"] = copy.deepcopy(DEFAULT_CRITERIA)
@@ -230,7 +275,11 @@ _BUILTIN = {"llm_enabled": True, "ollama_url": "http://127.0.0.1:11434", "llm_mo
             "host": "127.0.0.1", "port": 8000, "auto_reload": True, "server_mode": "local",
             "hide_saved": True, "fatigue_per_view": 0.03, "fatigue_max": 0.12, "fatigue_half_life_days": 2.0,
             "cuisine_fatigue_per_slot": 0.01, "cuisine_fatigue_max": 0.06, "history_lists": 3,
-            "discovery_slots": 0, "discovery_days": 7.0, "freshness_window_days": 14.0}
+            "discovery_slots": 0, "discovery_days": 7.0, "freshness_window_days": 14.0,
+            "ask_gap": 0.10, "ask_min_events": 3, "propose_gap": 0.15, "propose_min_events": 6,
+            "taste_conflict_mean": 0.40, "taste_min_evidence": 2.0, "cooldown_events": 6,
+            "show_similarity_score": True, "cycle_enabled": False, "cycle_meals": "breakfast,lunch,dinner",
+            "cycle_recommendations": 5, "cycle_days": 3}
 
 
 def _builtin_default(f):
@@ -303,6 +352,15 @@ def validate(cfg):
     for sec in SECTIONS:
         keys = {f["key"] for f in FIELDS if f["section"] == sec}
         errs += [f"{sec}.{k}: unknown setting" for k in (cfg.get(sec) or {}) if k not in keys and k != "$comment"]
+    errs += threshold_problems(lambda key: (cfg.get("supervisor") or {}).get(key))
+    meals = (cfg.get("cycle") or {}).get("meals")
+    if isinstance(meals, str):
+        names = [m.strip() for m in meals.split(",") if m.strip()]
+        errs += [f"cycle.meals: unknown meal '{m}' (use {', '.join(MEALS)})" for m in names if m not in MEALS]
+        if not names:
+            errs.append("cycle.meals: name at least one meal")
+        if len(set(names)) != len(names):
+            errs.append("cycle.meals: a meal is listed twice")
     acc = cfg.get("access") or {}
     roles = acc.get("roles") or {}
     if not roles:
@@ -352,6 +410,16 @@ def validate(cfg):
     if "criteria" in cfg or "interactions" in cfg:
         from .model_spec import normalize
         errs += normalize(cfg.get("criteria"), cfg.get("interactions"))[1]
+    return errs
+
+
+def threshold_problems(value):
+    """`value(key)`: a supervisor setting, or None when not set."""
+    errs = []
+    for a, b, text in (("ask_gap", "propose_gap", "gap"), ("ask_min_events", "propose_min_events", "minimum feedback")):
+        x, y = value(a), value(b)
+        if isinstance(x, (int, float)) and isinstance(y, (int, float)) and y < x:
+            errs.append(f"supervisor.{b}: the proposal's {text} ({y:g}) must not be lower than the question's ({x:g})")
     return errs
 
 
@@ -448,6 +516,14 @@ class AppConfig:
     def participant(self, username):
         return next((p for p in self.study.get("participants") or [] if p.get("username") == username), None)
 
+    def participant_by_link(self, token):
+        """The participant whose personal link holds this token, or None."""
+        if not isinstance(token, str) or not token:
+            return None
+        import hmac
+        return next((p for p in self.study.get("participants") or [] if p.get("link")
+                     and hmac.compare_digest(str(p["link"]).encode(), token.encode())), None)
+
     def role_name(self, user_id, assigned=None):
         """Administrator account > entry in access.users > study participant > stored assignment >
         default role."""
@@ -501,8 +577,10 @@ class AppConfig:
             adm.pop("password", None)
             adm["password_set"] = bool(adm.pop("password_hash", None))
         for p in (d.get("study") or {}).get("participants") or []:
-            if isinstance(p, dict) and "password" in p:
-                p["password"] = "***"
+            if isinstance(p, dict):
+                for secret in ("password", "link"):
+                    if secret in p:
+                        p[secret] = "***"
         return d
 
 

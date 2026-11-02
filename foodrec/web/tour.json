@@ -1,62 +1,91 @@
 {
-  "$comment": "The guided tour (tour.js). Each step points at an element (a CSS selector) on a page (#/<page>), or is centred when it has no target. Steps whose element is not on screen (a role without that feature) are skipped. 'views': only in that demo view ('user' or 'admin'). 'open': 'dock' opens the assistant first.",
+  "$comment": "The guided tour (tour.js). Each step points at an element (a CSS selector) on a page (#/<page>), or is centred when it has no target. Steps whose element is not on screen (a role without that feature) are skipped. 'views': only in that demo view ('user' or 'admin'). 'cycle': only with meal cycles on (true) or off (false). 'feature': only for roles with that feature. 'open': 'dock' opens the assistant first.",
   "steps": [
     {
       "title": "Welcome to FoodRec",
       "text": "FoodRec suggests recipes ranked by what matters to you, and shows exactly why. This short tour points out each part of the app. Use Next to follow it, or Skip to explore on your own."
     },
     {
-      "page": "discover", "target": ".discover aside.card",
-      "title": "Your values",
-      "text": "Move the sliders to say how much each value counts. Apply tries them on this list only; Save as goal keeps them as a new version of your goal."
+      "page": "discover",
+      "target": ".cycle-bar",
+      "title": "Your meal plan",
+      "text": "You go through breakfast, lunch and dinner, day by day. React to every dish in a meal to move on to the next one. The bar shows how far you are.",
+      "cycle": true
     },
     {
-      "page": "discover", "target": ".meal-seg",
+      "page": "discover",
+      "target": ".meal-seg",
       "title": "Pick a meal",
-      "text": "Choose breakfast, lunch, dinner and so on to see recipes for that meal. This affects only the current list."
+      "text": "Choose a meal to see recipes for it.",
+      "cycle": false
     },
     {
-      "page": "discover", "target": "article.recipe",
-      "title": "A recommended recipe",
-      "text": "Each card shows the dish, its scores and the main reason it is here. React with Like, Save, I'll cook this or Not for me: the app learns from it, and saved dishes wait in My dishes."
+      "page": "discover",
+      "target": "article.recipe",
+      "title": "A recommended dish",
+      "text": "Each card shows the dish, its health grade from A to E, its similarity score, and in plain words why it was suggested. React with Like, Save, I'll cook this or Not for me: the app learns from it, and saved dishes wait in My dishes."
     },
     {
-      "page": "discover", "target": "article.recipe .details-btn",
+      "page": "discover",
+      "target": "article.recipe .details-btn",
       "title": "Why this rank?",
       "text": "Open How it's scored to see every factor behind the scores, how each value contributed, and what is estimated or missing."
     },
     {
-      "page": "discover", "target": "aside.dock", "open": "dock",
+      "page": "discover",
+      "target": "aside.dock",
+      "open": "dock",
       "title": "The assistant",
-      "text": "Ask in plain words: \"something easy with lentils\", \"why is #2 first?\", \"compare #1 and #3\". Every step it takes is shown above its answer."
+      "text": "Ask in plain words: \"something easy with lentils\", \"why is #2 first?\", \"compare #1 and #3\". Every step it takes is shown above its answer.",
+      "feature": "assistant"
     },
     {
-      "page": "discover", "target": ".dock-tabs .sup-tab", "open": "dock",
+      "page": "discover",
+      "target": ".dock-tabs .sup-tab",
+      "open": "dock",
       "title": "The supervisor",
-      "text": "When your choices drift away from your saved goal, the supervisor asks a question or proposes a change here, with the evidence. Nothing changes until you accept."
+      "text": "When your choices drift away from your saved goal, the supervisor asks a question or proposes a change here, with the evidence. Nothing changes until you accept.",
+      "feature": "supervisor"
     },
     {
-      "page": "discover", "target": ".user-btn",
+      "page": "discover",
+      "target": ".user-btn",
       "title": "Your account",
-      "text": "Open this menu for My dishes (saved, liked and cooked), this tour, and the view switch: see the app as a user or as the administrator."
+      "text": "Open this menu for My dishes (saved, liked and cooked), this tour and the guide to how FoodRec works."
     },
     {
-      "page": "insights", "target": "nav a[href='#/insights']",
+      "page": "profile/values",
+      "target": ".values-card",
+      "title": "Your values",
+      "text": "In Profile you set how much each value counts, and how varied your lists are. Save as new goal keeps them as a new version.",
+      "feature": "weight_controls"
+    },
+    {
+      "page": "profile",
+      "target": ".profile-tabs",
+      "title": "Your profile",
+      "text": "Profile holds your rules and preferences, your values and how varied your lists are, and every earlier version of your goal."
+    },
+    {
+      "page": "insights",
+      "target": "nav a[href='#/insights']",
       "title": "Insights",
-      "text": "Compare the values you chose with how your choices actually weigh them, and see the evidence behind every change."
+      "text": "Compare the values you chose with how your choices actually weigh them, and see the evidence behind every change.",
+      "feature": "page_insights"
     },
     {
-      "page": "knowledge", "target": "nav a[href='#/knowledge']",
-      "title": "Knowledge",
-      "text": "Explore the food knowledge graph and search the documents the assistant can cite."
-    },
-    {
-      "page": "activity", "target": "nav a[href='#/activity']",
+      "page": "activity",
+      "target": "nav a[href='#/activity']",
       "title": "Activity",
-      "text": "Everything you did and every supervisor decision, newest first."
+      "text": "Everything you did and every supervisor decision, newest first.",
+      "feature": "page_activity"
     },
     {
-      "views": ["admin"], "page": "discover", "target": ".user-btn",
+      "views": [
+        "admin"
+      ],
+      "page": "discover",
+      "target": ".user-btn",
       "title": "The Config page",
       "text": "In the admin view, the account menu has Config: the model, dataset, criteria, access roles and the study population. In the demo it is read-only."
     },

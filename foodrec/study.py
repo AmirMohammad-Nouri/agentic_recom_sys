@@ -3,8 +3,17 @@
     "study": {
       "login_required": true,
       "population": {"size": 40, "prefix": "p", "digits": 3, "roles": {"full": 50, "baseline": 50},
-                     "shuffle": true, "seed": 7, "password_words": 2},
-      "participants": [{"username": "p001", "password": "maple-river-42", "role": "full"}, ...]}
+                     "shuffle": true, "seed": 7, "password_words": 2, "access": "password"},
+      "participants": [{"username": "p001", "password": "maple-river-42", "role": "full"},
+                       {"username": "p002", "link": "<token>", "role": "baseline"}, ...]}
+
+`access` says how participants get in: "password" (a username and a password) or "link" (a
+personal link, /join/<token>, and nothing to type). The demo only has links.
+
+A link has no end date: it works until the administrator removes the participant or sets
+"active": false. `flow` says what the participant does: "guided" (meal cycles with a reaction to
+every dish) or "free" (the normal list). Without it, people with a link are guided and people with
+a password follow cycle.enabled.
 
 `generate()` turns the population settings into participants: role counts by percentage
 (largest remainder, so they always add up to the size), roles spread over the usernames in
@@ -42,6 +51,11 @@ def password(rng=None, words=2):
     return "-".join(rng.choice(WORDS) for _ in range(max(1, words))) + f"-{rng.randint(10, 99)}"
 
 
+def link_token():
+    """The secret part of a personal link: whoever holds the link is that participant."""
+    return secrets.token_urlsafe(18)
+
+
 def allocate(size, shares):
     """Role counts for `size` users from percentages, largest remainder (sums to size)."""
     tot = sum(shares.values())
@@ -56,7 +70,7 @@ def allocate(size, shares):
 
 
 def generate(population, existing=None):
-    """Participants for a population spec; keeps the password (and note) of existing usernames."""
+    """Participants for a population spec; keeps the password or link (and note) of existing usernames."""
     size = int(population.get("size") or 0)
     prefix = str(population.get("prefix") or "p")
     digits = int(population.get("digits") or max(2, len(str(size))))
@@ -72,9 +86,18 @@ def generate(population, existing=None):
     for i, role in enumerate(roles, 1):
         name = f"{prefix}{i:0{digits}d}"
         prev = old.get(name) or {}
-        out.append({"username": name, "password": prev.get("password") or password(rng, population.get("password_words", 2)),
-                    "role": role, **({"note": prev["note"]} if prev.get("note") else {})})
+        secret = ({"link": prev.get("link") or link_token()} if population.get("access") == "link" else
+                  {"password": prev.get("password") or password(rng, population.get("password_words", 2))})
+        flow = population.get("flow") or prev.get("flow")
+        out.append({"username": name, **secret, "role": role, **({"flow": flow} if flow else {}),
+                    **({"active": False} if prev.get("active") is False else {}),
+                    **({"note": prev["note"]} if prev.get("note") else {})})
     return out, counts
+
+
+def _can_configure(roles, name):
+    role = roles.get(name) if isinstance(roles, dict) else None
+    return bool(isinstance(role, dict) and (role.get("features") or {}).get("configure"))
 
 
 def validate_study(st, roles):
@@ -87,6 +110,13 @@ def validate_study(st, roles):
             size = pop.get("size", 0)
             if not isinstance(size, int) or size < 0 or size > 10000:
                 errs.append("study.population.size: a whole number from 0 to 10000")
+            if pop.get("flow") not in (None, "guided", "free"):
+                errs.append("study.population.flow: \"guided\" or \"free\"")
+            if pop.get("access", "password") not in ("password", "link"):
+                errs.append("study.population.access: \"password\" or \"link\"")
+            elif pop.get("access") == "link":
+                errs += [f"study.population.roles: role '{r}' can configure the app, so it can't get an access link"
+                         for r, v in (pop.get("roles") or {}).items() if _can_configure(roles, r) and v]
             prefix = pop.get("prefix", "p")
             if not isinstance(prefix, str) or not re.match(r"^[A-Za-z][A-Za-z0-9_-]{0,15}$", prefix):
                 errs.append("study.population.prefix: letters, digits, _ or - (starting with a letter)")
@@ -116,9 +146,17 @@ def validate_study(st, roles):
         elif u in seen:
             errs.append(f"study.participants: duplicate username '{u}'")
         seen.add(u)
-        pw = p.get("password")
-        if not isinstance(pw, str) or len(pw) < 4:
-            errs.append(f"study.participants[{i}] ({u}): password of at least 4 characters")
+        if p.get("flow") not in (None, "guided", "free"):
+            errs.append(f"study.participants[{i}] ({u}): flow must be \"guided\" or \"free\"")
+        pw, link = p.get("password"), p.get("link")
+        if link is not None:
+            if not isinstance(link, str) or len(link) < 16:
+                errs.append(f"study.participants[{i}] ({u}): link token of at least 16 characters")
+            elif _can_configure(roles, p.get("role")):
+                errs.append(f"study.participants[{i}] ({u}): role '{p.get('role')}' can configure the app, so it can't "
+                            "use an access link")
+        if link is None and (not isinstance(pw, str) or len(pw) < 4):
+            errs.append(f"study.participants[{i}] ({u}): password of at least 4 characters, or a link")
         if p.get("role") not in roles:
             errs.append(f"study.participants[{i}] ({u}): role '{p.get('role')}' is not defined")
     return errs
@@ -140,11 +178,11 @@ class Sessions:
     def _sig(self, body):
         return hmac.new(self.secret, body.encode(), hashlib.sha256).hexdigest()[:32]
 
-    def issue(self, username, fingerprint=None):
+    def issue(self, username, fingerprint=None, ttl=None):
         """`fingerprint`: of the account's current password (credential_fp); a token stops
-        working when the password changes or the account is removed."""
+        working when the password changes or the account is removed or deactivated."""
         body = base64.urlsafe_b64encode(json.dumps({"u": username, "f": fingerprint,
-                                                    "exp": int(time.time() + self.ttl)}).encode()).decode()
+                                                    "exp": int(time.time() + (ttl or self.ttl))}).encode()).decode()
         return f"{body}.{self._sig(body)}"
 
     def user(self, token, cfg=None):
@@ -173,6 +211,7 @@ class Sessions:
 
 # ---- passwords ---------------------------------------------------------------------------------------
 PBKDF2_ITERATIONS = 200_000
+LINK_SESSION_SECONDS = 10 * 365 * 24 * 3600  # a link has no end date; removing or deactivating it ends the session
 
 
 def hash_password(pw, salt=None, iterations=PBKDF2_ITERATIONS):
@@ -198,16 +237,21 @@ def check_password(cfg, username, pw):
     if adm and username == adm.get("username"):
         return verify_password(pw, adm.get("password_hash"))
     p = cfg.participant(username)
-    return bool(p) and isinstance(pw, str) and hmac.compare_digest(str(p.get("password", "")).encode(), pw.encode())
+    # a participant with only a link has no password: an empty one must never match it
+    return bool(p and p.get("password") and p.get("active") is not False) and isinstance(pw, str) and \
+        hmac.compare_digest(str(p["password"]).encode(), pw.encode())
 
 
 def credential_fp(cfg, username):
-    """A short fingerprint of the account's current password (None: no such account)."""
+    """A short fingerprint of the account's current password or link (None: no such account)."""
     adm = cfg.admin_account()
     if adm and username == adm.get("username"):
         secret = adm.get("password_hash")
     else:
-        secret = (cfg.participant(username) or {}).get("password")
+        part = cfg.participant(username) or {}
+        if part.get("active") is False:
+            return None  # deactivated: sessions already handed out stop working
+        secret = part.get("password") or part.get("link")
     return hashlib.sha256(secret.encode()).hexdigest()[:12] if secret else None
 
 

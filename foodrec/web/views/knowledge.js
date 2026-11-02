@@ -143,7 +143,7 @@ function libraryPanel() {
         h("div.divider"), docs)));
 }
 
-export function knowledgeView() {
+export function knowledgeView({ embedded = false } = {}) {
   const body = h("div");
   const tabs = h("div.seg");
   const set = (which) => {
@@ -154,7 +154,7 @@ export function knowledgeView() {
     h("button", { dataset: { k: "library" }, onclick: () => set("library") }, "Library"));
   set("graph");
   return h("div",
-    h("div.page-head", h("div", h("h1", "Knowledge"),
+    h("div.page-head", h("div", embedded ? h("h2", "Knowledge") : h("h1", "Knowledge"),
       h("p", "The structured food graph and the documents the supervisor can retrieve from.")), tabs),
     body);
 }

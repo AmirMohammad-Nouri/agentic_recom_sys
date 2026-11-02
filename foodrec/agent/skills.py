@@ -117,11 +117,13 @@ class Skills:
         facts = notes + [f"Applied request filters: {', '.join(f['label'] for f in res['config']['request_filters'])}."
                          if res["config"]["request_filters"] else "No request filters; only your saved rules and goal."]
         nums, titles = [], []
+        show_score = app.setting(ctx.user_id, "show_similarity_score", True)
         for r in top:
             ev = r["evidence"]
             k = ev["ranking"]["top_contributor"]
+            score = f", similarity score {r['utility']:.2f}" if show_score else ""
             line = (f"#{r['final_rank']} {r['title']} ({r['cuisine']}, {r['n_ingredients']} ingredients, "
-                    f"health grade {r['health_grade']}, utility {r['utility']:.2f}); "
+                    f"health grade {r['health_grade']}{score}); "
                     f"{CRITERION_LABELS[k].lower()} contributes most")
             if ev["compromises"]:
                 line += f"; compromise: {ev['compromises'][0]['text']}"
@@ -147,7 +149,7 @@ class Skills:
         facts, nums = [], []
         if shown:
             rs = shown["reasons"]
-            facts += [f"It is #{shown['final_rank']} in your latest list (utility rank {shown['utility_rank']})."]
+            facts += [f"It is #{shown['final_rank']} in your latest list (similarity rank {shown['utility_rank']})."]
             facts += [x[0].upper() + x[1:] + "." for x in rs["fits"][:3] + rs["ranked_here"][:2] + rs["compromises"][:2]]
             facts += ["Uncertain: " + g + "." for g in rs["gaps"][:2]]
             from ..explain import _collect_numbers
@@ -164,8 +166,9 @@ class Skills:
             if viol:
                 facts.append(f"{r['title']} is not eligible for you: " + "; ".join(v[1] for v in viol) + ".")
             elif row:
-                facts.append(f"{r['title']} was a candidate at utility rank {row['utility_rank']} "
-                             f"(utility {row['utility']:.2f}) but did not make the top five.")
+                score = f" (similarity score {row['utility']:.2f})" if app.setting(ctx.user_id, "show_similarity_score", True) else ""
+                facts.append(f"{r['title']} was a candidate at similarity rank {row['utility_rank']}{score} "
+                             "but did not make the top five.")
                 nums += [row["utility_rank"], round(row["utility"], 2)]
             if goal and not viol:
                 sc_p = (row or {}).get("scores", {}).get("p")
@@ -346,7 +349,7 @@ class Skills:
             facts.append(f"Your choices so far behave like {c['observed']:.2f} (gap {c['gap']:+.2f}); overall "
                          f"preference match {ins['preference_match']:.2f}, confidence {ins['confidence']:.2f} "
                          f"after {ins['events_since_goal']} event(s) since the goal was saved.")
-            if abs(c["gap"]) >= policy.THRESHOLDS["ask_gap"]:
+            if abs(c["gap"]) >= policy.thresholds(app, ctx.user_id)["ask_gap"]:
                 facts.append("That gap is large enough for me to ask about it, but I never change your goal myself.")
             else:
                 facts.append("Your behaviour is consistent with your saved goal on this priority.")

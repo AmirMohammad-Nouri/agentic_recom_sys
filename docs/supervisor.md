@@ -48,7 +48,8 @@ option.
 | `taste_min_evidence` | 2.0 | ... with at least this much observed evidence |
 | `cooldown_events` | 6 | Feedback events before an answered or dismissed topic can return |
 
-These are design choices for the demo and are exposed at `GET /api/system`. They should be
+Set them on the Config page (Settings, Supervisor) or under `"supervisor"` in `foodrec.config.json`; the
+values above are the defaults. They are design choices, exposed at `GET /api/system`, and should be
 calibrated with simulated users before any evaluation.
 
 ## 2. A chat turn (`agent/supervisor.py`)

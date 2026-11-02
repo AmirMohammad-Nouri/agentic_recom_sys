@@ -10,6 +10,7 @@ import json
 import logging
 import threading
 import time
+import uuid
 
 from collections import Counter
 
@@ -33,12 +34,12 @@ from .store import Store
 
 log = logging.getLogger("foodrec.service")
 # Lists that count as "shown to the user" for freshness (not previews or goal-option lists).
-SHOWN_ORIGINS = ("ui", "assistant", "scenario")
+SHOWN_ORIGINS = ("ui", "assistant", "scenario", "cycle")
 SESSION_S = 3600  # lists of the last hour do not count yet; older ones count once per clock hour
 COLLECTIONS = {"saved": "save", "liked": "like", "cooked": "choose"}  # My dishes -> the feedback that adds to it
 # Interface events the client reports (page views, panels opened); logged for studies only.
 UI_EVENTS = ("page_view", "details_opened", "assistant_opened", "assistant_closed", "export_downloaded",
-             "suggestion_clicked", "session_start")
+             "suggestion_clicked", "session_start", "tour_closed")
 LEARNER_EVENTS = ("profile_created", "profile_updated", "goal_saved", "proposal_accepted", "feedback",
                   "profile_correction", "question_answered")
 FEEDBACK_TYPES = ("like", "save", "choose", "reject")
@@ -57,6 +58,7 @@ class App:
         self.cfg = getattr(settings, "config", None) or AppConfig({})
         self.restart_pending = []
         self.demo_views = {}  # demo mode: visitor id -> "admin" | "user"
+        self._tour_done = set()
         # what the restart-type settings were at start, as the file (not overrides) gave them
         self._started = self.resolved_settings(self.cfg)
         from .study import Sessions
@@ -113,7 +115,7 @@ class App:
                 "options": {"allergens": SUPPORTED_ALLERGENS, "diets": SUPPORTED_DIETS,
                             "cuisines": sorted({r["cuisine"] for r in self.catalogue.recipes}),
                             "meals": sorted({r.get("meal", "main") for r in self.catalogue.recipes}),
-                            "meal_contexts": MEAL_CONTEXTS,
+                            "meal_contexts": self._meal_options(),
                             "ingredients": self._common_ingredients(),
                             "health_goals": [{"id": k, "label": v["label"]} for k, v in GOALS.items()],
                             "reject_reasons": REJECT_REASONS, "choose_reasons": CHOOSE_REASONS,
@@ -126,23 +128,201 @@ class App:
                 "config": {"path": str(self.cfg.path) if self.cfg.path else None, "version": self.cfg.version,
                            "restart_pending": self.restart_pending}}
 
+    def _meal_options(self):
+        """The meals Discover offers: all of them, or only the cycle's when cycles are on."""
+        if self._demo():
+            from .appconfig import DEMO_CYCLE_MEALS
+            return {m: MEAL_CONTEXTS[m] for m in DEMO_CYCLE_MEALS}
+        if getattr(self.s, "cycle_enabled", False):
+            meals = [m.strip() for m in str(self.s.cycle_meals).split(",") if m.strip() in MEAL_CONTEXTS]
+            if meals:
+                return {m: MEAL_CONTEXTS[m] for m in meals}
+        return MEAL_CONTEXTS
+
     # ---- access roles and study registration ---------------------------------------------
     def access(self, user_id):
         """Role, features and visible criteria of a user (see appconfig.AppConfig.access). In demo
         mode the role is the view the visitor picked: the admin role or the full user role."""
-        if getattr(self.s, "server_mode", "open") == "demo":
+        if self._demo():
             from .appconfig import ADMIN_ROLE
-            if self.demo_views.get(user_id) == "admin" and ADMIN_ROLE in self.cfg.roles:
-                return self.cfg.access_for_role(ADMIN_ROLE, "demo view")
-            role = "full" if "full" in self.cfg.roles else self.cfg.data["access"].get("default_role")
-            return self.cfg.access_for_role(role, "demo view")
-        return self.cfg.access(user_id, self.store.assigned_role(user_id))
+            link = self.store.demo_link(user_id=user_id)
+            if link and link["role"] in self.cfg.roles:
+                acc = self.cfg.access_for_role(link["role"], "study link")
+            elif self.demo_views.get(user_id) == "admin" and ADMIN_ROLE in self.cfg.roles:
+                acc = self.cfg.access_for_role(ADMIN_ROLE, "demo view")
+            else:
+                role = "full" if "full" in self.cfg.roles else self.cfg.data["access"].get("default_role")
+                acc = self.cfg.access_for_role(role, "demo view")
+        else:
+            acc = self.cfg.access(user_id, self.store.assigned_role(user_id))
+        acc["show_similarity"] = bool(self.setting(user_id, "show_similarity_score", True))
+        return acc
 
     def set_demo_view(self, user_id, view):
         if view not in ("admin", "user"):
             raise ValueError("view must be admin or user")
+        if view == "admin" and self.store.demo_link(user_id=user_id):
+            raise PermissionError("a study link opens the app as a participant")
         self.demo_views[user_id] = view
         return self.access(user_id)
+
+    # ---- settings per user ---------------------------------------------------------------------
+    def _demo(self):
+        return getattr(self.s, "server_mode", "open") == "demo"
+
+    def _visitor_overrides(self, user_id):
+        """Demo only: what this visitor set for themselves; people who came through a visitor's
+        link use that visitor's settings. Nobody else is affected and the config file stays as it is."""
+        if not self._demo():
+            return {}
+        link = self.store.demo_link(user_id=user_id)
+        return self.store.visitor_settings(link["owner"] if link else user_id)
+
+    def thresholds(self, user_id):
+        from .agent.policy import thresholds
+        return thresholds(self, user_id)
+
+    def setting(self, user_id, attr, default=None):
+        """A runtime setting as it applies to this user."""
+        over = self._visitor_overrides(user_id)
+        return over[attr] if attr in over else getattr(self.s, attr, default)
+
+    def save_visitor_settings(self, user_id, values):
+        """Demo: {"supervisor.ask_gap": 0.2, ...}; only settings marked `visitor`. A value of null
+        goes back to the demo's value. Returns the visitor's settings by attribute."""
+        from .appconfig import coerce, threshold_problems
+        fields = {f"{f['section']}.{f['key']}": f for f in FIELDS if f.get("visitor")}
+        data = self.store.visitor_settings(user_id)
+        for name, value in (values or {}).items():
+            f = fields.get(name)
+            if f is None:
+                raise ValueError(f"{name} can't be changed in the demo")
+            if value is None:
+                data.pop(f["attr"], None)
+            else:
+                data[f["attr"]] = coerce(f, value)
+        errs = threshold_problems(lambda k: data.get(k, getattr(self.s, k, None)))
+        if errs:
+            raise ValueError("; ".join(errs))
+        self.store.save_visitor_settings(user_id, data)
+        return data
+
+    # ---- access links --------------------------------------------------------------------------
+    def demo_population(self, owner, population):
+        """Demo: people for a visitor's study, each with a personal link and no username or password.
+        Stored in the database, not the config file, and replaced when the visitor generates again."""
+        from .study import generate
+        parts, counts = generate({**population, "access": "link"})
+        links = [{"token": p["link"], "user_id": "visitor-" + uuid.uuid4().hex[:12], "label": p["username"],
+                  "role": p["role"]} for p in parts]
+        self.store.replace_demo_links(owner, links)
+        return {"participants": [{"username": x["label"], "link": x["token"], "role": x["role"]} for x in links],
+                "counts": counts}
+
+    # ---- meal cycles ----------------------------------------------------------------------------
+    # meals x recommendations x days reactions: the user sees r dishes for one meal, reacts to each,
+    # moves to the next meal, and after the last meal starts the next day.
+    def _guided(self, user_id):
+        """Does this user follow the guided path? The account's own setting wins; people with a link
+        are guided unless the administrator chose otherwise; the rest follow cycle.enabled."""
+        p = self.cfg.participant(user_id) or {}
+        flow = p.get("flow") or ("guided" if p.get("link") else None)
+        return flow == "guided" if flow else bool(getattr(self.s, "cycle_enabled", False))
+
+    def cycle_config(self, user_id):
+        acc = self.access(user_id)
+        if self._demo():
+            from .appconfig import ADMIN_ROLE, DEMO_CYCLE_MEALS
+            # the user view follows the path; the admin view browses freely to look around
+            enabled, meals = acc["source"] != "demo view" or acc["role"] != ADMIN_ROLE, list(DEMO_CYCLE_MEALS)
+        else:
+            enabled = self._guided(user_id)
+            meals = [m.strip() for m in str(getattr(self.s, "cycle_meals", "")).split(",") if m.strip() in MEAL_CONTEXTS]
+        r, n = int(self.setting(user_id, "cycle_recommendations", 5)), int(self.setting(user_id, "cycle_days", 3))
+        # a role without feedback buttons could never finish a meal
+        return {"enabled": enabled and bool(meals) and acc["features"]["feedback"], "meals": meals,
+                "recommendations": r, "days": n, "total": len(meals) * r * n}
+
+    def _cycle_open_step(self, user_id, round_, day, mi, meals, r):
+        filt = [{"field": "meal", "op": "is", "value": MEAL_CONTEXTS[meals[mi]], "source": f"{meals[mi]} context"}]
+        res = self.recommend(user_id, {"request_filters": filt, "k": r}, origin="cycle")
+        self.store.add_cycle_step(user_id, round_, day, mi, meals[mi], res["request_id"])
+        return res
+
+    def cycle_state(self, user_id):
+        """Where the user is in the cycle, with the list of the current meal (made once and kept, so
+        reloading the page never changes it)."""
+        cfg = self.cycle_config(user_id)
+        if not cfg["enabled"]:
+            return cfg
+        meals, r = cfg["meals"], cfg["recommendations"]
+        with self.lock:
+            steps = self.store.cycle_steps(user_id)
+            round_ = steps[-1]["round"] if steps else 1
+            steps = [s for s in steps if s["round"] == round_]
+            cur = steps[-1] if steps else None
+            res = None
+            if cur is None:
+                res = self._cycle_open_step(user_id, round_, 1, 0, meals, r)
+                cur = self.store.cycle_steps(user_id, round_)[-1]
+            elif cur["done_at"] is not None:
+                # the last step of the round was finished: the round is complete
+                return {**cfg, "round": round_, "finished": True, "day": cur["day"], "meal": None, "meal_index": None,
+                        "answered_total": self._cycle_answered(user_id, steps),
+                        "remaining": 0, "result": None, "answered": {}, "complete": True}
+            res = res or self.store.request(cur["request_id"])
+        shown = {x["recipe_id"] for x in res.get("results") or []}
+        answered = {a["recipe_id"]: a["type"] for a in self.store.cycle_answers(user_id, cur["request_id"])
+                    if a["recipe_id"] in shown}
+        return {**cfg, "round": round_, "finished": False, "day": cur["day"], "meal": cur["meal"],
+                "meal_index": meals.index(cur["meal"]) if cur["meal"] in meals else cur["meal_index"],
+                "answered_total": self._cycle_answered(user_id, steps), "result": res, "answered": answered,
+                "remaining": len(shown - set(answered)), "complete": not (shown - set(answered))}
+
+    def _cycle_answered(self, user_id, steps):
+        ids = {s["request_id"] for s in steps}
+        return sum(1 for a in self.store.cycle_answers(user_id) if a["request_id"] in ids)
+
+    def cycle_next(self, user_id):
+        """Close the current meal (every dish must have a reaction) and open the next one."""
+        st = self.cycle_state(user_id)
+        if not st["enabled"]:
+            raise ValueError("meal cycles are off")
+        if st["finished"]:
+            return st
+        if not st["complete"]:
+            raise ValueError(f"React to the {st['remaining']} remaining dish(es) first.")
+        meals, r = st["meals"], st["recommendations"]
+        with self.lock:
+            cur = self.store.cycle_steps(user_id, st["round"])[-1]
+            if cur["done_at"] is None:
+                self.store.finish_cycle_step(user_id, st["round"], cur["day"], cur["meal_index"])
+                day, mi = cur["day"], cur["meal_index"] + 1
+                if mi >= len(meals):
+                    day, mi = day + 1, 0
+                if day <= st["days"]:
+                    self._cycle_open_step(user_id, st["round"], day, mi, meals, r)
+        return self.cycle_state(user_id)
+
+    def cycle_restart(self, user_id):
+        """A finished cycle can be walked again; the reactions already given stay recorded."""
+        st = self.cycle_state(user_id)
+        if not st["enabled"]:
+            raise ValueError("meal cycles are off")
+        if not st["finished"]:
+            raise ValueError("finish this cycle first")
+        with self.lock:
+            self._cycle_open_step(user_id, st["round"] + 1, 1, 0, st["meals"], st["recommendations"])
+        return self.cycle_state(user_id)
+
+    def _cycle_mark(self, user_id, request_id, recipe_id, ftype):
+        """A reaction to a dish of the current meal counts, even when the click is a repeat (a dish
+        that is already in Liked can still appear in a list)."""
+        if not request_id:
+            return
+        steps = self.store.cycle_steps(user_id)
+        if any(s["request_id"] == request_id and s["done_at"] is None for s in steps):
+            self.store.add_cycle_answer(user_id, request_id, recipe_id, ftype)
 
     def _is_admin(self, user_id):
         return self.access(user_id)["features"]["configure"]
@@ -279,6 +459,16 @@ class App:
                                                      "role": self.access(user_id)["role"]})
         return {"event_id": ev["event_id"]}
 
+    def _tour_seen(self, user_id):
+        """Has this user closed the guided tour? Kept with the user, not the browser, so it is shown
+        once per user at their first login, on whichever device that is."""
+        if user_id in self._tour_done:
+            return True
+        seen = any(e["payload"].get("kind") == "tour_closed" for e in self.store.events(user_id, types=["ui"]))
+        if seen:
+            self._tour_done.add(user_id)
+        return seen
+
     def _common_ingredients(self, min_recipes=5):
         if not hasattr(self, "_ing_vocab"):
             c = Counter(i["name"] for r in self.catalogue.recipes for i in r["ingredients"])
@@ -333,6 +523,8 @@ class App:
         return {"user_id": user_id, "onboarded": prof is not None,
                 "access": self.access(user_id), "registration": self.registration(user_id),
                 "profile": prof, "goal": goal,
+                "thresholds": self.thresholds(user_id), "cycle": self.cycle_config(user_id),
+                "tour_seen": self._tour_seen(user_id),
                 "constraints": [{"code": c, "label": l} for c, l in active_constraints(prof["declared"])] if prof else [],
                 "open_decisions": self.store.decisions(user_id, status="open", limit=20)}
 
@@ -433,7 +625,7 @@ class App:
                "diversity": goal["diversity"] if overrides.get("diversity") is None else overrides["diversity"],
                "mode": overrides.get("mode") or goal["mode"],
                "request_filters": overrides.get("request_filters") or [],
-               "last_valid_weights": goal["weights"], "k": int(getattr(self.s, "top_k", 5)),
+               "last_valid_weights": goal["weights"], "k": int(overrides.get("k") or getattr(self.s, "top_k", 5)),
                "max_missing_share": getattr(self.s, "max_missing_share", 0.5),
                "freshness": self.freshness(user_id, now)}
         with self.lock:
@@ -578,6 +770,7 @@ class App:
         pl = {"type": ftype, "recipe_id": recipe_id, "reason": reason, "request_id": request_id, "scope": scope,
               "role": self.access(user_id)["role"]}
         with self.lock:
+            self._cycle_mark(user_id, request_id, recipe_id, ftype)
             if ftype in ("save", "like"):
                 # duplicate = already in Saved / Liked. After removing it from that list, saving or
                 # liking again puts it back (the learner still counts its taste only once).

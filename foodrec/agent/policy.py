@@ -1,12 +1,13 @@
-"""Supervisor monitoring policy (deterministic, documented thresholds).
+"""Supervisor monitoring policy (deterministic thresholds; set them on the Config page, section
+Supervisor, or under "supervisor" in foodrec.config.json).
 
 After every piece of feedback the supervisor compares the user's STATED weights (saved
 goal) with the OBSERVED weights from the value model (learner.py):
 
     gap_k = observed_k - stated_k
     small gaps                                  -> keep recommending, nothing to ask
-    gap >= ASK_GAP with >= ASK_MIN events       -> ASK a trade-off question
-    gap >= PROPOSE_GAP with >= PROPOSE_MIN      -> PROPOSE moving the weight halfway
+    gap >= ask_gap with >= ask_min_events       -> ASK a trade-off question
+    gap >= propose_gap with >= propose_min_events -> PROPOSE moving the weight halfway
                                                    (shows a what-if first; the user must accept)
 
 The policy never edits a saved goal or a mandatory constraint. Its outputs are decisions
@@ -27,6 +28,13 @@ THRESHOLDS = {
     "taste_min_evidence": 2.0,   # ... with at least this much observed evidence
     "cooldown_events": 6,        # after a dismissal, do not re-raise the same topic for N events
 }
+
+
+def thresholds(app, user_id):
+    """The thresholds in force for this user: the configured ones (THRESHOLDS are the defaults)."""
+    return {k: app.setting(user_id, k, d) for k, d in THRESHOLDS.items()}
+
+
 # criterion -> all choose / reject reason ids about it (from the configured interactions)
 REASON_FOR = {k: (tuple(r["id"] for r in INTERACTIONS["choose_reasons"] if r["criterion"] == k),
                   tuple(r["id"] for r in INTERACTIONS["reject_reasons"] if r["criterion"] == k))
@@ -50,11 +58,12 @@ def _cooling_down(app, user_id, topic):
         return False
     last = max(d["resolved_ts"] for d in settled)
     n_after = len(app.store.events(user_id, since=last, types=["feedback"]))
-    return n_after < THRESHOLDS["cooldown_events"]
+    return n_after < thresholds(app, user_id)["cooldown_events"]
 
 
 def review(app, user_id, trace, trigger="feedback"):
     """Run the monitoring loop once. Returns an assessment and any new decisions."""
+    th = thresholds(app, user_id)
     lr = app.learner(user_id)
     goal = app.store.goal(user_id)
     result = {"status": "insufficient_data", "conflicts": [], "decisions": [], "confidence": None}
@@ -87,20 +96,20 @@ def review(app, user_id, trace, trigger="feedback"):
                    f"({n_new} event(s) since).", evidence={x: round(drift[x], 3) for x in VALUE_CRITERIA})
 
     k = max(VALUE_CRITERIA, key=lambda x: abs(drift[x]))
-    big = abs(drift[k]) >= THRESHOLDS["ask_gap"] and n_new >= THRESHOLDS["ask_min_events"]
+    big = abs(drift[k]) >= th["ask_gap"] and n_new >= th["ask_min_events"]
     if not big:
-        result["status"] = "aligned" if n_new >= THRESHOLDS["ask_min_events"] else "uncertain"
+        result["status"] = "aligned" if n_new >= th["ask_min_events"] else "uncertain"
         trace.step("reason", "Goal and behaviour agree" if result["status"] == "aligned" else "Still learning",
                    f"Largest {'new drift' if vm.ack else 'gap'} is {CRITERION_LABELS[k]} ({drift[k]:+.2f}); "
-                   f"the supervisor acts only when it reaches {THRESHOLDS['ask_gap']:.2f} after "
-                   f"{THRESHOLDS['ask_min_events']} or more events.",
+                   f"the supervisor acts only when it reaches {th['ask_gap']:.2f} after "
+                   f"{th['ask_min_events']} or more events.",
                    evidence={x: round(drift[x], 3) for x in VALUE_CRITERIA})
     else:
         result["status"] = "conflict"
         result["conflicts"] = [{"criterion": x, "gap": gap[x], "stated": stated[x], "observed": vm.observed[x],
                                 "direction": "higher" if gap[x] > 0 else "lower"}
                                for x in sorted(VALUE_CRITERIA, key=lambda x: -abs(drift[x]))
-                               if abs(drift[x]) >= THRESHOLDS["ask_gap"]]
+                               if abs(drift[x]) >= th["ask_gap"]]
         topic = f"criterion:{k}"
         trace.step("reason", f"Gap on {CRITERION_LABELS[k]}",
                    f"Saved weight {stated[k]:.2f}; your choices behave like {vm.observed[k]:.2f} "
@@ -113,7 +122,7 @@ def review(app, user_id, trace, trigger="feedback"):
                        f"at a time, so nothing new is asked.", evidence={"decision_id": waiting[0]["decision_id"]})
         elif _cooling_down(app, user_id, topic):
             trace.step("reason", "Topic recently dismissed",
-                       f"The user dismissed this topic within the last {THRESHOLDS['cooldown_events']} events; "
+                       f"The user dismissed this topic within the last {th['cooldown_events']} events; "
                        "respecting that and not asking again yet.")
         else:
             _resolve_conflict(app, user_id, trace, k, stated, vm, drift, result, n_new)
@@ -138,11 +147,12 @@ def _history_evidence(app, user_id, trace, k):
 def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result, n_events=None):
     """`gap`: the drift to act on (beyond an acknowledged gap); `n_events`: events behind it."""
     n_events = vm.n if n_events is None else n_events
+    th = thresholds(app, user_id)
     rows, support = _history_evidence(app, user_id, trace, k)
-    strong = abs(gap[k]) >= THRESHOLDS["propose_gap"] and n_events >= THRESHOLDS["propose_min_events"]
+    strong = abs(gap[k]) >= th["propose_gap"] and n_events >= th["propose_min_events"]
     trace.step("decide", "Enough evidence to propose a change?" + (" Yes" if strong else " No"),
-               f"Rule: propose only if the gap is at least {THRESHOLDS['propose_gap']:.2f} after "
-               f"{THRESHOLDS['propose_min_events']} events. Here gap = {abs(gap[k]):.2f}, events = {n_events}. "
+               f"Rule: propose only if the gap is at least {th['propose_gap']:.2f} after "
+               f"{th['propose_min_events']} events. Here gap = {abs(gap[k]):.2f}, events = {n_events}. "
                + ("Preparing a proposal; the saved goal stays unchanged until you accept it."
                   if strong else "Asking a targeted question instead of guessing."),
                source="policy", data={"options": ["propose", "ask"], "chosen": "propose" if strong else "ask"})
@@ -210,6 +220,7 @@ def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result, n_events=
 
 
 def _taste_conflicts(app, user_id, trace, lr, result):
+    th = thresholds(app, user_id)
     open_topics = _open_topics(app, user_id)
     for c in sorted(lr.taste.a):
         m, n = lr.taste.mean(c), lr.taste.evidence(c)
@@ -217,7 +228,7 @@ def _taste_conflicts(app, user_id, trace, lr, result):
         if kind not in ("cuisine", "ingredient"):
             continue
         declared = lr.taste.l0.get(c, 0) > 0
-        if not declared or m >= THRESHOLDS["taste_conflict_mean"] or n < THRESHOLDS["taste_min_evidence"]:
+        if not declared or m >= th["taste_conflict_mean"] or n < th["taste_min_evidence"]:
             continue
         topic = f"concept:{c}"
         if topic in open_topics or _cooling_down(app, user_id, topic):

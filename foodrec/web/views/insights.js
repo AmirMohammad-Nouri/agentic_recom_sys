@@ -49,7 +49,7 @@ export function insightsView() {
       clear(rows, h("div.empty", "No user model yet."));
       return;
     }
-    const th = state.system.thresholds;
+    const th = state.user_state.thresholds || state.system.thresholds;
     const c = ins.counts;
     clear(summary, h("div.match-summary",
       ring(ins.preference_match, "Preference match", "how closely your choices follow the values you set"),

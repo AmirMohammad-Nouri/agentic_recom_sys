@@ -248,8 +248,12 @@ export function menu(anchor, items) {
   }), 0);
 }
 
+// The health grade as a row of A to E with the dish's own letter bold and bigger. It looks like a
+// nutrition label on purpose, but it is FoodRec's own banding, not the official Nutri-Score.
 export function grade(g) {
-  return h("span.grade." + (g || "none"), { title: g ? `Health grade ${g} (FoodRec banding of the healthiness score, not Nutri-Score)` : "Health grade unknown" }, g || "?");
+  const title = g ? `Health grade ${g}: FoodRec's banding of the healthiness score, not the official Nutri-Score` : "Health grade unknown";
+  return h("span.nutri", { title, "aria-label": title, role: "img" },
+    ["A", "B", "C", "D", "E"].map((x) => h("span.nutri-l." + x + (x === g ? ".on" : ""), x)));
 }
 
 // Ask the embedded assistant from anywhere: opens the dock and sends the text.

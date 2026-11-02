@@ -21,7 +21,7 @@ function attachments(a) {
     out.push(h("div.mini-recipes", res.results.map((r) => h("div.mini",
       h("div.row.between", h("span.t", `#${r.final_rank} ${r.title}`), r.health_grade !== undefined ? grade(r.health_grade) : null),
       h("div.small.muted", [r.cuisine === "Other" ? human(r.meal) : r.cuisine, r.n_ingredients != null && can("food_details") ? `${r.n_ingredients} ingredients` : null,
-        r.utility != null ? `utility ${f2(r.utility)}` : null].filter(Boolean).join(" · ")),
+        r.utility != null ? `similarity score ${f2(r.utility)}` : null].filter(Boolean).join(" · ")),
       h("div.small", { style: { marginTop: "4px", color: "var(--text-2)" } }, personalFits(r)[0] || r.reasons.ranked_here[0] || "")))));
     if (res.config.request_filters?.length) {
       out.push(h("div.row.wrap", res.config.request_filters.map((f) => h("span.tag.info", { title: "Applied to this request only; not saved" }, f.label)),

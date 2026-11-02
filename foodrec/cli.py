@@ -217,11 +217,13 @@ def _study(a):
     from .study import generate
     cfg = AppConfig.load()
     st = cfg.study
+    # a password or a personal link
+    access = lambda p: (p.get("password") or f"/join/{p.get('link')}") + (" (deactivated)" if p.get("active") is False else "")  # noqa: E731
     if a.cmd == "list":
         parts = st.get("participants") or []
         print(f"{len(parts)} participant(s); login required: {bool(st.get('login_required'))}")
         for p in parts:
-            print(f"  {p['username']:<16} {p['role']:<18} {p['password']}")
+            print(f"  {p['username']:<16} {p['role']:<18} {access(p)}")
         return 0
     pop = dict(st.get("population") or {})
     if a.size is not None:
@@ -233,7 +235,7 @@ def _study(a):
     parts, counts = generate(pop, None if a.new_passwords else st.get("participants"))
     print(f"{len(parts)} participant(s): " + ", ".join(f"{r} {n}" for r, n in counts.items()))
     for p in parts[:10]:
-        print(f"  {p['username']:<16} {p['role']:<18} {p['password']}")
+        print(f"  {p['username']:<16} {p['role']:<18} {access(p)}")
     if len(parts) > 10:
         print(f"  ... and {len(parts) - 10} more")
     if not a.write:
