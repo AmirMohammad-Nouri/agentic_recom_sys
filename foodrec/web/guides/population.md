@@ -2,6 +2,7 @@
 
 Instead of adding participants one by one, describe the population and generate the accounts.
 
+0. **Population name**, e.g. `Pilot A`. You can have several populations and follow each one separately in **Monitor**. Generating again under the same name replaces only that population. Each population needs its own prefix, because usernames must be unique. With no name, people go in *Main population*.
 1. **Number of users**, e.g. 40.
 2. **Percent per role**, e.g. full 50 %, baseline 50 %. The percentages must add up to 100. The counts follow the largest-remainder rule, so they always add up to the number of users (40 × 50 % = 20 + 20; 25 with 33/33/34 % = 8 + 8 + 9).
 3. **Username prefix and digits**: `p` + 3 digits gives p001 … p040.
@@ -18,6 +19,8 @@ Instead of adding participants one by one, describe the population and generate 
 
 The **CSV download** gives a sheet to hand out.
 
+**Trying a link yourself**: use a private window, so your own account stays signed in. If you open it in your normal browser, you become that participant there. Account menu → **Leave this link** takes you back.
+
 **In the demo** there are only links. **Create links** makes them at once for you alone, up to 50 at a time, and they work without saving. Creating new ones replaces your earlier links, and the nightly reset removes them.
 
 Command line, same rules:
@@ -33,8 +36,8 @@ In the JSON file:
 "study": {
   "population": {"size": 40, "prefix": "p", "digits": 3,
                  "roles": {"full": 50, "baseline": 50},
-                 "shuffle": true, "seed": 7, "password_words": 2},
-  "participants": [{"username": "p001", "password": "maple-river-42", "role": "baseline"},
+                 "shuffle": true, "seed": 7, "password_words": 2, "name": "Pilot A"},
+  "participants": [{"username": "p001", "password": "maple-river-42", "role": "baseline", "population": "Pilot A"},
                    {"username": "p002", "link": "<code>", "role": "full", "flow": "guided"},
                    {"username": "p003", "link": "<code>", "role": "full", "active": false}]
 }

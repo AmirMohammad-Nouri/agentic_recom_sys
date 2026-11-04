@@ -1,5 +1,5 @@
 {
-  "$comment": "The public FoodRec demo: same code, this config. Visitors switch between a user and an admin view; the Config page is read-only and nothing can be administered. Used by foodrec-demo.service (see docs/deployment.md).",
+  "$comment": "The public FoodRec demo: same code, this config. Visitors choose a user or an admin view; the admin view has Monitor with sample data and a read-only Config page, and nothing can be administered. Used by foodrec-demo.service (see docs/deployment.md).",
   "config_version": 1,
   "server": {"mode": "demo", "host": "127.0.0.1", "port": 8000, "auto_reload": false},
   "dataset": {"data_dir": "data/demo/runtime"},

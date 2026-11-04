@@ -38,3 +38,5 @@ Every switch is **enforced by the server**: hidden fields are removed from the A
 - **baseline**: a plain list with food details and feedback buttons only.
 
 The export records each user's role and, for every list, exactly which scores were visible.
+
+**Administrators** are anyone whose role has the *Config page* feature. They see only Monitor and Config, whatever else the role allows: no onboarding, preferences or recommendations. To see the participant side yourself, create a personal link and open it in a private window.

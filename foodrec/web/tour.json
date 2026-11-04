@@ -1,35 +1,56 @@
 {
-  "$comment": "The guided tour (tour.js). Each step points at an element (a CSS selector) on a page (#/<page>), or is centred when it has no target. Steps whose element is not on screen (a role without that feature) are skipped. 'views': only in that demo view ('user' or 'admin'). 'cycle': only with meal cycles on (true) or off (false). 'feature': only for roles with that feature. 'open': 'dock' opens the assistant first.",
-  "steps": [
+  "$comment": "The guided tours (tour.js): 'user' for participants, 'admin' for administrators. A step is centred, or points at 'target' (a CSS selector) on 'page' (#/<page>); it is skipped if that element is not on screen, as for a role without the feature. 'click': selectors to click first, in order. 'open': 'dock' opens the assistant. Filters: 'demo' (only on a demo server, or only elsewhere), 'cycle' (meal cycles on or off), 'feature' (roles with that feature), 'needs_people' (only if Monitor has someone to show).",
+  "user": [
     {
       "title": "Welcome to FoodRec",
-      "text": "FoodRec suggests recipes ranked by what matters to you, and shows exactly why. This short tour points out each part of the app. Use Next to follow it, or Skip to explore on your own."
+      "text": "FoodRec suggests recipes ranked by what matters to you, and shows exactly why. This tour goes through each part of the app, one step at a time. Use Next to follow it, or Skip to explore on your own."
     },
     {
       "page": "discover",
       "target": ".cycle-bar",
       "title": "Your meal plan",
-      "text": "You go through breakfast, lunch and dinner, day by day. React to every dish in a meal to move on to the next one. The bar shows how far you are.",
+      "text": "You go through breakfast, lunch and dinner, day by day. The steps show which meal you are on, and the bar shows how many reactions you have given so far.",
       "cycle": true
     },
     {
       "page": "discover",
       "target": ".meal-seg",
       "title": "Pick a meal",
-      "text": "Choose a meal to see recipes for it.",
+      "text": "Choose a meal to see recipes for it. Your top dishes are ranked again each time.",
       "cycle": false
     },
     {
       "page": "discover",
       "target": "article.recipe",
       "title": "A recommended dish",
-      "text": "Each card shows the dish, its health grade from A to E, its similarity score, and in plain words why it was suggested. React with Like, Save, I'll cook this or Not for me: the app learns from it, and saved dishes wait in My dishes."
+      "text": "Each card is one dish, with its picture, the main facts, and in plain words why it was suggested."
+    },
+    {
+      "page": "discover",
+      "target": "article.recipe .nutri",
+      "title": "Health grade",
+      "text": "A to E, where A is the healthiest. FoodRec works it out from the dish's nutrition. It is similar to a Nutri-Score, but it is not the official one.",
+      "feature": "food_details"
+    },
+    {
+      "page": "discover",
+      "target": "article.recipe .recipe-actions",
+      "title": "React to the dish",
+      "text": "Like it, Save it for later, say I'll cook this, or Not for me, with a reason. The app learns your taste from these. Your saved goal only changes if you agree.",
+      "feature": "feedback"
+    },
+    {
+      "page": "discover",
+      "target": ".cycle-foot",
+      "title": "Move on to the next meal",
+      "text": "Once you have reacted to every dish in this meal, Continue takes you to the next one. After the last meal of the last day, you are done.",
+      "cycle": true
     },
     {
       "page": "discover",
       "target": "article.recipe .details-btn",
       "title": "Why this rank?",
-      "text": "Open How it's scored to see every factor behind the scores, how each value contributed, and what is estimated or missing."
+      "text": "Open How it's scored to see every factor behind the scores, how much each of your values contributed, and what is estimated or missing."
     },
     {
       "page": "discover",
@@ -48,29 +69,38 @@
       "feature": "supervisor"
     },
     {
-      "page": "discover",
-      "target": ".user-btn",
-      "title": "Your account",
-      "text": "Open this menu for My dishes (saved, liked and cooked), this tour and the guide to how FoodRec works."
+      "page": "profile/preferences",
+      "target": ".profile-tabs",
+      "title": "Your profile",
+      "text": "Profile holds everything the app knows about you, in tabs. Preferences has your safety rules, health goal, tastes and ingredient limit. Rules such as allergies are never relaxed automatically.",
+      "feature": "page_profile"
     },
     {
       "page": "profile/values",
       "target": ".values-card",
       "title": "Your values",
-      "text": "In Profile you set how much each value counts, and how varied your lists are. Save as new goal keeps them as a new version.",
+      "text": "Set how much healthiness, sustainability and convenience count, and how varied your lists are. Preview the effect first. Save as new goal keeps them as a new version.",
       "feature": "weight_controls"
     },
     {
-      "page": "profile",
+      "page": "profile/knowledge",
       "target": ".profile-tabs",
-      "title": "Your profile",
-      "text": "Profile holds your rules and preferences, your values and how varied your lists are, and every earlier version of your goal."
+      "title": "Knowledge",
+      "text": "Search the knowledge the assistant uses, and add your own documents for it to read.",
+      "feature": "page_knowledge"
+    },
+    {
+      "page": "profile/history",
+      "target": ".profile-tabs",
+      "title": "History",
+      "text": "Every earlier version of your profile and goal is kept here, and you can go back to one.",
+      "feature": "page_profile"
     },
     {
       "page": "insights",
       "target": "nav a[href='#/insights']",
       "title": "Insights",
-      "text": "Compare the values you chose with how your choices actually weigh them, and see the evidence behind every change.",
+      "text": "Compare the values you chose with how your choices actually weigh them, and see the evidence behind every change. You can correct what was learned.",
       "feature": "page_insights"
     },
     {
@@ -81,17 +111,214 @@
       "feature": "page_activity"
     },
     {
-      "views": [
-        "admin"
-      ],
       "page": "discover",
       "target": ".user-btn",
-      "title": "The Config page",
-      "text": "In the admin view, the account menu has Config: the model, dataset, criteria, access roles and the study population. In the demo it is read-only."
+      "title": "Your account",
+      "text": "This menu has My dishes (saved, liked and cooked), this tour, and the full guide to how FoodRec works."
+    },
+    {
+      "page": "discover",
+      "target": ".user-btn",
+      "title": "See the other side",
+      "text": "In the demo, this menu also switches to the administrator's view, where you can see how a study is run.",
+      "demo": true
     },
     {
       "title": "You are ready",
       "text": "Try a few reactions on Discover and ask the assistant something. You can restart this tour any time from the account menu."
+    }
+  ],
+  "admin": [
+    {
+      "title": "Welcome, administrator",
+      "text": "This side of FoodRec is for running a study. It has two pages: Monitor to follow what people do, and Config to set everything up. There are no recipes or preferences here, because those belong to participants."
+    },
+    {
+      "page": "monitor",
+      "target": ".nav",
+      "title": "Two pages",
+      "text": "Monitor and Config are always up here. Unsaved changes in Config are kept while you look at Monitor."
+    },
+    {
+      "page": "monitor",
+      "target": ".change",
+      "title": "Sample data",
+      "text": "A public demo has no real study, so these populations are made up, to show what monitoring looks like. In your own copy you see your real participants.",
+      "demo": true,
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "target": ".mon-totals",
+      "title": "The whole study at a glance",
+      "text": "How many populations and people there are, how many have started and finished, and how many reactions they have given.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "target": ".mon-compare",
+      "title": "Compare populations",
+      "text": "One row per population, side by side: progress, reactions per person, the share of rejected dishes, assistant use and open supervisor questions. Click a row to jump to that group.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "target": ".mon-pop",
+      "title": "One population",
+      "text": "Each group lists its people, with role, status and meal-cycle progress. Status runs from Invited to Started, In progress and Finished, or Deactivated if you ended their access.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "target": ".mon-user",
+      "title": "Open a person",
+      "text": "Click anyone to read what they did. Next opens the first person for you.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "click": [
+        ".mon-user"
+      ],
+      "target": ".mon-person",
+      "title": "One person's record",
+      "text": "Their status, population and role, with the key numbers underneath.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "click": [
+        ".mon-user",
+        ".mon-tab-interactions"
+      ],
+      "target": ".mon-record",
+      "title": "Interactions",
+      "text": "Every reaction: the dish, where it was in the list, and the reason the person gave.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "click": [
+        ".mon-user",
+        ".mon-tab-log"
+      ],
+      "target": ".mon-record",
+      "title": "Log",
+      "text": "The full timeline: each list shown, action taken, message and supervisor decision. Use Show to narrow it down.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "click": [
+        ".mon-user",
+        ".mon-tab-conversation"
+      ],
+      "target": ".mon-record",
+      "title": "Conversation",
+      "text": "What the person asked the assistant, and what it answered.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "click": [
+        ".mon-user",
+        ".mon-tab-supervisor"
+      ],
+      "target": ".mon-record",
+      "title": "Supervisor",
+      "text": "What the supervisor asked or proposed to this person, why, and how they responded.",
+      "needs_people": true
+    },
+    {
+      "page": "monitor",
+      "click": [
+        ".mon-user",
+        ".mon-tab-values"
+      ],
+      "target": ".mon-record",
+      "title": "Values",
+      "text": "The weights the person saved, next to the weights their choices actually show. The gap is what the supervisor watches.",
+      "needs_people": true
+    },
+    {
+      "page": "config/settings",
+      "target": ".cfg-tabs",
+      "title": "Config",
+      "text": "Everything is set here, in six tabs. Each section has a Guide button that explains its settings. Saving writes the config file, and the app restarts by itself when a setting needs it."
+    },
+    {
+      "page": "config/settings",
+      "target": ".change",
+      "title": "Read-only in the demo",
+      "text": "You can look at every setting and try things in the page, but the demo's file does not change. To configure FoodRec, clone the project and run it on your computer.",
+      "demo": true
+    },
+    {
+      "page": "config/settings",
+      "target": ".visitor-card",
+      "title": "Try these yourself",
+      "text": "These settings really do work in the demo, for your visit and your links only: the size of a meal cycle, how soon the supervisor speaks, and more. Switch to the user view to see the effect.",
+      "demo": true
+    },
+    {
+      "page": "config/settings",
+      "target": ".cfg-tabs [data-tab=settings].on",
+      "title": "Settings",
+      "text": "The language model, dataset, services, ranking, meal cycles and the supervisor's thresholds."
+    },
+    {
+      "page": "config/criteria",
+      "target": ".cfg-tabs [data-tab=criteria].on",
+      "title": "Criteria and interactions",
+      "text": "What dishes are scored on, and how strongly each reaction teaches the model."
+    },
+    {
+      "page": "config/roles",
+      "target": ".cfg-tabs [data-tab=roles].on",
+      "title": "Access roles",
+      "text": "A role decides what a person can see: for example, full transparency or a plain baseline list. These are the conditions of your experiment."
+    },
+    {
+      "page": "config/users",
+      "target": ".pop-card",
+      "title": "Create a population",
+      "text": "Give the group a name, a size and the percentage per role, and choose how people get in: a password or a personal link.",
+      "demo": false
+    },
+    {
+      "page": "config/users",
+      "target": ".pop-card",
+      "title": "Create links",
+      "text": "Set a size and the percentage per role, and get a personal link per person. This does work in the demo. Open a link in a private window, and that person's real activity appears in Monitor under Your links. In your normal browser it works too: leave it from the account menu to come back here.",
+      "demo": true
+    },
+    {
+      "page": "config/users",
+      "target": ".parts-card",
+      "title": "Accounts and links",
+      "text": "Copy links, download them as a sheet, or deactivate someone. Deactivating ends that person's access straight away."
+    },
+    {
+      "page": "config/export",
+      "target": ".cfg-tabs [data-tab=export].on",
+      "title": "Export",
+      "text": "Download the study data as JSON, or as a ZIP of CSV tables for analysis."
+    },
+    {
+      "page": "config/json",
+      "target": ".cfg-tabs [data-tab=json].on",
+      "title": "JSON file",
+      "text": "The same settings as one file, if you prefer to edit it directly."
+    },
+    {
+      "page": "monitor",
+      "target": ".user-btn",
+      "title": "Your account",
+      "text": "This menu restarts the tour and opens the full guide. In the demo it switches to the user view, and in your own copy it signs you out."
+    },
+    {
+      "title": "You are ready",
+      "text": "To see a participant's side in your own copy, create a personal link and open it in a private window. Restart this tour any time from the account menu."
     }
   ]
 }

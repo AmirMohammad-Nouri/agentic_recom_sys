@@ -3,7 +3,7 @@
 // Every section has a guide button (ⓘ) that opens a guide from /static/guides/<id>.md.
 // Saving writes the file; the server applies "live" settings at once and restarts itself
 // for the others (the page then waits for the new process and reloads).
-import { ago, api, clear, download, h, icon, safeSet, sessionGet, sessionSet, setDemoView, state, toast } from "../lib.js";
+import { ago, api, clear, download, h, icon, leaveLink, safeGet, safeSet, sessionGet, sessionSet, setDemoView, state, toast } from "../lib.js";
 import { markdown } from "../markdown.js";
 
 const TABS = [["settings", "Settings"], ["criteria", "Criteria & interactions"], ["roles", "Access roles"],
@@ -61,6 +61,8 @@ export function configView() {
   const body = h("div");
   const head = h("div.row", { style: { gap: "8px", alignItems: "center" } });
   const tabsEl = h("div.seg.cfg-tabs");
+  const tabKeys = TABS.map(([k]) => k);
+  if (!tabKeys.includes(tab)) tab = "settings";
 
   function fromView(v) {
     // runtime settings: what the FILE says (null = environment/default); the rest: effective
@@ -86,10 +88,18 @@ export function configView() {
   // No access yet: in the demo, offer the admin view; otherwise the administrator signs in.
   function accessForm(why) {
     if (state.system?.mode === "demo") {
+      // this browser is a participant of a personal link: that link has to be left first
+      if (safeGet("foodrec.joined")) {
+        clear(body, h("section.card", h("div.card-body.stack",
+          h("h3", "You are using a personal link"),
+          h("p.muted", "People with a link are participants, so they can't see this page. Leave the link to go back to the demo."),
+          h("div.btn-row", h("button.btn.primary.leave-link", { onclick: leaveLink }, "Leave this link")))));
+        return;
+      }
       clear(body, h("section.card", h("div.card-body.stack",
         h("h3", "This is the administrator's page"),
         h("p.muted", "In the demo you can look at it from the admin view (read-only)."),
-        h("div.btn-row", h("button.btn.primary", { onclick: async () => { await setDemoView("admin"); load(); } }, "Switch to the admin view")))));
+        h("div.btn-row", h("button.btn.primary", { onclick: async () => { await setDemoView("admin"); location.reload(); } }, "Switch to the admin view")))));
       return;
     }
     const user = h("input", { type: "text", autocomplete: "username", placeholder: "Administrator username", style: { width: "260px" } });
@@ -105,7 +115,8 @@ export function configView() {
           const out = await api("/api/login", { method: "POST", body: { username: user.value.trim(), password: pw.value } });
           safeSet("foodrec.session", out.token);
           safeSet("foodrec.user", out.user_id);
-          load();
+          safeSet("foodrec.joined", "");
+          location.reload();
         } catch (err) { msg.textContent = err.message; }
       } }, user, pw, msg, h("button.btn.primary", { type: "submit" }, "Sign in")),
       h("details", h("summary.small.muted", "Other ways in"),
@@ -144,9 +155,16 @@ export function configView() {
       : [dirty ? h("span.tag.warn", "unsaved changes") : h("span.small.muted", `version ${view?.version || "–"}`),
         h("button.btn", { disabled: !dirty, onclick: () => { draft = fromView(view); dirty = false; render(); } }, "Discard"),
         h("button.btn.primary", { disabled: !dirty, onclick: save }, "Save to file")]);
-    clear(tabsEl, TABS.map(([k, label]) => h("button" + (k === tab ? ".on" : ""), {
-      onclick: () => { tab = k; sessionSet("foodrec.config_tab", k); render(); },
+    clear(tabsEl, TABS.map(([k, label]) => h("button" + (k === tab ? ".on" : ""), { dataset: { tab: k },
+      onclick: () => { setTab(k); history.replaceState(null, "", `#/config/${k}`); },
     }, label)));
+  }
+
+  function setTab(k) {
+    if (!tabKeys.includes(k) || k === tab) return;
+    tab = k;
+    sessionSet("foodrec.config_tab", k);
+    if (view) render();
   }
 
   function render() {
@@ -157,7 +175,7 @@ export function configView() {
         view.exists ? "" : " (not created yet: saving creates it)",
         view.auto_reload ? " · edits to the file (here or by hand) are applied automatically" : " · automatic reload is off",
         view.admin_token ? " · protected by an admin token" : ""),
-      view.read_only ? h("div.change", h("b", "Demo: "), "this is the Config page as an administrator sees it. You can look at every setting, open the guides and try things, but nothing in the file changes here. The only exceptions are the settings under \"Try these yourself\" and the links you create: they count for your visit only. To configure FoodRec, clone the project and run it on your computer.") : null,
+      view.read_only ? h("div.change", h("b", "Demo: "), "this is the Config page as an administrator sees it. You can look at every setting, open the guides and try things, but nothing in the file changes here. The only exceptions are the settings under \"Try these yourself\" and the links you create: they count for your visit only, and you see their effect in the user view. To configure FoodRec, clone the project and run it on your computer.") : null,
       view.config_problem ? h("div.change.bad", h("b", "The file on disk was not applied: "), view.config_problem,
         h("div.small", "The app keeps running with the last valid configuration until the file is fixed.")) : null,
       pending.length && !view.read_only ? h("div.change", h("b", "Waiting for a restart: "), pending.map((p) => `${p.label} (running ${p.running}, saved ${p.saved})`).join("; "),
@@ -253,7 +271,7 @@ export function configView() {
           onchange: (e) => { values[name] = num(e.target.value); } });
       return h("div.cfg-field", h("div", h("b.small", f.label), f.help ? h("div.hint", f.help) : null), h("div", input));
     };
-    return h("section.card",
+    return h("section.card.visitor-card",
       h("div.card-head", h("h2", "Try these yourself"), h("span.grow"), h("span.small.muted", "Only for your visit, and for people who use your links")),
       h("div.card-body.stack", fields.map(row),
         h("div.btn-row",
@@ -546,7 +564,14 @@ export function configView() {
       for (const r of Object.keys(ex).sort((a, b) => (ex[b] - c[b]) - (ex[a] - c[a]))) { if (left-- <= 0) break; c[r]++; }
       return c;
     })();
-    const popCard = card("Create the study population", "population",
+    const popName = (pop.name || "").trim() || "Main population";
+    const samePop = st.participants.filter((p) => (p.population || "Main population") === popName).length;
+    const popCard = card("Create a study population", "population",
+      demo ? null : h("div.field", h("span.field-label", "Population name"),
+        h("input", { type: "text", maxLength: 60, value: pop.name || "", placeholder: "Main population", list: "cfg-population-names",
+          onchange: (e) => setv(pop, "name", e.target.value.trim(), true) }),
+        h("datalist", { id: "cfg-population-names" }, [...new Set(st.participants.map((p) => p.population || "Main population"))].map((n) => h("option", { value: n }))),
+        h("span.hint", "Give each group its own name to follow them separately in Monitor. Generating again under the same name replaces that group only. Use a different prefix for each group, because usernames must be unique.")),
       h("div.row.wrap", { style: { gap: "12px", alignItems: "flex-end" } },
         h("label.field", h("span.field-label", "Number of users"), h("input", { type: "number", min: 0, max: 10000, value: pop.size, style: { width: "110px" }, onchange: (e) => setv(pop, "size", Math.max(0, Math.round(+e.target.value || 0)), true) })),
         demo ? null : h("label.field", h("span.field-label", "How people get in"),
@@ -571,7 +596,7 @@ export function configView() {
         (demo ? "" : ` The guided path uses the settings under Settings → Meal cycles.`)),
       h("div.btn-row",
         h("button.btn.primary", { disabled: Math.abs(tot - 100) > 0.01 || !pop.size, onclick: async () => {
-          if (!demo && st.participants.length && !confirm(`Replace the ${st.participants.length} participant(s) with ${pop.size} generated ones? Those whose username stays keep their password or link.`)) return;
+          if (!demo && samePop && !confirm(`Replace the ${samePop} participant(s) of "${popName}" with ${pop.size} generated ones? Those whose username stays keep their password or link.`)) return;
           try {
             const res = await api("/api/config/population", { method: "POST", body: { population: demo ? pop : { ...pop, flow: popFlow }, participants: st.participants } });
             const summary = Object.entries(res.counts).map(([r, n]) => `${label(r)} ${n}`).join(", ");
@@ -581,7 +606,7 @@ export function configView() {
             } else {
               st.participants = res.participants;
               touch();
-              toast(`${res.participants.length} participants generated: ${summary}. Save to keep them.`);
+              toast(`${pop.size} participants generated for "${popName}": ${summary}. Save to keep them.`);
             }
             render();
           } catch (e) { toast(e.message, "err"); }
@@ -618,9 +643,11 @@ export function configView() {
       h("div.hint", "Whoever opens a link uses the app as that person, with its role and your settings. A link works until you deactivate or remove it, but demo data is reset every night, and the links with it. For a real experiment, use your own copy.")) : card(`Participant accounts (${parts.length})`, "population",
       unsavedLinks ? h("div.change", h("b", "These links don't work yet. "), "Click ", h("b", "Save to file"), " at the top of the page, then copy them.") : null,
       parts.length ? h("div.small.muted", Object.entries(byRole).map(([r, n]) => `${label(r)} ${n}`).join(" · ")) : h("div.small.muted", "No accounts yet. Generate them above or add one."),
-      parts.length ? h("div", { style: { maxHeight: "420px", overflow: "auto" } }, h("table.t", h("thead", h("tr", h("th", "Username"), h("th", "Password or link"), h("th", "Role"), h("th", "Path"), h("th", "Active"), h("th", "Note"), h("th", ""))),
+      parts.length ? h("div", { style: { maxHeight: "420px", overflow: "auto" } }, h("table.t", h("thead", h("tr", h("th", "Username"), h("th", "Population"), h("th", "Password or link"), h("th", "Role"), h("th", "Path"), h("th", "Active"), h("th", "Note"), h("th", ""))),
         h("tbody", parts.map((p, i) => h("tr",
           h("td", h("input.mono", { type: "text", value: p.username, style: { width: "120px" }, onchange: (e) => setv(p, "username", e.target.value.trim()) })),
+          h("td", h("input", { type: "text", maxLength: 60, value: p.population || "", placeholder: "Main population", list: "cfg-population-names", style: { width: "150px" },
+            onchange: (e) => { if (e.target.value.trim()) p.population = e.target.value.trim(); else delete p.population; touch(); } })),
           p.link ? h("td", linkSaved(p.link) ? h("button.btn.sm", { title: linkUrl(p.link), onclick: () => copyLink(p.link) }, "Copy link")
             : h("span.small.muted", { title: "This link works once it is saved" }, "Save first"))
             : h("td", h("input.mono", { type: "text", value: p.password, style: { width: "170px" }, onchange: (e) => setv(p, "password", e.target.value) })),
@@ -683,6 +710,8 @@ export function configView() {
           adm.password = pw1.value; touch(); render(); toast("Save to file to store the new password");
         } }, "Use this password")),
       h("div.hint", "The administrator signs in with this account and is the only one who sees Config."));
+    popCard.classList.add("pop-card");
+    partsCard.classList.add("parts-card");
     return h("div.stack",
       h("div.two-col", studyCard, popCard),
       adminCard,
@@ -732,11 +761,13 @@ export function configView() {
 
   window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
   load();
-  return h("div",
+  const root = h("div",
     h("div.page-head", h("div", h("h1", "Config"),
       h("p", "Model, dataset, criteria, access roles and the study. Saved to the config file in the repository; edits to that file by hand are picked up too.")),
       head),
     h("div", { style: { marginBottom: "14px" } }, tabsEl),
     body);
+  root.setTab = setTab;
+  return root;
 }
 

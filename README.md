@@ -165,8 +165,14 @@ That is a complete installation. The next sections are optional.
 | **Activity** | The full event log and every supervisor decision. |
 | **Profile** | In tabs: **Preferences** (rules and tastes), **Values & diversity** (how much each value counts, saved as goal versions), **Knowledge** (the knowledge graph, your document library and a search tester) and **History** (profile versions and goal versions you can restore). |
 
-**Guided tour.** Account menu → **Show the tour** walks through these parts with short, skippable hints
-(on the public demo it starts by itself). The hints are in `foodrec/web/tour.json` and can be edited.
+**Guided tour.** A tour with short, skippable hints starts by itself at a person's first login, and from
+Account menu → **Show the tour** at any time. Users and administrators each have their own. The hints are in
+`foodrec/web/tour.json` and can be edited.
+
+**The administrator's side.** An administrator has no onboarding, preferences or recommendations. After
+signing in they get two pages: **Monitor** compares the populations and shows each person's interactions and
+logs, and **Config** holds every setting. To see the participant side, create a personal link and open it in a
+private window.
 
 Saved dishes wait in My dishes instead of taking a place in Discover. Dishes you are shown but ignore,
 and cuisines that keep appearing, slowly give way so the lists stay fresh over days.
@@ -283,7 +289,7 @@ environment and are never written to the file. Full reference:
 | Server mode | Who | Config page |
 |---|---|---|
 | `local` (default) | everyone signs in: the administrator account or participant accounts | administrator only |
-| `demo` | public showcase: no sign-in; visitors switch between a User and an Admin view | admin view, read-only |
+| `demo` | public showcase: no sign-in; visitors first choose a User or an Admin view, and can switch later | admin view, read-only |
 | `open` | no sign-in; for development and automated tests only | roles with *configure* |
 
 ---
@@ -330,8 +336,9 @@ step: the Dataset guide on the Config page, or [docs/configuration.md](docs/conf
 ## Demo and server deployment
 
 The same code runs a public showcase: `server.mode = "demo"` with `deploy/demo/demo.config.json`. Visitors
-need no account; the account menu switches between **User view** and **Admin view**, the Config page is
-read-only, visitors cannot see each other's data, and the data is reset every night.
+need no account and first choose the **User** or the **Admin** view (the account menu switches later). The admin
+view shows Monitor with made-up sample populations, and a read-only Config page. Visitors cannot see each
+other's data, and the data is reset every night.
 
 Try it on your computer next to your normal app:
 
@@ -429,6 +436,7 @@ Interactive documentation at `http://127.0.0.1:8000/docs`. Main endpoints:
 | POST | `/api/users/{id}/chat` | a chat turn, streamed as trace steps (NDJSON) |
 | GET | `/api/users/{id}/insight`, `/events`, `/messages`, `/export` | beliefs, event log, conversation, own export |
 | GET / PUT | `/api/config` | the configuration (administrator) |
+| GET | `/api/admin/monitor`, `/api/admin/monitor/users/{id}` | populations and one person's interactions and logs (administrator) |
 | GET | `/api/export?users=&format=json\|zip` | the study export (administrator) |
 
 ---

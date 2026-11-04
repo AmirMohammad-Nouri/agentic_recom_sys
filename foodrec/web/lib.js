@@ -204,7 +204,7 @@ export function visibleCriteria(keys = CRIT) {
 }
 // Report an interface interaction for the study log (fire and forget).
 export function track(kind, data = {}) {
-  if (!state.user_state?.onboarded) return;
+  if (!state.user_state?.onboarded && data.side !== "admin") return;  // administrators never onboard
   fetch(userPath("/ui-events"), { method: "POST", headers: headers(true), body: JSON.stringify({ kind, ...data }) })
     .catch(() => {});
 }
@@ -299,11 +299,31 @@ export function visitorId() {
   return v;
 }
 export const demoView = () => (safeGet("foodrec.view") === "admin" ? "admin" : "user");
+export const demoViewChosen = () => ["admin", "user"].includes(safeGet("foodrec.view"));
 export async function startDemo() {
   state.user = visitorId();
   await api("/api/demo/view", { method: "POST", body: { view: demoView() } });
 }
+// Opening a personal link makes this browser that participant. Remember who it was before, so that
+// leaving the link gives the demo visitor back their own view, links and settings.
+export function rememberVisitor() {
+  if (safeGet("foodrec.joined")) return;  // from one link to another: the visitor is already remembered
+  safeSet("foodrec.own_visitor", safeGet("foodrec.visitor") || "");
+  safeSet("foodrec.own_view", safeGet("foodrec.view") || "");
+}
+export function leaveLink() {
+  safeSet("foodrec.joined", "");
+  safeSet("foodrec.session", "");
+  safeSet("foodrec.user", "");
+  safeSet("foodrec.visitor", safeGet("foodrec.own_visitor") || "");
+  safeSet("foodrec.view", safeGet("foodrec.own_view") || "");
+  safeSet("foodrec.own_visitor", "");
+  safeSet("foodrec.own_view", "");
+  history.replaceState(null, "", "/");
+  location.reload();
+}
 export async function setDemoView(view) {
+  state.user = visitorId();
   safeSet("foodrec.view", view);
   await api("/api/demo/view", { method: "POST", body: { view } });
 }

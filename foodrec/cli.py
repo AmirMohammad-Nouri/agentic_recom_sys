@@ -1,7 +1,7 @@
 """Command line: foodrec [open | serve | status | stop | scenario | export | config | study | users].
 
     foodrec                                   open the app in the browser (starts it if it is not running)
-    foodrec config open                       open the Config page (starts the app if it is not running)
+    foodrec config open                       open the administrator's Config page (starts the app if it is not running)
     foodrec serve                             run the server only (no browser), e.g. on a study server
     foodrec status | stop                     is the app running? stop it (from any terminal)
     foodrec --config study.json serve         use another config file
@@ -214,7 +214,7 @@ def _admin(a):
 
 def _study(a):
     from .appconfig import AppConfig
-    from .study import generate
+    from .study import add_population
     cfg = AppConfig.load()
     st = cfg.study
     # a password or a personal link
@@ -232,7 +232,7 @@ def _study(a):
         pop["roles"] = {r: float(v) for r, v in (x.split("=", 1) for x in a.role)}
     if a.prefix:
         pop["prefix"] = a.prefix
-    parts, counts = generate(pop, None if a.new_passwords else st.get("participants"))
+    parts, counts = add_population(pop, st.get("participants"), new_secrets=a.new_passwords)
     print(f"{len(parts)} participant(s): " + ", ".join(f"{r} {n}" for r, n in counts.items()))
     for p in parts[:10]:
         print(f"  {p['username']:<16} {p['role']:<18} {access(p)}")

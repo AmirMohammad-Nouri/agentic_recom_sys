@@ -1,5 +1,5 @@
 // App shell: top bar, router, system status, onboarding gate.
-import { api, can, clear, demoView, h, icon, on, safeGet, safeSet, setCriteria, setDemoView, startDemo, state, toast, track, userPath } from "./lib.js";
+import { api, can, clear, demoView, demoViewChosen, h, icon, leaveLink, on, rememberVisitor, safeGet, safeSet, setCriteria, setDemoView, startDemo, state, toast, track, userPath } from "./lib.js";
 import { mountDock } from "./dock.js";
 import { startTour } from "./tour.js";
 import { discoverView } from "./views/discover.js";
@@ -21,7 +21,8 @@ const hashRoute = () => {
   const path = location.hash.replace("#/", "") || "discover";
   return MOVED[path] || path;
 };
-// The Config page is a separate page (/config), opened with `foodrec config open`; the app has no link to it.
+// Administrators have their own page (/config: Monitor and Config, see config-main.js); this app is for users.
+const ADMIN_PAGE = "/config#/monitor";
 const allowed = (k) => ROUTES[k] && (!ROUTES[k].feature || can(ROUTES[k].feature)) && (!ROUTES[k].anyOf || ROUTES[k].anyOf.some(can));
 
 const main = document.querySelector("main");
@@ -75,9 +76,8 @@ function systemPanel() {
   document.body.append(overlay);
 }
 
-// The account menu (the user button, top right): My dishes and, for administrators, Config;
-// then, by mode: signed-in user and Sign out (local), the Admin/User view switch (demo), or the
-// pseudonymous user id (open, development only).
+// The account menu (the user button, top right): My dishes; then, by mode: signed-in user and
+// Sign out (local), the Admin/User view switch (demo), or the pseudonymous user id (open, development only).
 function userMenu(anchor) {
   const close = () => pop.remove();
   const mode = state.system?.mode;
@@ -86,25 +86,25 @@ function userMenu(anchor) {
   const top = [
     can("page_dishes") ? item("bookmark", "My dishes", "Saved for later, liked and cooked",
       { onclick: () => { close(); location.hash = "#/dishes"; } }) : null,
-    can("configure") ? item("tool", "Config", mode === "demo" ? "Every setting, read-only in the demo" : "Model, dataset, criteria, roles, study",
-      { href: "/config" }) : null,
     item("spark", "Show the tour", "A short walk through the app", { onclick: () => { close(); startTour(); } }),
     item("info", "How FoodRec works", "The complete guide: concepts and every equation", { href: "/guide", target: "_blank", rel: "noopener" }),
   ].filter(Boolean);
   let account = null;
   let input = null;
   if (joinedByLink()) {
-    account = h("div.menu-label", { style: { padding: "0" } }, "You joined with a personal link");
+    account = [h("div.menu-label", { style: { padding: "0 0 6px" } }, "You joined with a personal link"),
+      h("button.btn.sm.leave-link", { onclick: leaveLink }, "Leave this link"),
+      h("div.hint", { style: { marginTop: "6px" } }, mode === "demo"
+        ? "Goes back to the demo as you had it. The link keeps working, and you can open it again."
+        : "Goes to the sign-in page. The link keeps working, and you can open it again.")];
   } else if (mode === "demo") {
     const view = demoView();
     account = [h("div.menu-label", { style: { padding: "0 0 6px" } }, "See the app as"),
       h("div.seg", { style: { width: "100%" } }, [["user", "User"], ["admin", "Admin"]].map(([v, t]) => h("button" + (v === view ? ".on" : ""), {
         style: { flex: "1" },
-        onclick: async () => { if (v !== view) { await setDemoView(v); location.reload(); } },
+        onclick: async () => { if (v !== view) { await setDemoView(v); location.replace(ADMIN_PAGE); } },
       }, t))),
-      h("div.hint", { style: { marginTop: "6px" } }, view === "admin"
-        ? "Admin view: everything a user sees, plus the Config page (read-only here)."
-        : "User view: what a participant with full access sees.")];
+      h("div.hint", { style: { marginTop: "6px" } }, "User view: what a participant with full access sees.")];
   } else if (state.system?.login_required) {
     account = [h("div.menu-label", { style: { padding: "0 0 6px" } }, `Signed in as ${state.user}`),
       h("button.btn.sm", { onclick: () => { safeSet("foodrec.session", ""); location.reload(); } }, "Sign out")];
@@ -135,10 +135,33 @@ const joinedByLink = () => !!state.user && safeGet("foodrec.joined") === state.u
 
 function demoBanner() {
   const b = h("div.demo-banner", h("b", "Demo"), joinedByLink()
-    ? " · you joined with a personal link · data is reset regularly"
-    : [` · you see the app as ${demoView() === "admin" ? "the administrator" : "a user"} `,
-      "(switch in the account menu, top right) · data is reset regularly · to use FoodRec for real, clone the project and run it on your computer"]);
+    ? " · you joined with a personal link (to leave it, use the account menu, top right) · data is reset regularly"
+    : " · you see the app as a user (switch in the account menu, top right) · data is reset regularly · to use FoodRec for real, clone the project and run it on your computer");
   document.querySelector(".topbar").after(b);
+}
+
+// The first thing a demo visitor sees: which side of FoodRec to look at. Asked once per browser.
+function chooseView() {
+  document.querySelector(".topbar").classList.add("topbar-plain");
+  return new Promise((resolve) => {
+    const pick = (view) => async () => {
+      try {
+        await setDemoView(view);
+        resolve(view);
+      } catch (e) { toast(e.message, "err"); }
+    };
+    const option = (view, ic, title, text, points) => h("button.view-option", { type: "button", onclick: pick(view) },
+      h("span.view-icon", icon(ic)), h("h2", title), h("p", text),
+      h("ul", points.map((t) => h("li", t))), h("span.btn.primary", `Continue as ${view === "admin" ? "administrator" : "user"}`));
+    clear(main, h("div.view-choice",
+      h("h1", "How do you want to see FoodRec?"),
+      h("p.muted", "FoodRec recommends recipes and shows exactly why. Pick a side to try. You can switch later in the account menu, top right."),
+      h("div.view-options",
+        option("user", "bowl", "User", "Get food recommendations, the way a study participant does.",
+          ["Set your preferences and values", "React to dishes, meal by meal", "Ask the assistant why a dish was suggested"]),
+        option("admin", "tool", "Administrator", "Run a study: configure the app and follow what people do.",
+          ["Monitor populations, with sample data", "Read each person's interactions and logs", "Go through every setting"]))));
+  });
 }
 
 function loginScreen(system) {
@@ -189,7 +212,7 @@ async function joinFromLink() {
   try {
     const out = await api("/api/join", { method: "POST", body: { token: decodeURIComponent(m[1]) } });
     if (out.token) safeSet("foodrec.session", out.token);
-    if (out.mode === "demo") { safeSet("foodrec.visitor", out.user_id); safeSet("foodrec.view", "user"); }
+    if (out.mode === "demo") { rememberVisitor(); safeSet("foodrec.visitor", out.user_id); safeSet("foodrec.view", "user"); }
     safeSet("foodrec.joined", out.user_id);
     safeSet("foodrec.user", out.user_id);
     state.user = out.user_id;
@@ -222,8 +245,11 @@ async function boot() {
     state.system = await api("/api/system");
     setCriteria(state.system.criteria_specs);
     if (state.system.mode === "demo") {
+      if (!demoViewChosen() && !joinedByLink()) await chooseView();
+      if (demoView() === "admin" && !joinedByLink()) return location.replace(ADMIN_PAGE);
+      document.querySelector(".topbar").classList.remove("topbar-plain");
       await startDemo();
-      document.querySelector(".user-btn .uid").textContent = demoView() === "admin" ? "Admin view" : "User view";
+      document.querySelector(".user-btn .uid").textContent = "User view";
       demoBanner();
     } else if (state.system.login_required) {
       const sess = await api("/api/session");
@@ -241,9 +267,12 @@ async function boot() {
     }
     state.user_state = await api(userPath("/state"));
   } catch (e) {
-    clear(main, h("div.empty", { style: { paddingTop: "80px" } }, h("h3", e.status === 403 ? "Your access has ended" : "The server is not reachable"), h("p", e.message)));
+    clear(main, h("div.empty", { style: { paddingTop: "80px" } }, h("h3", e.status === 403 ? "Your access has ended" : "The server is not reachable"), h("p", e.message),
+      e.status === 403 && joinedByLink() ? h("button.btn.leave-link", { onclick: leaveLink }, "Leave this link") : null));
     return;
   }
+  // An administrator has no profile, onboarding or recommendations here: straight to their page.
+  if (state.user_state.access?.features?.configure) return location.replace(ADMIN_PAGE);
   renderStatus();
   document.querySelector(".user-btn").title = "Account";
   if (state.system.study?.name) document.title = `${state.system.study.name} · FoodRec`;

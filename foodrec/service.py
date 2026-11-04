@@ -232,9 +232,8 @@ class App:
     def cycle_config(self, user_id):
         acc = self.access(user_id)
         if self._demo():
-            from .appconfig import ADMIN_ROLE, DEMO_CYCLE_MEALS
-            # the user view follows the path; the admin view browses freely to look around
-            enabled, meals = acc["source"] != "demo view" or acc["role"] != ADMIN_ROLE, list(DEMO_CYCLE_MEALS)
+            from .appconfig import DEMO_CYCLE_MEALS
+            enabled, meals = True, list(DEMO_CYCLE_MEALS)
         else:
             enabled = self._guided(user_id)
             meals = [m.strip() for m in str(getattr(self.s, "cycle_meals", "")).split(",") if m.strip() in MEAL_CONTEXTS]
@@ -459,14 +458,15 @@ class App:
                                                      "role": self.access(user_id)["role"]})
         return {"event_id": ev["event_id"]}
 
-    def _tour_seen(self, user_id):
-        """Has this user closed the guided tour? Kept with the user, not the browser, so it is shown
-        once per user at their first login, on whichever device that is."""
-        if user_id in self._tour_done:
+    def _tour_seen(self, user_id, side="user"):
+        """Has this user closed the guided tour of this side (user or admin)? Kept with the user, not
+        the browser, so each tour is shown once, at the first login, on whichever device that is."""
+        if (user_id, side) in self._tour_done:
             return True
-        seen = any(e["payload"].get("kind") == "tour_closed" for e in self.store.events(user_id, types=["ui"]))
+        seen = any(e["payload"].get("kind") == "tour_closed" and e["payload"].get("side", "user") == side
+                   for e in self.store.events(user_id, types=["ui"]))
         if seen:
-            self._tour_done.add(user_id)
+            self._tour_done.add((user_id, side))
         return seen
 
     def _common_ingredients(self, min_recipes=5):
@@ -524,7 +524,7 @@ class App:
                 "access": self.access(user_id), "registration": self.registration(user_id),
                 "profile": prof, "goal": goal,
                 "thresholds": self.thresholds(user_id), "cycle": self.cycle_config(user_id),
-                "tour_seen": self._tour_seen(user_id),
+                "tour_seen": self._tour_seen(user_id), "tour_seen_admin": self._tour_seen(user_id, "admin"),
                 "constraints": [{"code": c, "label": l} for c, l in active_constraints(prof["declared"])] if prof else [],
                 "open_decisions": self.store.decisions(user_id, status="open", limit=20)}
 

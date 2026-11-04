@@ -36,6 +36,7 @@ import time
 from pathlib import Path
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
+DEFAULT_POPULATION = "Main population"
 WORDS = ("amber", "apple", "basil", "berry", "birch", "bloom", "brook", "cedar", "cherry", "clover", "cocoa", "coral",
          "cotton", "daisy", "delta", "ember", "fern", "fig", "forest", "garden", "ginger", "harbor", "hazel", "honey",
          "island", "ivy", "jasmine", "juniper", "kiwi", "lagoon", "lemon", "lilac", "lime", "linen", "lotus", "maple",
@@ -69,6 +70,26 @@ def allocate(size, shares):
     return counts
 
 
+def population_name(obj):
+    """The population a participant belongs to, or the one a population spec creates."""
+    return str((obj or {}).get("population" if "username" in (obj or {}) else "name") or DEFAULT_POPULATION).strip() or DEFAULT_POPULATION
+
+
+def add_population(population, participants, new_secrets=False):
+    """Generate one named population and put it next to the others: only the participants of a
+    population with the same name are replaced (keeping their password or link, unless
+    `new_secrets`). Returns (all participants, role counts)."""
+    name = population_name(population)
+    same = [p for p in participants or [] if population_name(p) == name]
+    others = [p for p in participants or [] if population_name(p) != name]
+    parts, counts = generate(population, None if new_secrets else same)
+    taken = {p["username"]: population_name(p) for p in others}
+    clash = [p["username"] for p in parts if p["username"] in taken]
+    if clash:
+        raise ValueError(f"{clash[0]} is already in the population '{taken[clash[0]]}': choose another prefix")
+    return others + parts, counts
+
+
 def generate(population, existing=None):
     """Participants for a population spec; keeps the password or link (and note) of existing usernames."""
     size = int(population.get("size") or 0)
@@ -90,6 +111,7 @@ def generate(population, existing=None):
                   {"password": prev.get("password") or password(rng, population.get("password_words", 2))})
         flow = population.get("flow") or prev.get("flow")
         out.append({"username": name, **secret, "role": role, **({"flow": flow} if flow else {}),
+                    **({"population": population_name(population)} if population.get("name") else {}),
                     **({"active": False} if prev.get("active") is False else {}),
                     **({"note": prev["note"]} if prev.get("note") else {})})
     return out, counts
@@ -110,6 +132,8 @@ def validate_study(st, roles):
             size = pop.get("size", 0)
             if not isinstance(size, int) or size < 0 or size > 10000:
                 errs.append("study.population.size: a whole number from 0 to 10000")
+            if not isinstance(pop.get("name", ""), str) or len(pop.get("name") or "") > 60:
+                errs.append("study.population.name: text of at most 60 characters")
             if pop.get("flow") not in (None, "guided", "free"):
                 errs.append("study.population.flow: \"guided\" or \"free\"")
             if pop.get("access", "password") not in ("password", "link"):
@@ -148,6 +172,8 @@ def validate_study(st, roles):
         seen.add(u)
         if p.get("flow") not in (None, "guided", "free"):
             errs.append(f"study.participants[{i}] ({u}): flow must be \"guided\" or \"free\"")
+        if not isinstance(p.get("population", ""), str) or len(p.get("population") or "") > 60:
+            errs.append(f"study.participants[{i}] ({u}): population must be text of at most 60 characters")
         pw, link = p.get("password"), p.get("link")
         if link is not None:
             if not isinstance(link, str) or len(link) < 16:

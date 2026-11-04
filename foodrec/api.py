@@ -33,7 +33,8 @@ from .appconfig import (ASSIGNMENT, FIELDS, REGISTRATION, ROOT, SECTIONS, AppCon
 from .config import load_settings
 from .export import export, to_json, to_zip
 from .model_spec import KINDS
-from .study import LINK_SESSION_SECONDS, admin_link_token, check_password, credential_fp, generate, validate_study
+from . import monitor
+from .study import LINK_SESSION_SECONDS, add_population, admin_link_token, check_password, credential_fp, validate_study
 
 BOOT_ID = uuid.uuid4().hex[:12]  # changes on every (re)start; the Config page waits for a new one
 from .features import breakdown, health_grade
@@ -716,7 +717,7 @@ def create_app(settings=None, llm=None):
             if over_limit(("population", me), 20, 3600):
                 raise HTTPException(429, "the demo allows 20 generated populations per hour")
             return core.demo_population(me, pop)
-        parts, counts = generate(pop, body.get("participants"))
+        parts, counts = add_population(pop, body.get("participants"))
         return {"participants": parts, "counts": counts}
 
     @api.post("/api/demo/links")
@@ -751,6 +752,21 @@ def create_app(settings=None, llm=None):
         threading.Timer(0.5, w.restart).start()
         return {"restarting": True}
 
+    @api.get("/api/admin/monitor")
+    def admin_monitor(request: Request):
+        """The Monitor page: every population with its people and their activity."""
+        me = admin(request)
+        return monitor.overview(core, me if mode() == "demo" else None)
+
+    @api.get("/api/admin/monitor/users/{uid}")
+    def admin_monitor_user(request: Request, uid: str):
+        """One person's interactions and logs. In the demo: sample people and the visitor's own links."""
+        me = admin(request)
+        out = monitor.user_detail(core, uid, me if mode() == "demo" else None)
+        if out is None:
+            raise HTTPException(404, "unknown person")
+        return out
+
     @api.get("/api/admin/users")
     def admin_users(request: Request):
         me = admin(request)
@@ -774,7 +790,10 @@ def create_app(settings=None, llm=None):
         me = admin(request)
         ids = users.split(",") if users else None
         if mode() == "demo":
-            ids = [me]  # a demo visitor exports only their own data
+            # a demo visitor exports only their own data and that of the people behind their links
+            own = [me] + [x["user_id"] for x in core.store.demo_links(me) if core.store.user_created(x["user_id"])]
+            # (never an empty list: to export() that means every user on the server)
+            ids = [u for u in ids or own if u in own] or [me]
         doc = export(core, ids, include_raw=raw)
         return _download(doc, format, export_stem([u["user_id"] for u in doc["users"]] if ids else None))
 

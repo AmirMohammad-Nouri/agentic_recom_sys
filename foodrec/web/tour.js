@@ -1,22 +1,24 @@
-// Guided tour: hint bubbles that point at parts of the app (steps in tour.json). It starts by
-// itself at each user's first login (after onboarding), and from the account menu at any time.
-// Back / Next / Skip; the server remembers that the user closed it. The page stays usable.
-import { can, demoView, emit, h, state, track } from "./lib.js";
+// Guided tours: hint bubbles that point at parts of the app (steps in tour.json), one tour for
+// users and one for administrators. Each starts by itself the first time a person is on that side,
+// and from the account menu at any time. Back / Next / Skip; the server remembers that the person
+// closed it. The page stays usable.
+import { can, emit, h, state, track } from "./lib.js";
 
-let steps = null;
+let tours = null;
+let side = "user";
 let current = -1;
 let bubble = null;
 let marked = null;
 
 async function load() {
-  if (!steps) {
+  if (!tours) {
     const res = await fetch("/static/tour.json");
-    steps = (await res.json()).steps || [];
+    tours = await res.json();
   }
-  const view = state.system?.mode === "demo" ? demoView() : null;
+  const demo = state.system?.mode === "demo";
   const cycle = !!state.user_state?.cycle?.enabled;
-  return steps.filter((s) => (!s.views || (view && s.views.includes(view))) && (s.cycle === undefined || s.cycle === cycle) &&
-    (!s.feature || can(s.feature)));
+  return (tours[side] || []).filter((s) => (s.demo === undefined || s.demo === demo) && (s.cycle === undefined || s.cycle === cycle) &&
+    (!s.feature || can(s.feature)) && !(s.needs_people && state.monitorEmpty));
 }
 
 function waitFor(selector, ms = 5000) {
@@ -41,9 +43,10 @@ function close(result) {
   bubble?.remove();
   bubble = null;
   current = -1;
-  if (result && state.user_state && !state.user_state.tour_seen) {
-    state.user_state.tour_seen = true;
-    track("tour_closed", { result });
+  const key = side === "admin" ? "tour_seen_admin" : "tour_seen";
+  if (result && state.user_state && !state.user_state[key]) {
+    state.user_state[key] = true;
+    track("tour_closed", { result, side });
   }
 }
 
@@ -59,7 +62,7 @@ function place(el) {
   if (r.height > window.innerHeight / 2) {  // a tall panel (the assistant): put the hint beside it
     const left = r.left > w + 2 * pad ? r.left - w - pad : Math.min(r.right + pad, window.innerWidth - w - pad);
     bubble.style.left = `${Math.max(pad, left)}px`;
-    bubble.style.top = `${window.scrollY + Math.max(pad, r.top + 40)}px`;
+    bubble.style.top = `${window.scrollY + Math.max(pad, Math.min(r.top + 40, window.innerHeight - hgt - pad))}px`;
     bubble.dataset.arrow = "none";
     return;
   }
@@ -77,14 +80,28 @@ async function show(list, i, dir = 1) {
   current = i;
   const s = list[i];
   clearMark();
-  if (s.page && (location.hash.replace("#/", "") || "discover") !== s.page) location.hash = `#/${s.page}`;
+  const here = location.hash.replace("#/", "") || (side === "user" ? "discover" : "");
+  if (s.page && here !== s.page) {
+    location.hash = `#/${s.page}`;
+    await new Promise((r) => setTimeout(r, 450));  // the new page replaces what is on screen
+    if (current !== i) return;
+  }
   if (s.open === "dock") emit("open_dock");
+  for (const sel of s.click || []) {  // e.g. open a person, then one of the tabs of their record
+    const target = await waitFor(sel);
+    if (current !== i) return;
+    if (!target) return show(list, i + dir, dir);
+    target.click();
+  }
   let el = null;
   if (s.target) {
     el = await waitFor(s.target);
-    if (!el) return show(list, i + dir, dir);  // not on screen for this role: skip the step
     if (current !== i) return;                  // the user moved on meanwhile
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (!el) return show(list, i + dir, dir);   // not on screen for this role: skip the step
+    // a panel taller than the window: show its top straight away, so the hint stays put beside it
+    const tall = el.getBoundingClientRect().height > window.innerHeight / 2;
+    el.style.scrollMarginTop = tall ? "70px" : "";
+    el.scrollIntoView(tall ? { block: "start" } : { block: "center", behavior: "smooth" });
     el.classList.add("tour-target");
     marked = el;
   }
@@ -101,10 +118,11 @@ async function show(list, i, dir = 1) {
   setTimeout(() => bubble && place(el), el ? 350 : 0);  // after scrolling
 }
 
-/** Start the tour; `auto`: only if this user has not finished or skipped it yet. */
-export async function startTour({ auto = false } = {}) {
-  if (auto && state.user_state?.tour_seen) return;
+/** Start a tour; `auto`: only if this person has not finished or skipped this side's tour yet. */
+export async function startTour({ auto = false, side: which = "user" } = {}) {
+  if (auto && state.user_state?.[which === "admin" ? "tour_seen_admin" : "tour_seen"]) return;
   if (bubble) return;
+  side = which;
   const list = await load();
   if (list.length) show(list, 0);
 }

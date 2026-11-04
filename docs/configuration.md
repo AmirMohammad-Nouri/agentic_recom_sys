@@ -2,7 +2,7 @@
 
 Everything that controls how FoodRec runs lives in one JSON file, **`foodrec.config.json`** in the
 repository root: the language model, the dataset, the criteria users weigh, the feedback options,
-access roles and the study population. The **Config page** (`/config`, a separate page from the app)
+access roles and the study population. The **Config page** (part of the administrator's page, `/config`, separate from the app)
 edits the same file, and every setting on the page is a key in the file. Use another file with
 `foodrec --config path/to/study.json serve` or `FOODREC_CONFIG=...`.
 
@@ -42,8 +42,8 @@ says so before loading anything; pick another port with `--port` or `server.port
 opens the browser at `/config`; if not, it starts the app and opens the page when it is ready
 (`--no-browser` prints the link only). The link carries this installation's admin token
 (`data/runtime/.admin_session`, readable only by you), so the page opens as administrator without
-choosing a user. In the app, only the administrator sees **Config** in the account menu. **Open the app** (top right of the Config
-page) replaces the Config page with the app in the same tab. After a restart caused by a config change,
+choosing a user. An administrator who signs in at the app goes straight to this page, which has two parts,
+**Monitor** and **Config**, and nothing of the user side. **Sign out** is in the account menu. After a restart caused by a config change,
 the app comes back as a plain server and no extra tab is opened.
 
 The running app **watches the config file** (`server.auto_reload`, on by default). Whether a change comes

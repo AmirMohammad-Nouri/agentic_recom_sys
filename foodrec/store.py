@@ -214,6 +214,23 @@ class Store:
                  "assigned_role": r["role"], "assignment_method": r["method"], "assigned_at": r["assigned_at"],
                  "events": r["events"], "last_active": r["last_ts"]} for r in rows]
 
+    def activity_counts(self):
+        """Per user, for the Monitor page: reactions by type, chat turns, lists, open decisions, last message."""
+        out = {}
+        slot = lambda u: out.setdefault(u, {"reactions": {}, "chat_turns": 0, "lists": 0, "decisions_open": 0, "last": None})  # noqa: E731
+        with self._conn() as c:
+            for r in c.execute("SELECT user_id, payload_json FROM events WHERE type='feedback'"):
+                kinds = slot(r["user_id"])["reactions"]
+                kind = json.loads(r["payload_json"]).get("type")
+                kinds[kind] = kinds.get(kind, 0) + 1
+            for r in c.execute("SELECT user_id, COUNT(*) AS n, MAX(ts) AS last FROM messages WHERE role='user' GROUP BY user_id"):
+                slot(r["user_id"]).update(chat_turns=r["n"], last=r["last"])
+            for r in c.execute("SELECT user_id, COUNT(*) AS n FROM requests WHERE origin IN ('ui','assistant','cycle') GROUP BY user_id"):
+                slot(r["user_id"])["lists"] = r["n"]
+            for r in c.execute("SELECT user_id, COUNT(*) AS n FROM decisions WHERE status='open' GROUP BY user_id"):
+                slot(r["user_id"])["decisions_open"] = r["n"]
+        return out
+
     def user_created(self, user_id):
         with self._conn() as c:
             r = c.execute("SELECT created_at FROM users WHERE user_id=?", (user_id,)).fetchone()

@@ -1,9 +1,11 @@
 """server.mode: local (everyone signs in, one administrator account), demo (public showcase
-with an admin/user view and a read-only Config page) and open (development and tests)."""
+with an admin/user view, sample data in Monitor and a read-only Config page) and open (development and tests)."""
 import json
 import os
 import subprocess
 import sys
+
+import pytest
 
 from conftest import FIXTURE, OfflineLLM
 from fastapi.testclient import TestClient
@@ -384,16 +386,12 @@ def test_demo_owner_can_deactivate_and_remove_a_link(tmp_path):
     assert c.get(f"/api/users/{uid}/state", headers=them).status_code == 403                # not a new visitor either
 
 
-def test_demo_user_view_is_guided_and_admin_view_is_free(tmp_path):
+def test_demo_user_view_is_guided(tmp_path):
     c = _cycle_client(tmp_path, mode="demo", enabled=False)
     h = {"X-User": VISITOR}
     c.post(f"/api/users/{VISITOR}/onboard", headers=h, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
     assert c.get(f"/api/users/{VISITOR}/state", headers=h).json()["cycle"]["enabled"]
     assert c.post(f"/api/users/{VISITOR}/cycle/next", headers=h).status_code == 400        # a reaction to every dish first
-    c.post("/api/demo/view", headers=h, json={"view": "admin"})
-    assert not c.get(f"/api/users/{VISITOR}/state", headers=h).json()["cycle"]["enabled"]
-    c.post("/api/demo/view", headers=h, json={"view": "user"})
-    assert c.get(f"/api/users/{VISITOR}/state", headers=h).json()["cycle"]["enabled"]
 
 
 def test_tour_is_remembered_per_user_not_per_browser(tmp_path):
@@ -404,3 +402,98 @@ def test_tour_is_remembered_per_user_not_per_browser(tmp_path):
     assert not seen("a") and not seen("b")
     assert c.post("/api/users/a/ui-events", headers={"X-User": "a"}, json={"kind": "tour_closed", "result": "skipped"}).status_code == 200
     assert seen("a") and not seen("b")
+
+
+# ---- the administrator's Monitor page ---------------------------------------------------------------------
+def test_monitor_groups_people_by_population_and_is_for_administrators(tmp_path):
+    parts = [{"username": "a1", "password": "maple-river-42", "role": "baseline", "population": "Pilot A"},
+             {"username": "b1", "password": "cedar-oak-11", "role": "full", "population": "Pilot B", "active": False},
+             {"username": "b2", "password": "cedar-oak-12", "role": "full", "population": "Pilot B"},
+             {"username": "c1", "password": "cedar-oak-13", "role": "full"}]
+    c, _ = _client(tmp_path, "local", participants=parts)
+    admin, a1 = _login(c, "admin", "admin-pass-1"), _login(c, "a1", "maple-river-42")
+    assert c.get("/api/admin/monitor").status_code == 401
+    assert c.get("/api/admin/monitor", headers=a1).status_code == 403
+    assert c.get("/api/admin/monitor/users/a1", headers=a1).status_code == 403
+    c.post("/api/users/a1/onboard", headers=a1, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    res = c.post("/api/users/a1/recommend", headers=a1, json={}).json()
+    c.post("/api/users/a1/feedback", headers=a1, json={"request_id": res["request_id"], "recipe_id": res["results"][0]["recipe_id"], "type": "like"})
+    c.get("/api/users/admin/state", headers=admin)
+    data = c.get("/api/admin/monitor", headers=admin).json()
+    assert not data["has_sample"]
+    pops = {p["name"]: p for p in data["populations"]}
+    assert set(pops) == {"Main population", "Pilot A", "Pilot B"}                 # administrators are not listed
+    a = pops["Pilot A"]
+    assert a["size"] == 1 and a["started"] == 1 and a["reactions"] == {"like": 1}
+    assert a["people"][0]["state"] == "in_progress"
+    assert {p["label"]: p["state"] for p in pops["Pilot B"]["people"]} == {"b1": "deactivated", "b2": "invited"}
+    text = json.dumps(data)
+    assert "maple-river-42" not in text and "password" not in text
+    d = c.get("/api/admin/monitor/users/a1", headers=admin).json()
+    assert d["interactions"][0]["type"] == "like" and d["interactions"][0]["title"]
+    assert any(x["kind"] == "recommendation" for x in d["log"]) and "maple-river-42" not in json.dumps(d)
+    assert c.get("/api/admin/monitor/users/b2", headers=admin).json()["interactions"] == []
+    assert c.get("/api/admin/monitor/users/admin", headers=admin).status_code == 404
+    assert c.get("/api/admin/monitor/users/nobody", headers=admin).status_code == 404
+
+
+def test_demo_monitor_has_labelled_samples_and_only_this_visitors_links(tmp_path):
+    c, _ = _client(tmp_path, "demo")
+    h = {"X-User": VISITOR}
+    assert c.get("/api/admin/monitor", headers=h).status_code == 403                  # user view
+    c.post("/api/demo/view", headers=h, json={"view": "admin"})
+    data = c.get("/api/admin/monitor", headers=h).json()
+    assert data["has_sample"] and len(data["populations"]) == 3 and all(p["sample"] for p in data["populations"])
+    assert data == c.get("/api/admin/monitor", headers=h).json()                      # the same every time
+    states = {x["state"] for p in data["populations"] for x in p["people"]}
+    assert states == {"invited", "started", "in_progress", "finished", "deactivated"}
+    first = data["populations"][0]["people"][0]
+    assert first["state"] == "finished"                                               # the tour opens this person
+    d = c.get(f"/api/admin/monitor/users/{first['user_id']}", headers=h).json()
+    assert d["sample"] and len(d["interactions"]) == first["reactions_total"] == first["cycle"]["total"]
+    assert d["log"] and d["log"][0]["ts"] >= d["log"][-1]["ts"]                       # newest first
+    assert c.get("/api/admin/monitor/users/sample-a01", headers={"X-User": "visitor-ffffffffffff"}).status_code == 403
+    # samples are not stored, and links appear as real data for their owner alone
+    assert not [u for u in json.loads(c.get("/api/export", headers=h).text)["users"] if u["user_id"].startswith("sample-")]
+    made = c.post("/api/config/population", headers=h, json={"population": {"size": 2, "prefix": "q", "digits": 2, "roles": {"full": 100}}}).json()
+    them = c.post("/api/join", json={"token": made["participants"][0]["link"]}).json()["user_id"]
+    tv = {"X-User": them}
+    c.post(f"/api/users/{them}/onboard", headers=tv, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    pops = {p["name"]: p for p in c.get("/api/admin/monitor", headers=h).json()["populations"]}
+    mine = pops["Your links"]
+    assert not mine["sample"] and mine["size"] == 2 and mine["started"] == 1
+    assert c.get(f"/api/admin/monitor/users/{them}", headers=h).status_code == 200
+    assert [u["user_id"] for u in json.loads(c.get(f"/api/export?users={them}", headers=h).text)["users"]] == [them]
+    other = {"X-User": "visitor-ffffffffffff"}
+    c.post("/api/demo/view", headers=other, json={"view": "admin"})
+    assert "Your links" not in {p["name"] for p in c.get("/api/admin/monitor", headers=other).json()["populations"]}
+    assert c.get(f"/api/admin/monitor/users/{them}", headers=other).status_code == 404
+    # asking for someone else's data never widens the export
+    assert [u["user_id"] for u in json.loads(c.get(f"/api/export?users={them}", headers=other).text)["users"]] == ["visitor-ffffffffffff"]
+
+
+def test_populations_are_generated_side_by_side(tmp_path):
+    from foodrec.study import add_population
+    a, _ = add_population({"name": "Pilot A", "size": 2, "prefix": "a", "digits": 2, "roles": {"full": 100}}, [])
+    both, _ = add_population({"name": "Pilot B", "size": 2, "prefix": "b", "digits": 2, "roles": {"baseline": 100}}, a)
+    assert [(p["username"], p["population"]) for p in both] == [("a01", "Pilot A"), ("a02", "Pilot A"), ("b01", "Pilot B"), ("b02", "Pilot B")]
+    again, _ = add_population({"name": "Pilot B", "size": 1, "prefix": "b", "digits": 2, "roles": {"baseline": 100}}, both)
+    assert [p["username"] for p in again] == ["a01", "a02", "b01"]
+    assert next(p for p in again if p["username"] == "b01")["password"] == next(p for p in both if p["username"] == "b01")["password"]
+    with pytest.raises(ValueError, match="choose another prefix"):
+        add_population({"name": "Pilot C", "size": 1, "prefix": "a", "digits": 2, "roles": {"full": 100}}, both)
+    # participants without a name stay together, as before
+    plain, _ = add_population({"size": 1, "prefix": "z", "roles": {"full": 100}}, [{"username": "old", "password": "maple-1", "role": "full"}])
+    assert [p["username"] for p in plain] == ["z01"]
+
+
+def test_each_side_has_its_own_tour(tmp_path):
+    c = _cycle_client(tmp_path)
+    h = {"X-User": "a"}
+    c.post("/api/users/a/onboard", headers=h, json={"declared": {}, "weights": {"h": .4, "s": .3, "t": .3}})
+    seen = lambda: (lambda s: (s["tour_seen"], s["tour_seen_admin"]))(c.get("/api/users/a/state", headers=h).json())  # noqa: E731
+    assert seen() == (False, False)
+    c.post("/api/users/a/ui-events", headers=h, json={"kind": "tour_closed", "result": "done", "side": "admin"})
+    assert seen() == (False, True)
+    c.post("/api/users/a/ui-events", headers=h, json={"kind": "tour_closed", "result": "done"})
+    assert seen() == (True, True)
