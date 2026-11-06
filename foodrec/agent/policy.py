@@ -14,7 +14,7 @@ The policy never edits a saved goal or a mandatory constraint. Its outputs are d
 (proposals and questions) that wait for the user. Every question and proposal lets the user
 say how far the answer should reach:
     "update my preference"   lasting: recorded as evidence (question) or saved (proposal)
-    "only today"             today's lists are adjusted; the day's drift is rolled back
+    "only today"             today's lists are adjusted; nothing learned is erased
     "keep my goal"           the drift since the goal was saved is forgotten
 """
 from .. import INTERACTIONS, VALUE_CRITERIA, CRITERION_LABELS
@@ -219,6 +219,13 @@ def _resolve_conflict(app, user_id, trace, k, stated, vm, gap, result, n_events=
     result["decisions"].append(d)
 
 
+def _still_declared(app, user_id, kind, name):
+    """Is this liking still in the profile? A removed one is no longer the user's declaration, even though the learner
+    keeps its history."""
+    declared = (app.store.profile(user_id) or {}).get("declared", {})
+    return name in (declared.get("preferred_cuisines" if kind == "cuisine" else "liked_ingredients") or [])
+
+
 def _taste_conflicts(app, user_id, trace, lr, result):
     th = thresholds(app, user_id)
     open_topics = _open_topics(app, user_id)
@@ -227,7 +234,7 @@ def _taste_conflicts(app, user_id, trace, lr, result):
         kind, _, name = c.partition(":")
         if kind not in ("cuisine", "ingredient"):
             continue
-        declared = lr.taste.l0.get(c, 0) > 0
+        declared = lr.taste.l0.get(c, 0) > 0 and _still_declared(app, user_id, kind, name)
         if not declared or m >= th["taste_conflict_mean"] or n < th["taste_min_evidence"]:
             continue
         topic = f"concept:{c}"

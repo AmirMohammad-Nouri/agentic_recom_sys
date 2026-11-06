@@ -41,7 +41,7 @@ COLLECTIONS = {"saved": "save", "liked": "like", "cooked": "choose"}  # My dishe
 UI_EVENTS = ("page_view", "details_opened", "assistant_opened", "assistant_closed", "export_downloaded",
              "suggestion_clicked", "session_start", "tour_closed")
 LEARNER_EVENTS = ("profile_created", "profile_updated", "goal_saved", "proposal_accepted", "feedback",
-                  "profile_correction", "question_answered")
+                  "profile_correction", "question_answered", "cycle_day_started")
 FEEDBACK_TYPES = ("like", "save", "choose", "reject")
 # configured feedback reasons ("interactions" in foodrec.config.json, model_spec.py)
 REJECT_REASONS = tuple(r["id"] for r in INTERACTIONS["reject_reasons"])
@@ -299,6 +299,8 @@ class App:
                 day, mi = cur["day"], cur["meal_index"] + 1
                 if mi >= len(meals):
                     day, mi = day + 1, 0
+                    if day <= st["days"]:
+                        self._emit(user_id, "cycle_day_started", {"round": st["round"], "day": day})
                 if day <= st["days"]:
                     self._cycle_open_step(user_id, st["round"], day, mi, meals, r)
         return self.cycle_state(user_id)
@@ -311,6 +313,7 @@ class App:
         if not st["finished"]:
             raise ValueError("finish this cycle first")
         with self.lock:
+            self._emit(user_id, "cycle_day_started", {"round": st["round"] + 1, "day": 1})
             self._cycle_open_step(user_id, st["round"] + 1, 1, 0, st["meals"], st["recommendations"])
         return self.cycle_state(user_id)
 

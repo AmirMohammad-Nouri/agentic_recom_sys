@@ -32,9 +32,10 @@ Temporary vs lasting (the "scope" of a signal)
              Feedback and answers carry scope "lasting" (default) or "today". A "today" signal never
              touches either model; it only adds a same-day adjustment (temporary_effects): a small
              weight nudge, a replacement weight set, or hiding a recipe until the end of the day.
-             Answering "only today" also rolls the value model back to how it was at the start of
-             the day; "keep my goal" keeps the saved goal AND the observed weights, and marks the current gap
+             Answering "only today" erases nothing: what was learned stays and only today's lists are
+             adjusted. "Keep my goal" keeps the saved goal AND the observed weights, and marks the current gap
              as acknowledged so the supervisor only reacts to further drift.
+             "Today" ends at the next calendar day or, in a meal cycle, when the next day of the cycle starts.
 
 Recency      Choosing a recipe or rejecting it as "had it recently" stores WHEN it was eaten
              (recent[recipe_id] = ts). The engine applies a temporary repetition penalty that
@@ -169,16 +170,9 @@ class ValueModel:
         self.counts = {"choices": 0, "reasons": 0, "rejections": 0, "answers": 0, "goal_saves": 0}
         self.evidence = []          # last 40 updates, newest last
         self.ts = None              # timestamp of the event being applied (set by Learner)
-        self.day_start = {}         # day -> (observed, n) before the first update of that day
 
     def _apply(self, factors, kind, event_id, extra=None):
         before = dict(self.observed)
-        if self.ts is not None:
-            d = day_key(self.ts)
-            if d not in self.day_start:
-                self.day_start[d] = (dict(self.observed), self.n)
-                for old in sorted(self.day_start)[:-7]:
-                    del self.day_start[old]
         floor = self.p.get("floor", 0.0)
         o = {k: max(self.observed[k], floor) * math.exp(self.p["eta"] * factors.get(k, 0.0))
              for k in VALUE_CRITERIA}
@@ -245,21 +239,8 @@ class ValueModel:
         self.observed = {k: (self.observed[k] + self.stated[k]) / 2 for k in VALUE_CRITERIA}
         self.ack = None  # a new goal is a new baseline
         self.n = 0
-        self.day_start = {}
         self.counts["goal_saves"] += 1
         self._log("goal_saved", event_id, before, {"weights": {k: round(self.stated[k], 3) for k in VALUE_CRITERIA}})
-
-    def rollback_day(self, ts, event_id):
-        """Undo every update made on the day of `ts` ("that was only today")."""
-        snap = self.day_start.pop(day_key(ts), None)
-        if snap is None:
-            return False
-        before = dict(self.observed)
-        self.observed, self.n = dict(snap[0]), snap[1]
-        if self.ack and self.ack["n"] > self.n:
-            self.ack["n"] = self.n
-        self._log("rolled_back_today", event_id, before)
-        return True
 
     def keep_goal(self, event_id):
         """"Keep my goal": the saved goal stays and NOTHING learned is discarded. The current gap
@@ -380,9 +361,10 @@ class Learner:
         elif typ == "profile_updated":
             self._declare(pl["declared"], eid, only_new=True)
             why = "you updated your profile"
+        elif typ == "cycle_day_started":
+            self.temporary = []  # a new day of the meal cycle: "today" is over, even on the same calendar date
+            why = "a new day of the meal cycle started"
         elif typ == "question_answered" and pl.get("scope") == "today":
-            if self.values:
-                self.values.rollback_day(self._ts, eid)
             if pl.get("weights"):
                 self.temporary.append({"ts": self._ts, "type": "weights", "weights": dict(pl["weights"]),
                                        "event_id": eid})

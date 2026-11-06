@@ -72,7 +72,7 @@ labelled **unverified**: the verified steps are the agent's, the model's reasoni
 for transparency but never trusted.
 
 **Answers control what is learned.** Questions offer the two winners (lasting evidence),
-*Only today* (today's lists change, the day's drift is rolled back) and *Keep my goal* (the goal
+*Only today* (today's lists change and nothing learned is erased; today ends at the next day of a meal cycle) and *Keep my goal* (the goal
 stays, the learned weights are kept, and the gap seen at that moment counts as acknowledged: the
 supervisor measures later gaps from there and only asks again when the choices move further from the
 goal; moving back toward the goal never counts, while passing it in the other direction does). Proposals offer
