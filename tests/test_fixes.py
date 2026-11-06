@@ -246,7 +246,7 @@ def test_question_scopes_control_lasting_updates(onboarded):
                                             {"id": "keep_goal", "label": "Keep my goal", "scope": "keep_goal"}]},
         "policy")
     app.resolve_decision("u", d["decision_id"], "answer", "today")
-    assert vm.observed == pytest.approx(vm.stated)      # all of today's drift rolled back
+    assert vm.observed == pytest.approx(drifted)        # "only today" erases nothing that was learned
     assert app.store.goal("u")["version"] == 1
     for _ in range(2):
         res = app.recommend("u")
@@ -388,3 +388,124 @@ def test_hard_constraints_hold_after_rerank_and_goal_changes(onboarded):
     check(app.recommend("u"))
     assert all(v >= 0 for v in app.store.goal("u")["weights"].values())
     assert set(app.store.goal("u")["weights"]) == set(VALUE_CRITERIA)
+
+
+def _cycle(app, days=2):
+    app.s.cycle_enabled, app.s.cycle_meals, app.s.cycle_recommendations, app.s.cycle_days = True, "breakfast,lunch", 2, days
+
+
+def _finish_meal(app, uid="u"):
+    st = app.cycle_state(uid)
+    for r in st["result"]["results"]:
+        app.feedback(uid, st["result"]["request_id"], r["recipe_id"], "like")
+    return app.cycle_next(uid)
+
+
+def _only_today(app, uid="u"):
+    d = app.add_decision(uid, "tradeoff_question", "q", {
+        "topic": "criterion:t", "options": [{"id": "today", "label": "Only today", "scope": "today", "nudge": {"t": 0.1}}]},
+        "policy")
+    app.resolve_decision(uid, d["decision_id"], "answer", "today")
+
+
+def test_only_today_keeps_learning_and_counts(onboarded):
+    app = onboarded
+    for _ in range(3):
+        res = app.recommend("u")
+        r = min(res["results"], key=lambda x: x["n_ingredients"])
+        app.feedback("u", res["request_id"], r["recipe_id"], "choose", "easy")
+    vm = app.learner("u").values
+    observed, n = dict(vm.observed), vm.n
+    _only_today(app)
+    assert vm.observed == pytest.approx(observed) and vm.n == n
+    assert app.today_weights("u", app.store.goal("u")["weights"])[1]    # today's lists are still adjusted
+
+
+def test_only_today_ends_when_the_next_cycle_day_starts(onboarded):
+    app = onboarded
+    _cycle(app)
+    goal = app.store.goal("u")["weights"]
+    app.cycle_state("u")
+    _only_today(app)
+    assert app.today_weights("u", goal)[1]
+    st = _finish_meal(app)                       # breakfast to lunch: the same cycle day
+    assert st["day"] == 1 and app.today_weights("u", goal)[1]
+    st = _finish_meal(app)                       # lunch to the next day, on the same calendar date
+    assert st["day"] == 2 and app.today_weights("u", goal)[1] is None
+
+
+def test_new_cycle_day_is_replayable_from_the_event_log(onboarded):
+    from foodrec.learner import Learner
+    app = onboarded
+    _cycle(app)
+    app.cycle_state("u")
+    _only_today(app)
+    _finish_meal(app)
+    _finish_meal(app)
+    assert app.store.events("u", types=["cycle_day_started"])
+    app.learners.pop("u")
+    assert app.learner("u").temporary == []
+    assert isinstance(app.learner("u"), Learner)
+
+
+def test_only_today_still_lasts_all_day_without_cycles(onboarded):
+    app = onboarded
+    goal = app.store.goal("u")["weights"]
+    _only_today(app)
+    assert app.today_weights("u", goal)[1]
+    assert app.learner("u").temporary_effects(time.time() + 2 * 86400)["nudges"] == {}
+
+
+def test_a_today_reaction_does_not_teach_but_earlier_learning_stays(onboarded):
+    app = onboarded
+    res = app.recommend("u")
+    r = min(res["results"], key=lambda x: x["n_ingredients"])
+    app.feedback("u", res["request_id"], r["recipe_id"], "choose", "easy")
+    vm = app.learner("u").values
+    observed, n = dict(vm.observed), vm.n
+    res = app.recommend("u")
+    fast = max(res["results"], key=lambda x: x["n_ingredients"])
+    app.feedback("u", res["request_id"], fast["recipe_id"], "choose", "easy", scope="today")
+    assert vm.observed == pytest.approx(observed) and vm.n == n
+
+
+def _reject_all_with(app, concept, times=8):
+    from foodrec.agent.policy import review
+    from foodrec.agent.trace import Trace
+    raised = []
+    kind, _, name = concept.partition(":")
+    dishes = [r for r in app.catalogue.recipes if concept in app.catalogue.concepts(r)]
+    for i in range(times):
+        res = app.recommend("v")
+        app.feedback("v", res["request_id"], dishes[i % len(dishes)]["id"], "reject", "not_my_taste")
+        raised += [d for d in review(app, "v", Trace())["decisions"] if d["kind"] == "taste_question"]
+        for d in raised:
+            if app.store.decision(d["decision_id"])["status"] == "open":
+                return raised, d
+    return raised, None
+
+
+def test_removed_liking_is_not_asked_about_again(app):
+    from foodrec.agent.policy import review
+    from foodrec.agent.trace import Trace
+    concept = "cuisine:Italian"
+    app.onboard("v", {"preferred_cuisines": ["Italian"]}, {"h": .4, "s": .3, "t": .3})
+    _, d = _reject_all_with(app, concept)
+    assert d is not None and d["body"]["concept"] == concept
+    app.resolve_decision("v", d["decision_id"], "answer", "remove")
+    assert "Italian" not in app.store.profile("v")["declared"]["preferred_cuisines"]
+    dishes = [r for r in app.catalogue.recipes if concept in app.catalogue.concepts(r)]
+    again = []
+    for i in range(12):                     # well past the cool-down
+        res = app.recommend("v")
+        app.feedback("v", res["request_id"], dishes[i % len(dishes)]["id"], "reject", "not_my_taste")
+        again += [x for x in review(app, "v", Trace())["decisions"] if x["kind"] == "taste_question"]
+    assert again == []
+
+
+def test_liking_kept_in_the_profile_can_still_be_asked_about(app):
+    app.onboard("v", {"preferred_cuisines": ["Italian"]}, {"h": .4, "s": .3, "t": .3})
+    _, d = _reject_all_with(app, "cuisine:Italian")
+    assert d is not None
+    app.resolve_decision("v", d["decision_id"], "answer", "keep")
+    assert "Italian" in app.store.profile("v")["declared"]["preferred_cuisines"]
